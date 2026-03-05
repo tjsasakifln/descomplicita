@@ -10,7 +10,7 @@ export interface SavedSearch {
     ufs: string[];
     dataInicial: string;
     dataFinal: string;
-    searchMode: string;
+    searchMode: 'setor' | 'termos';
     setorId?: string;
     customTerms?: string[];
     termosBusca?: string;
