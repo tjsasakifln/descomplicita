@@ -15,9 +15,9 @@ from urllib3.util.retry import Retry
 from config import RetryConfig, DEFAULT_MODALIDADES
 from exceptions import PNCPAPIError
 
-# PNCP API supports up to 500 items per page (default 50)
-# Source: Manual das APIs de Consultas PNCP v1.0
-PNCP_PAGE_SIZE = 500
+# PNCP consulta API max page size is 50 (despite manual claiming 500)
+# Tested: 100/200/500 all return HTTP 400 "Tamanho de página inválido"
+PNCP_PAGE_SIZE = 50
 
 logger = logging.getLogger(__name__)
 
