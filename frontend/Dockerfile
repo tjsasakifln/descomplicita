@@ -58,9 +58,8 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
+# NOTE: Railway handles healthcheck via railway.toml (healthcheckPath = "/")
+# Do NOT add HEALTHCHECK instruction here - it conflicts with Railway's system
 
 # Start the application
 CMD ["node", "server.js"]
