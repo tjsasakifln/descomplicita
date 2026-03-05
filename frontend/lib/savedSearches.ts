@@ -13,6 +13,7 @@ export interface SavedSearch {
     searchMode: string;
     setorId?: string;
     customTerms?: string[];
+    termosBusca?: string;
   };
   createdAt: string;
   lastUsedAt: string;
