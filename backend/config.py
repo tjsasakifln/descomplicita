@@ -46,7 +46,7 @@ class RetryConfig:
     max_delay: float = 60.0  # seconds
     exponential_base: int = 2
     jitter: bool = True
-    timeout: int = 30  # seconds
+    timeout: int = 15  # seconds (reduced from 30s for faster retries)
 
     # HTTP status codes that should trigger retry
     retryable_status_codes: Tuple[int, ...] = field(
