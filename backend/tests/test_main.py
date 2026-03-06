@@ -1,8 +1,12 @@
 """Tests for FastAPI application structure and base endpoints."""
 
+import asyncio
+import time
 import pytest
+from unittest.mock import Mock, patch
+from io import BytesIO
 from fastapi.testclient import TestClient
-from main import app
+from main import app, _job_store, run_search_job
 
 
 @pytest.fixture
@@ -278,7 +282,14 @@ class TestErrorHandling:
 
 
 class TestBuscarEndpoint:
-    """Test POST /buscar endpoint - main orchestration pipeline."""
+    """Test POST /buscar endpoint - async job-based orchestration pipeline."""
+
+    @pytest.fixture(autouse=True)
+    def reset_job_store(self):
+        """Reset job store between tests."""
+        _job_store._jobs.clear()
+        yield
+        _job_store._jobs.clear()
 
     @pytest.fixture
     def valid_request(self):
@@ -303,11 +314,57 @@ class TestBuscarEndpoint:
             "linkSistemaOrigem": "https://pncp.gov.br/app/editais/123456789",
         }
 
+    @pytest.fixture
+    def run_sync(self, monkeypatch):
+        """Make background search jobs complete synchronously.
+
+        The Starlette TestClient runs requests on a background event-loop
+        thread.  asyncio.create_task schedules the background coroutine on
+        that loop, but loop.run_in_executor inside the coroutine contends
+        with the TestClient for the default thread-pool, causing deadlocks.
+
+        This fixture replaces run_search_job with a version that calls
+        loop.run_in_executor synchronously (returning resolved futures),
+        so the background task completes without needing the thread pool.
+        """
+        import main as main_module
+        original_run_search_job = main_module.run_search_job
+
+        async def _inline_run_search_job(job_id, request):
+            """Run search job with run_in_executor replaced by sync calls."""
+            loop = asyncio.get_event_loop()
+            original_rie = loop.run_in_executor
+
+            def _sync_run_in_executor(executor, func, *args):
+                """Run func synchronously, returning a completed future."""
+                fut = loop.create_future()
+                try:
+                    result = func(*args)
+                    fut.set_result(result)
+                except Exception as e:
+                    fut.set_exception(e)
+                return fut
+
+            loop.run_in_executor = _sync_run_in_executor
+            try:
+                await original_run_search_job(job_id, request)
+            finally:
+                loop.run_in_executor = original_rie
+
+        monkeypatch.setattr("main.run_search_job", _inline_run_search_job)
+
+    def _post_and_get_result(self, client, request):
+        """POST /buscar with run_sync fixture, then GET the result."""
+        resp = client.post("/buscar", json=request)
+        assert resp.status_code == 200
+        job_id = resp.json()["job_id"]
+        # With run_sync fixture, the job completes within the POST handler
+        result_resp = client.get(f"/buscar/{job_id}/result")
+        return result_resp
+
     def test_buscar_endpoint_exists(self, client):
         """POST /buscar endpoint should be defined."""
-        # Send empty POST to trigger validation error (not 404)
         response = client.post("/buscar", json={})
-        # Should get 422 (validation error) not 404 (endpoint doesn't exist)
         assert response.status_code == 422
 
     def test_buscar_validation_empty_ufs(self, client, valid_request):
@@ -330,33 +387,36 @@ class TestBuscarEndpoint:
         response = client.post("/buscar", json={"ufs": ["SP"]})
         assert response.status_code == 422
         data = response.json()
-        # Should have validation errors for missing fields
         assert "detail" in data
 
-    def test_buscar_success_response_structure(self, client, valid_request, mock_licitacao, monkeypatch):
-        """Successful request should return all required fields."""
-        from unittest.mock import Mock
+    def test_buscar_returns_job_id(self, client, valid_request, monkeypatch):
+        """POST /buscar should return 200 with job_id and status='queued'."""
+        mock_client_instance = Mock()
+        mock_client_instance.fetch_all.return_value = iter([])
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
 
-        # Mock PNCP client
+        response = client.post("/buscar", json=valid_request)
+        assert response.status_code == 200
+        data = response.json()
+        assert "job_id" in data
+        assert data["status"] == "queued"
+        assert len(data["job_id"]) == 36
+
+    def test_buscar_success_response_structure(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
+        """Completed job result should return all required fields."""
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
-        def mock_pncp_client():
-            return mock_client_instance
-
-        # Mock filter_batch to return the bid
         def mock_filter_batch(bids, **kwargs):
             return [bids[0]], {"total_rejeitados": 0}
 
-        # Mock create_excel to return a buffer
-        from io import BytesIO
         def mock_create_excel(bids):
-            buffer = BytesIO()
-            buffer.write(b"fake-excel-content")
-            buffer.seek(0)
-            return buffer
+            buf = BytesIO()
+            buf.write(b"fake-excel-content")
+            buf.seek(0)
+            return buf
 
-        # Mock gerar_resumo to return valid summary
         def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
@@ -366,28 +426,23 @@ class TestBuscarEndpoint:
                 destaques=["SP: R$ 150k"],
             )
 
-        # Apply mocks
-        monkeypatch.setattr("main._get_pncp_client", mock_pncp_client)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", mock_filter_batch)
         monkeypatch.setattr("main.create_excel", mock_create_excel)
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
 
-        response = client.post("/buscar", json=valid_request)
+        result_resp = self._post_and_get_result(client, valid_request)
+        assert result_resp.status_code == 200
+        data = result_resp.json()
 
-        assert response.status_code == 200
-        data = response.json()
-
-        # Verify all required fields
+        assert data["status"] == "completed"
         assert "resumo" in data
         assert "excel_base64" in data
         assert "total_raw" in data
         assert "total_filtrado" in data
 
-    def test_buscar_resumo_structure(self, client, valid_request, mock_licitacao, monkeypatch):
-        """Response should include valid resumo structure."""
-        from unittest.mock import Mock
-        from io import BytesIO
-
+    def test_buscar_resumo_structure(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
+        """Completed job result should include valid resumo structure."""
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
@@ -407,8 +462,8 @@ class TestBuscarEndpoint:
 
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
 
-        response = client.post("/buscar", json=valid_request)
-        data = response.json()
+        result_resp = self._post_and_get_result(client, valid_request)
+        data = result_resp.json()
 
         resumo = data["resumo"]
         assert "resumo_executivo" in resumo
@@ -417,11 +472,9 @@ class TestBuscarEndpoint:
         assert "destaques" in resumo
         assert "alerta_urgencia" in resumo
 
-    def test_buscar_excel_base64_valid(self, client, valid_request, mock_licitacao, monkeypatch):
+    def test_buscar_excel_base64_valid(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """Excel should be valid base64 string."""
         import base64
-        from unittest.mock import Mock
-        from io import BytesIO
 
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
@@ -442,19 +495,15 @@ class TestBuscarEndpoint:
 
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
 
-        response = client.post("/buscar", json=valid_request)
-        data = response.json()
+        result_resp = self._post_and_get_result(client, valid_request)
+        data = result_resp.json()
 
         excel_base64 = data["excel_base64"]
-        # Should be valid base64
         decoded = base64.b64decode(excel_base64)
         assert decoded == excel_content
 
-    def test_buscar_llm_fallback_on_error(self, client, valid_request, mock_licitacao, monkeypatch):
+    def test_buscar_llm_fallback_on_error(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """Should use fallback when LLM fails."""
-        from unittest.mock import Mock
-        from io import BytesIO
-
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
@@ -462,11 +511,9 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
-        # Mock gerar_resumo to raise exception
         def mock_gerar_resumo(bids, **kwargs):
             raise Exception("OpenAI API error")
 
-        # Mock fallback to return valid summary
         def mock_gerar_resumo_fallback(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
@@ -478,30 +525,29 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
         monkeypatch.setattr("main.gerar_resumo_fallback", mock_gerar_resumo_fallback)
 
-        response = client.post("/buscar", json=valid_request)
-        assert response.status_code == 200
-        # Should succeed with fallback
-        data = response.json()
+        result_resp = self._post_and_get_result(client, valid_request)
+        assert result_resp.status_code == 200
+        data = result_resp.json()
         assert data["resumo"]["resumo_executivo"] == "Fallback summary"
 
-    def test_buscar_pncp_api_error_502(self, client, valid_request, monkeypatch):
-        """PNCP API error should return 502."""
+    def test_buscar_pncp_api_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
+        """PNCP API error should result in a failed job."""
         from exceptions import PNCPAPIError
-        from unittest.mock import Mock
 
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.side_effect = PNCPAPIError("Connection timeout")
 
         monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
-        response = client.post("/buscar", json=valid_request)
-        assert response.status_code == 502
-        assert "PNCP" in response.json()["detail"]
+        result_resp = self._post_and_get_result(client, valid_request)
+        assert result_resp.status_code == 500
+        data = result_resp.json()
+        assert data["status"] == "failed"
+        assert "PNCP" in data["error"]
 
-    def test_buscar_rate_limit_error_503(self, client, valid_request, monkeypatch):
-        """PNCP rate limit error should return 503 with Retry-After."""
+    def test_buscar_rate_limit_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
+        """PNCP rate limit error should result in a failed job."""
         from exceptions import PNCPRateLimitError
-        from unittest.mock import Mock
 
         mock_client_instance = Mock()
         error = PNCPRateLimitError("Rate limit exceeded")
@@ -510,60 +556,42 @@ class TestBuscarEndpoint:
 
         monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
-        response = client.post("/buscar", json=valid_request)
-        assert response.status_code == 503
-        assert "Retry-After" in response.headers
-        assert response.headers["Retry-After"] == "120"
+        result_resp = self._post_and_get_result(client, valid_request)
+        assert result_resp.status_code == 500
+        data = result_resp.json()
+        assert data["status"] == "failed"
+        assert "120" in data["error"] or "limitando" in data["error"]
 
-    def test_buscar_internal_error_500(self, client, valid_request, monkeypatch):
-        """Unexpected error should return 500 with sanitized message."""
-        from unittest.mock import Mock
-
+    def test_buscar_internal_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
+        """Unexpected error should result in a failed job with sanitized message."""
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.side_effect = RuntimeError("Internal bug with sensitive data")
 
         monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
-        response = client.post("/buscar", json=valid_request)
-        assert response.status_code == 500
-        # Should NOT expose internal error details
-        assert "Erro interno do servidor" in response.json()["detail"]
-        assert "sensitive data" not in response.json()["detail"]
+        result_resp = self._post_and_get_result(client, valid_request)
+        assert result_resp.status_code == 500
+        data = result_resp.json()
+        assert data["status"] == "failed"
+        assert "Erro interno" in data["error"]
+        assert "sensitive data" not in data["error"]
 
-    def test_buscar_empty_results(self, client, valid_request, monkeypatch):
+    def test_buscar_empty_results(self, client, valid_request, monkeypatch, run_sync):
         """Should handle empty results gracefully."""
-        from unittest.mock import Mock
-        from io import BytesIO
-
         mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([])  # Empty generator
+        mock_client_instance.fetch_all.return_value = iter([])
 
         monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
-        monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"empty-excel"))
 
-        def mock_gerar_resumo(bids, **kwargs):
-            from schemas import ResumoLicitacoes
-            return ResumoLicitacoes(
-                resumo_executivo="Nenhuma licitação encontrada",
-                total_oportunidades=0,
-                valor_total=0.0,
-            )
-
-        monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
-
-        response = client.post("/buscar", json=valid_request)
-        assert response.status_code == 200
-        data = response.json()
+        result_resp = self._post_and_get_result(client, valid_request)
+        assert result_resp.status_code == 200
+        data = result_resp.json()
         assert data["total_raw"] == 0
         assert data["total_filtrado"] == 0
 
-    def test_buscar_statistics_match(self, client, valid_request, mock_licitacao, monkeypatch):
+    def test_buscar_statistics_match(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """total_raw and total_filtrado should reflect actual counts."""
-        from unittest.mock import Mock
-        from io import BytesIO
-
-        # Mock 10 raw bids, 3 filtered
         mock_licitacoes_raw = [mock_licitacao.copy() for _ in range(10)]
         mock_licitacoes_filtradas = mock_licitacoes_raw[:3]
 
@@ -584,16 +612,13 @@ class TestBuscarEndpoint:
 
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
 
-        response = client.post("/buscar", json=valid_request)
-        data = response.json()
+        result_resp = self._post_and_get_result(client, valid_request)
+        data = result_resp.json()
         assert data["total_raw"] == 10
         assert data["total_filtrado"] == 3
 
-    def test_buscar_logs_pipeline_stages(self, client, valid_request, mock_licitacao, monkeypatch, caplog):
+    def test_buscar_logs_pipeline_stages(self, client, valid_request, mock_licitacao, monkeypatch, run_sync, caplog):
         """Should log each pipeline stage."""
-        from unittest.mock import Mock
-        from io import BytesIO
-
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
@@ -612,19 +637,279 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
 
         with caplog.at_level("INFO"):
-            _response = client.post("/buscar", json=valid_request)
+            self._post_and_get_result(client, valid_request)
 
-        # Verify key log messages
         log_messages = " ".join([record.message for record in caplog.records])
-        assert "Starting procurement search" in log_messages
+        assert "Search job created" in log_messages
         assert "Fetching bids from PNCP API" in log_messages
-        assert "Applying filters" in log_messages
+        assert "Filtering complete" in log_messages or "Applying filters" in log_messages
         assert "Generating LLM summary + Excel report in parallel" in log_messages
         assert "Search completed successfully" in log_messages
 
 
+class TestJobStatusEndpoint:
+    """Test GET /buscar/{job_id}/status endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def reset_job_store(self):
+        """Reset job store between tests."""
+        _job_store._jobs.clear()
+        yield
+        _job_store._jobs.clear()
+
+    def test_status_404_for_unknown_job(self, client):
+        """Status of unknown job should return 404."""
+        response = client.get("/buscar/nonexistent-job-id/status")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_status_returns_progress(self, client, monkeypatch):
+        """Status should return progress for a running job."""
+        from unittest.mock import Mock
+
+        mock_client_instance = Mock()
+        # Use a slow mock to ensure the job is still running when we check
+        def slow_fetch(*args, **kwargs):
+            import time as t
+            t.sleep(1)
+            return iter([])
+
+        mock_client_instance.fetch_all.side_effect = slow_fetch
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
+
+        request = {
+            "ufs": ["SP"],
+            "data_inicial": "2025-01-01",
+            "data_final": "2025-01-31",
+        }
+
+        resp = client.post("/buscar", json=request)
+        job_id = resp.json()["job_id"]
+
+        # Give a moment for the task to start
+        time.sleep(0.2)
+
+        status_resp = client.get(f"/buscar/{job_id}/status")
+        assert status_resp.status_code == 200
+        data = status_resp.json()
+        assert data["job_id"] == job_id
+        assert data["status"] in ("queued", "running")
+        assert "progress" in data
+        assert "elapsed_seconds" in data
+        assert "created_at" in data
+
+
+class TestJobResultEndpoint:
+    """Test GET /buscar/{job_id}/result endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def reset_job_store(self):
+        """Reset job store between tests."""
+        _job_store._jobs.clear()
+        yield
+        _job_store._jobs.clear()
+
+    @pytest.fixture
+    def run_sync(self, monkeypatch):
+        """Replace run_in_executor with synchronous calls to avoid deadlocks."""
+        import main as main_module
+        original_run_search_job = main_module.run_search_job
+
+        async def _inline_run_search_job(job_id, request):
+            loop = asyncio.get_event_loop()
+            original_rie = loop.run_in_executor
+
+            def _sync_rie(executor, func, *args):
+                fut = loop.create_future()
+                try:
+                    result = func(*args)
+                    fut.set_result(result)
+                except Exception as e:
+                    fut.set_exception(e)
+                return fut
+
+            loop.run_in_executor = _sync_rie
+            try:
+                await original_run_search_job(job_id, request)
+            finally:
+                loop.run_in_executor = original_rie
+
+        monkeypatch.setattr("main.run_search_job", _inline_run_search_job)
+
+    def test_result_404_for_unknown_job(self, client):
+        """Result of unknown job should return 404."""
+        response = client.get("/buscar/nonexistent-job-id/result")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_result_202_for_running_job(self, client, monkeypatch):
+        """Result of a running job should return 202."""
+        # Directly create a running job in the store to avoid deadlocks
+        from job_store import SearchJob
+        job = SearchJob(job_id="running-job", status="running")
+        _job_store._jobs["running-job"] = job
+
+        result_resp = client.get("/buscar/running-job/result")
+        assert result_resp.status_code == 202
+        data = result_resp.json()
+        assert data["status"] == "running"
+
+    def test_result_500_for_failed_job(self, client, monkeypatch):
+        """Result of a failed job should return 500 with error."""
+        # Directly create a failed job in the store
+        from job_store import SearchJob
+        job = SearchJob(
+            job_id="failed-job",
+            status="failed",
+            error="Something went wrong",
+            completed_at=time.time(),
+        )
+        _job_store._jobs["failed-job"] = job
+
+        result_resp = client.get("/buscar/failed-job/result")
+        assert result_resp.status_code == 500
+        data = result_resp.json()
+        assert data["status"] == "failed"
+        assert "error" in data
+
+    def test_result_completed_with_data(self, client, monkeypatch, run_sync):
+        """Result of a completed job should return 200 with full data."""
+        mock_licitacao = {
+            "codigoCompra": "123",
+            "objetoCompra": "Aquisição de uniformes escolares",
+            "nomeOrgao": "Prefeitura Test",
+            "uf": "SP",
+            "municipio": "São Paulo",
+            "valorTotalEstimado": 100000.00,
+            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "linkSistemaOrigem": "https://pncp.gov.br/test",
+        }
+
+        mock_client_instance = Mock()
+        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
+
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
+        monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel-data"))
+
+        def mock_gerar_resumo(bids, **kwargs):
+            from schemas import ResumoLicitacoes
+            return ResumoLicitacoes(
+                resumo_executivo="Found 1 bid",
+                total_oportunidades=1,
+                valor_total=100000.00,
+            )
+
+        monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
+
+        request = {
+            "ufs": ["SP"],
+            "data_inicial": "2025-01-01",
+            "data_final": "2025-01-31",
+        }
+
+        resp = client.post("/buscar", json=request)
+        job_id = resp.json()["job_id"]
+
+        # With run_sync, the background task completes within the POST
+        result_resp = client.get(f"/buscar/{job_id}/result")
+        assert result_resp.status_code == 200
+        data = result_resp.json()
+        assert data["status"] == "completed"
+        assert data["job_id"] == job_id
+        assert data["total_raw"] == 1
+        assert data["total_filtrado"] == 1
+        assert "resumo" in data
+        assert "excel_base64" in data
+        assert len(data["excel_base64"]) > 0
+
+
+class TestJobLifecycle:
+    """Test job lifecycle behaviors: capacity limits and cleanup."""
+
+    @pytest.fixture(autouse=True)
+    def reset_job_store(self):
+        """Reset job store between tests."""
+        _job_store._jobs.clear()
+        yield
+        _job_store._jobs.clear()
+
+    def test_429_when_too_many_jobs(self, client, monkeypatch):
+        """Should return 429 when job store is at capacity."""
+        from job_store import SearchJob
+
+        # Fill up the job store with fake active jobs
+        for i in range(_job_store.max_jobs):
+            job = SearchJob(job_id=f"fake-job-{i}", status="running")
+            _job_store._jobs[f"fake-job-{i}"] = job
+
+        request = {
+            "ufs": ["SP"],
+            "data_inicial": "2025-01-01",
+            "data_final": "2025-01-31",
+        }
+
+        response = client.post("/buscar", json=request)
+        assert response.status_code == 429
+        assert "simultâneas" in response.json()["detail"].lower() or "429" in str(response.status_code)
+
+    def test_job_cleanup(self, client, monkeypatch):
+        """Completed jobs with expired TTL should be cleaned up."""
+        from job_store import SearchJob
+
+        # Insert a completed job with created_at far in the past
+        old_job = SearchJob(
+            job_id="old-job",
+            status="completed",
+            created_at=time.time() - _job_store.ttl - 100,
+            completed_at=time.time() - _job_store.ttl - 100,
+            result={"test": True},
+        )
+        _job_store._jobs["old-job"] = old_job
+
+        # Verify the job exists
+        assert "old-job" in _job_store._jobs
+
+        # Trigger cleanup via a new POST (which calls cleanup_expired)
+        from unittest.mock import Mock
+        mock_client_instance = Mock()
+        mock_client_instance.fetch_all.return_value = iter([])
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
+
+        request = {
+            "ufs": ["SP"],
+            "data_inicial": "2025-01-01",
+            "data_final": "2025-01-31",
+        }
+        client.post("/buscar", json=request)
+
+        # The old job should have been cleaned up
+        assert "old-job" not in _job_store._jobs
+
+
 class TestBuscarIntegration:
     """Integration tests using real modules (not fully mocked)."""
+
+    @pytest.fixture(autouse=True)
+    def reset_job_store(self):
+        """Reset job store between tests."""
+        _job_store._jobs.clear()
+        yield
+        _job_store._jobs.clear()
+
+    def _wait_for_job(self, client, job_id, timeout=5):
+        """Poll job status until completed or failed."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            resp = client.get(f"/buscar/{job_id}/status")
+            if resp.status_code == 200:
+                data = resp.json()
+                if data["status"] in ("completed", "failed"):
+                    return data
+            time.sleep(0.1)
+        return None
 
     @pytest.mark.integration
     @pytest.mark.skip(reason="Filter correctly rejects bids with future deadlines (>7 days)")
@@ -639,7 +924,7 @@ class TestBuscarIntegration:
             "uf": "SP",
             "municipio": "São Paulo",
             "valorTotalEstimado": 200000.00,
-            "dataAberturaProposta": "2025-02-15T10:00:00",  # Future date > 7 days ahead
+            "dataAberturaProposta": "2025-02-15T10:00:00",
             "linkSistemaOrigem": "https://pncp.gov.br/test",
         }
 
@@ -648,7 +933,6 @@ class TestBuscarIntegration:
 
         monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
-        # Mock only LLM to avoid API calls
         def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
@@ -665,11 +949,14 @@ class TestBuscarIntegration:
             "data_final": "2025-01-31",
         }
 
-        response = client.post("/buscar", json=request)
-        assert response.status_code == 200
+        resp = client.post("/buscar", json=request)
+        assert resp.status_code == 200
+        job_id = resp.json()["job_id"]
+        self._wait_for_job(client, job_id)
 
-        data = response.json()
-        # Filter should pass the uniform keyword
+        result_resp = client.get(f"/buscar/{job_id}/result")
+        assert result_resp.status_code == 200
+
+        data = result_resp.json()
         assert data["total_filtrado"] >= 1
-        # Excel should be generated (non-empty base64)
         assert len(data["excel_base64"]) > 100

@@ -11,13 +11,28 @@ This API provides endpoints for:
 - Creating AI-powered executive summaries (GPT-4.1-nano)
 """
 
+import asyncio
 import base64
 import logging
 import os
+import time
+import uuid
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from config import setup_logging
-from schemas import BuscaRequest, BuscaResponse, FilterStats, ResumoLicitacoes
+from schemas import (
+    BuscaRequest,
+    BuscaResponse,
+    FilterStats,
+    ResumoLicitacoes,
+    JobCreatedResponse,
+    JobStatusResponse,
+    JobResultResponse,
+    JobProgress,
+)
+from job_store import JobStore, SearchJob
 from pncp_client import PNCPClient
 from exceptions import PNCPAPIError, PNCPRateLimitError
 from filter import filter_batch
@@ -134,6 +149,20 @@ def _get_pncp_client() -> PNCPClient:
     return _pncp_client
 
 
+# Global job store for async search jobs
+_job_store = JobStore()
+
+
+@app.on_event("startup")
+async def startup_cleanup_task():
+    """Launch periodic cleanup of expired jobs."""
+    async def _periodic_cleanup():
+        while True:
+            await asyncio.sleep(60)
+            await _job_store.cleanup_expired()
+    asyncio.create_task(_periodic_cleanup())
+
+
 @app.get("/setores")
 async def listar_setores():
     """Return available procurement sectors for frontend dropdown."""
@@ -190,114 +219,160 @@ async def debug_pncp_test():
         }
 
 
-@app.post("/buscar", response_model=BuscaResponse)
+# ---------------------------------------------------------------------------
+# Async job-based search (SP-001.3)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/buscar", response_model=JobCreatedResponse)
 async def buscar_licitacoes(request: BuscaRequest):
     """
-    Main search endpoint - orchestrates the complete pipeline.
+    Start an asynchronous procurement search job.
 
-    Workflow:
+    Creates a background job that executes the full search pipeline:
         1. Fetch bids from PNCP API (with automatic pagination)
         2. Apply sequential filters (UF, value, keywords, status)
         3. Generate executive summary via GPT-4.1-nano (with fallback)
         4. Create formatted Excel report
-        5. Return summary + base64-encoded Excel
+
+    Poll GET /buscar/{job_id}/status for progress.
+    Retrieve results from GET /buscar/{job_id}/result when completed.
 
     Args:
         request: BuscaRequest with ufs, data_inicial, data_final
 
     Returns:
-        BuscaResponse with resumo, excel_base64, total_raw, total_filtrado
+        JobCreatedResponse with job_id and status="queued"
 
     Raises:
-        HTTPException 502: PNCP API error (network, timeout, invalid response)
-        HTTPException 503: PNCP rate limit exceeded (retry after N seconds)
-        HTTPException 500: Internal server error (unexpected failure)
-
-    Example:
-        >>> request = BuscaRequest(
-        ...     ufs=["SP", "RJ"],
-        ...     data_inicial="2025-01-01",
-        ...     data_final="2025-01-31"
-        ... )
-        >>> response = await buscar_licitacoes(request)
-        >>> response.total_filtrado
-        15
+        HTTPException 429: Too many concurrent jobs
     """
+    # Run cleanup of expired jobs
+    await _job_store.cleanup_expired()
+
+    # Check capacity
+    if _job_store.is_full:
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas buscas simultâneas. Aguarde a conclusão de uma busca anterior.",
+        )
+
+    # Create job
+    job_id = str(uuid.uuid4())
+    await _job_store.create(job_id)
+
+    # Launch background task
+    asyncio.create_task(run_search_job(job_id, request))
+
     logger.info(
-        "Starting procurement search",
-        extra={
-            "ufs": request.ufs,
-            "data_inicial": request.data_inicial,
-            "data_final": request.data_final,
-            "setor_id": request.setor_id,
-        },
+        "Search job created",
+        extra={"job_id": job_id, "ufs": request.ufs},
     )
 
+    return JobCreatedResponse(job_id=job_id, status="queued")
+
+
+async def run_search_job(job_id: str, request: BuscaRequest) -> None:
+    """
+    Execute the full search pipeline as a background async task.
+
+    Mirrors the original synchronous POST /buscar logic but updates
+    job progress at each phase boundary and stores the result (or error)
+    in the job store.
+
+    Phases: fetching -> filtering -> summarizing -> generating_excel -> done
+    """
+    loop = asyncio.get_event_loop()
+
     try:
-        # Load sector configuration
+        # --- Validate sector ---
         try:
             sector = get_sector(request.setor_id)
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            await _job_store.fail(job_id, f"Setor inválido: {e}")
+            return
 
-        logger.info(f"Using sector: {sector.name} ({len(sector.keywords)} keywords)")
+        logger.info(
+            f"[job={job_id}] Using sector: {sector.name} "
+            f"({len(sector.keywords)} keywords)"
+        )
 
-        # Determine keywords: custom terms REPLACE sector keywords (mutually exclusive)
+        # Determine keywords: custom terms REPLACE sector keywords
         custom_terms: list[str] = []
         if request.termos_busca and request.termos_busca.strip():
-            custom_terms = [t.strip().lower() for t in request.termos_busca.strip().split() if t.strip()]
+            custom_terms = [
+                t.strip().lower()
+                for t in request.termos_busca.strip().split()
+                if t.strip()
+            ]
 
         if custom_terms:
             active_keywords = set(custom_terms)
-            logger.info(f"Using {len(custom_terms)} custom search terms: {custom_terms}")
+            logger.info(
+                f"[job={job_id}] Using {len(custom_terms)} custom search terms: "
+                f"{custom_terms}"
+            )
         else:
             active_keywords = set(sector.keywords)
-            logger.info(f"Using sector keywords ({len(active_keywords)} terms)")
-
-        # Step 1: Fetch from PNCP (generator → list for reusability in filter + LLM)
-        logger.info("Fetching bids from PNCP API")
-        client = _get_pncp_client()
-        licitacoes_raw = list(
-            client.fetch_all(
-                data_inicial=request.data_inicial,
-                data_final=request.data_final,
-                ufs=request.ufs,
+            logger.info(
+                f"[job={job_id}] Using sector keywords ({len(active_keywords)} terms)"
             )
-        )
-        logger.info(f"Fetched {len(licitacoes_raw)} raw bids from PNCP")
 
-        # Step 2: Apply filtering (fail-fast sequential: UF → value → keywords)
-        # Value range expanded to capture more opportunities:
-        # - R$ 10k min: Include smaller municipal contracts
-        # - R$ 10M max: Include larger state/federal contracts
-        # Reference: Investigation 2026-01-28 - docs/investigations/
-        logger.info("Applying filters to raw bids")
-        licitacoes_filtradas, stats = filter_batch(
-            licitacoes_raw,
-            ufs_selecionadas=set(request.ufs),
-            valor_min=10_000.0,   # Expanded from R$ 50k to capture more opportunities
-            valor_max=10_000_000.0,  # Expanded from R$ 5M to capture larger contracts
-            keywords=active_keywords,
-            exclusions=sector.exclusions if not custom_terms else set(),
-            keywords_a=sector.keywords_a if not custom_terms else None,
-            keywords_b=sector.keywords_b if not custom_terms else None,
-            keywords_c=sector.keywords_c if not custom_terms else None,
-            threshold=sector.threshold if not custom_terms else 0.6,
+        # --- Phase: fetching ---
+        await _job_store.update_progress(
+            job_id, phase="fetching", ufs_total=len(request.ufs)
         )
 
-        # Detailed logging for debugging and monitoring
+        logger.info(f"[job={job_id}] Fetching bids from PNCP API")
+        client = _get_pncp_client()
+
+        licitacoes_raw = await loop.run_in_executor(
+            None,
+            lambda: list(
+                client.fetch_all(
+                    data_inicial=request.data_inicial,
+                    data_final=request.data_final,
+                    ufs=request.ufs,
+                )
+            ),
+        )
+        logger.info(f"[job={job_id}] Fetched {len(licitacoes_raw)} raw bids from PNCP")
+
+        # --- Phase: filtering ---
+        await _job_store.update_progress(
+            job_id, phase="filtering", items_fetched=len(licitacoes_raw)
+        )
+
+        logger.info(f"[job={job_id}] Applying filters to raw bids")
+
+        licitacoes_filtradas, stats = await loop.run_in_executor(
+            None,
+            lambda: filter_batch(
+                licitacoes_raw,
+                ufs_selecionadas=set(request.ufs),
+                valor_min=10_000.0,
+                valor_max=10_000_000.0,
+                keywords=active_keywords,
+                exclusions=sector.exclusions if not custom_terms else set(),
+                keywords_a=sector.keywords_a if not custom_terms else None,
+                keywords_b=sector.keywords_b if not custom_terms else None,
+                keywords_c=sector.keywords_c if not custom_terms else None,
+                threshold=sector.threshold if not custom_terms else 0.6,
+            ),
+        )
+
         logger.info(
-            f"Filtering complete: {len(licitacoes_filtradas)}/{len(licitacoes_raw)} bids passed"
+            f"[job={job_id}] Filtering complete: "
+            f"{len(licitacoes_filtradas)}/{len(licitacoes_raw)} bids passed"
         )
-        # Use .get() with defaults for robustness (e.g., in tests with mocked stats)
         if stats:
-            logger.info(f"  - Total processadas: {stats.get('total', len(licitacoes_raw))}")
-            logger.info(f"  - Aprovadas: {stats.get('aprovadas', len(licitacoes_filtradas))}")
-            logger.info(f"  - Rejeitadas (UF): {stats.get('rejeitadas_uf', 0)}")
-            logger.info(f"  - Rejeitadas (Valor): {stats.get('rejeitadas_valor', 0)}")
-            logger.info(f"  - Rejeitadas (Keyword): {stats.get('rejeitadas_keyword', 0)}")
-            logger.info(f"  - Rejeitadas (Prazo): {stats.get('rejeitadas_prazo', 0)}")
-            logger.info(f"  - Rejeitadas (Outros): {stats.get('rejeitadas_outros', 0)}")
+            logger.info(f"[job={job_id}]   - Total processadas: {stats.get('total', len(licitacoes_raw))}")
+            logger.info(f"[job={job_id}]   - Aprovadas: {stats.get('aprovadas', len(licitacoes_filtradas))}")
+            logger.info(f"[job={job_id}]   - Rejeitadas (UF): {stats.get('rejeitadas_uf', 0)}")
+            logger.info(f"[job={job_id}]   - Rejeitadas (Valor): {stats.get('rejeitadas_valor', 0)}")
+            logger.info(f"[job={job_id}]   - Rejeitadas (Keyword): {stats.get('rejeitadas_keyword', 0)}")
+            logger.info(f"[job={job_id}]   - Rejeitadas (Prazo): {stats.get('rejeitadas_prazo', 0)}")
+            logger.info(f"[job={job_id}]   - Rejeitadas (Outros): {stats.get('rejeitadas_outros', 0)}")
 
         # Diagnostic: sample of keyword-rejected items for debugging
         if stats.get('rejeitadas_keyword', 0) > 0:
@@ -311,73 +386,83 @@ async def buscar_licitacoes(request: BuscaRequest):
                     if len(keyword_rejected_sample) >= 3:
                         break
             if keyword_rejected_sample:
-                logger.debug(f"  - Sample keyword-rejected objects: {keyword_rejected_sample}")
+                logger.debug(
+                    f"[job={job_id}]   - Sample keyword-rejected objects: "
+                    f"{keyword_rejected_sample}"
+                )
 
-        # Build filter stats for frontend
-        fs = FilterStats(
-            rejeitadas_uf=stats.get("rejeitadas_uf", 0),
-            rejeitadas_valor=stats.get("rejeitadas_valor", 0),
-            rejeitadas_keyword=stats.get("rejeitadas_keyword", 0),
-            rejeitadas_prazo=stats.get("rejeitadas_prazo", 0),
-            rejeitadas_outros=stats.get("rejeitadas_outros", 0),
+        # Build filter stats dict for result
+        fs = {
+            "rejeitadas_uf": stats.get("rejeitadas_uf", 0),
+            "rejeitadas_valor": stats.get("rejeitadas_valor", 0),
+            "rejeitadas_keyword": stats.get("rejeitadas_keyword", 0),
+            "rejeitadas_prazo": stats.get("rejeitadas_prazo", 0),
+            "rejeitadas_outros": stats.get("rejeitadas_outros", 0),
+        }
+
+        # --- Phase: summarizing ---
+        await _job_store.update_progress(
+            job_id, phase="summarizing", items_filtered=len(licitacoes_filtradas)
         )
 
         # Early return if no results passed filters — skip LLM and Excel
         if not licitacoes_filtradas:
-            logger.info("No bids passed filters — skipping LLM and Excel generation")
-            resumo = ResumoLicitacoes(
-                resumo_executivo=(
+            logger.info(
+                f"[job={job_id}] No bids passed filters — skipping LLM and Excel"
+            )
+            resumo_dict = {
+                "resumo_executivo": (
                     f"Nenhuma licitação de {sector.name.lower()} encontrada "
                     f"nos estados selecionados para o período informado."
                 ),
-                total_oportunidades=0,
-                valor_total=0.0,
-                destaques=[],
-                alerta_urgencia=None,
-            )
-            response = BuscaResponse(
-                resumo=resumo,
-                excel_base64="",
-                total_raw=len(licitacoes_raw),
-                total_filtrado=0,
-                filter_stats=fs,
-            )
+                "total_oportunidades": 0,
+                "valor_total": 0.0,
+                "destaques": [],
+                "alerta_urgencia": None,
+            }
+            result = {
+                "resumo": resumo_dict,
+                "excel_base64": "",
+                "total_raw": len(licitacoes_raw),
+                "total_filtrado": 0,
+                "filter_stats": fs,
+            }
+            await _job_store.complete(job_id, result)
             logger.info(
-                "Search completed with 0 results",
+                f"[job={job_id}] Search completed with 0 results",
                 extra={"total_raw": len(licitacoes_raw), "total_filtrado": 0},
             )
-            return response
+            return
 
         # Steps 3+4: Generate LLM summary and Excel report in parallel
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor as _TPE
-
         def _generate_resumo():
             try:
                 r = gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
-                logger.info("LLM summary generated successfully")
+                logger.info(f"[job={job_id}] LLM summary generated successfully")
                 return r
             except Exception as e:
                 logger.warning(
-                    f"LLM generation failed, using fallback mechanism: {e}",
+                    f"[job={job_id}] LLM generation failed, using fallback: {e}",
                     exc_info=True,
                 )
                 r = gerar_resumo_fallback(licitacoes_filtradas, sector_name=sector.name)
-                logger.info("Fallback summary generated successfully")
+                logger.info(f"[job={job_id}] Fallback summary generated successfully")
                 return r
 
         def _generate_excel():
             buf = create_excel(licitacoes_filtradas)
             b64 = base64.b64encode(buf.read()).decode("utf-8")
-            logger.info(f"Excel report generated ({len(b64)} base64 chars)")
+            logger.info(f"[job={job_id}] Excel report generated ({len(b64)} base64 chars)")
             return b64
 
-        logger.info("Generating LLM summary + Excel report in parallel")
-        loop = asyncio.get_event_loop()
-        with _TPE(max_workers=2) as pool:
-            resumo_future = loop.run_in_executor(pool, _generate_resumo)
-            excel_future = loop.run_in_executor(pool, _generate_excel)
-            resumo, excel_base64 = await asyncio.gather(resumo_future, excel_future)
+        logger.info(f"[job={job_id}] Generating LLM summary + Excel report in parallel")
+
+        # --- Phase: generating_excel (covers both LLM + Excel generation) ---
+        await _job_store.update_progress(job_id, phase="generating_excel")
+
+        resumo_future = loop.run_in_executor(None, _generate_resumo)
+        excel_future = loop.run_in_executor(None, _generate_excel)
+        resumo, excel_base64 = await asyncio.gather(resumo_future, excel_future)
 
         # CRITICAL: Override LLM-generated counts with actual computed values.
         actual_total = len(licitacoes_filtradas)
@@ -386,59 +471,101 @@ async def buscar_licitacoes(request: BuscaRequest):
         )
         if resumo.total_oportunidades != actual_total:
             logger.warning(
-                f"LLM returned total_oportunidades={resumo.total_oportunidades}, "
-                f"overriding with actual count={actual_total}"
+                f"[job={job_id}] LLM returned total_oportunidades="
+                f"{resumo.total_oportunidades}, overriding with actual={actual_total}"
             )
         resumo.total_oportunidades = actual_total
         resumo.valor_total = actual_valor
 
-        # Step 5: Return response
-        response = BuscaResponse(
-            resumo=resumo,
-            excel_base64=excel_base64,
-            total_raw=len(licitacoes_raw),
-            total_filtrado=len(licitacoes_filtradas),
-            filter_stats=fs,
-        )
+        # Convert Pydantic model to plain dict for serialization
+        resumo_dict = resumo.model_dump()
+
+        # --- Phase: done ---
+        result = {
+            "resumo": resumo_dict,
+            "excel_base64": excel_base64,
+            "total_raw": len(licitacoes_raw),
+            "total_filtrado": len(licitacoes_filtradas),
+            "filter_stats": fs,
+        }
+        await _job_store.complete(job_id, result)
 
         logger.info(
-            "Search completed successfully",
+            f"[job={job_id}] Search completed successfully",
             extra={
-                "total_raw": response.total_raw,
-                "total_filtrado": response.total_filtrado,
-                "valor_total": resumo.valor_total,
+                "total_raw": len(licitacoes_raw),
+                "total_filtrado": len(licitacoes_filtradas),
+                "valor_total": actual_valor,
             },
         )
 
-        return response
-
     except PNCPRateLimitError as e:
-        logger.error(f"PNCP rate limit exceeded: {e}", exc_info=True)
-        # Extract Retry-After header if available
-        retry_after = getattr(e, "retry_after", 60)  # Default 60s if not provided
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                f"O PNCP está limitando requisições. "
-                f"Aguarde {retry_after} segundos e tente novamente."
-            ),
-            headers={"Retry-After": str(retry_after)},
+        logger.error(f"[job={job_id}] PNCP rate limit exceeded: {e}", exc_info=True)
+        retry_after = getattr(e, "retry_after", 60)
+        await _job_store.fail(
+            job_id,
+            f"O PNCP está limitando requisições. "
+            f"Aguarde {retry_after} segundos e tente novamente.",
         )
 
     except PNCPAPIError as e:
-        logger.error(f"PNCP API error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                "O Portal Nacional de Contratações (PNCP) está temporariamente "
-                "indisponível ou retornou um erro. Tente novamente em alguns "
-                "instantes ou reduza o número de estados selecionados."
-            ),
+        logger.error(f"[job={job_id}] PNCP API error: {e}", exc_info=True)
+        await _job_store.fail(
+            job_id,
+            "O Portal Nacional de Contratações (PNCP) está temporariamente "
+            "indisponível ou retornou um erro. Tente novamente em alguns "
+            "instantes ou reduza o número de estados selecionados.",
         )
 
-    except Exception:
-        logger.exception("Internal server error during procurement search")
-        raise HTTPException(
+    except Exception as e:
+        logger.exception(f"[job={job_id}] Internal server error during search")
+        await _job_store.fail(
+            job_id,
+            "Erro interno do servidor. Tente novamente em alguns instantes.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Job polling endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/buscar/{job_id}/status", response_model=JobStatusResponse)
+async def job_status(job_id: str):
+    """Return current status and progress of a search job."""
+    job = await _job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    elapsed = time.time() - job.created_at
+    return JobStatusResponse(
+        job_id=job.job_id,
+        status=job.status,
+        progress=JobProgress(**job.progress),
+        created_at=datetime.fromtimestamp(job.created_at, tz=timezone.utc).isoformat(),
+        elapsed_seconds=round(elapsed, 1),
+    )
+
+
+@app.get("/buscar/{job_id}/result")
+async def job_result(job_id: str):
+    """Return the result of a completed (or failed) search job.
+
+    Returns HTTP 202 if the job is still in progress.
+    """
+    job = await _job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status == "completed":
+        return JSONResponse(content={"job_id": job_id, "status": "completed", **job.result})
+    elif job.status == "failed":
+        return JSONResponse(
+            content={"job_id": job_id, "status": "failed", "error": job.error},
             status_code=500,
-            detail="Erro interno do servidor. Tente novamente em alguns instantes.",
+        )
+    else:
+        return JSONResponse(
+            content={"job_id": job_id, "status": job.status},
+            status_code=202,
         )

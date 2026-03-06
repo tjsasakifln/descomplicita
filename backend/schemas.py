@@ -198,3 +198,48 @@ class BuscaResponse(BaseModel):
                 "total_filtrado": 15,
             }
         }
+
+
+# ---------------------------------------------------------------------------
+# Async job schemas (SP-001.3)
+# ---------------------------------------------------------------------------
+
+
+class JobCreatedResponse(BaseModel):
+    """Response returned when an async search job is created."""
+
+    job_id: str
+    status: str = "queued"
+
+
+class JobProgress(BaseModel):
+    """Progress information for a running search job."""
+
+    phase: str = "queued"
+    ufs_completed: int = 0
+    ufs_total: int = 0
+    items_fetched: int = 0
+    items_filtered: int = 0
+
+
+class JobStatusResponse(BaseModel):
+    """Polling response with current job status and progress."""
+
+    job_id: str
+    status: str
+    progress: JobProgress
+    created_at: str
+    elapsed_seconds: float
+
+
+class JobResultResponse(BaseModel):
+    """Final result of a completed (or failed) search job."""
+
+    job_id: str
+    status: str
+    resumo: Optional[ResumoLicitacoes] = None
+    excel_base64: Optional[str] = None
+    total_raw: Optional[int] = None
+    total_filtrado: Optional[int] = None
+    filter_stats: Optional[FilterStats] = None
+    error: Optional[str] = None
