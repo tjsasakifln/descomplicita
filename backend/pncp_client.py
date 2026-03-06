@@ -426,6 +426,7 @@ class PNCPClient:
         item["municipio"] = unidade.get("municipioNome", "")
         item["nomeOrgao"] = orgao.get("razaoSocial", "") or unidade.get("nomeUnidade", "")
         item["codigoCompra"] = item.get("numeroControlePNCP", "")
+        item["cnpj"] = orgao.get("cnpj", "")
 
         return item
 

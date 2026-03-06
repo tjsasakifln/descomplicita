@@ -130,8 +130,14 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
         ws.cell(row=row_idx, column=10, value=lic.get("situacaoCompraNome", ""))
 
         # K: Link (hyperlink)
+        # Format: https://pncp.gov.br/app/editais/{CNPJ}/{anoCompra}/{sequencialCompra}
+        cnpj = lic.get("cnpj", "")
+        ano = lic.get("anoCompra", "")
+        seq = lic.get("sequencialCompra", "")
         link = lic.get("linkPncp") or (
-            f"https://pncp.gov.br/app/editais/{lic.get('codigoCompra', '')}"
+            f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seq}"
+            if cnpj and ano and seq
+            else f"https://pncp.gov.br/app/editais?q={lic.get('codigoCompra', '')}"
         )
         link_cell = ws.cell(row=row_idx, column=11, value="Abrir")
         link_cell.hyperlink = link

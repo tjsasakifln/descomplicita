@@ -205,7 +205,24 @@ class TestCreateExcel:
         assert ws["I2"].value is None
 
     def test_create_excel_with_missing_link(self):
-        """Deve gerar link padrão se linkPncp não existir."""
+        """Deve gerar link padrão usando CNPJ/ano/sequencial se linkPncp não existir."""
+        licitacao = {
+            "codigoCompra": "83845701000159-1-000016/2026",
+            "cnpj": "83845701000159",
+            "anoCompra": 2026,
+            "sequencialCompra": 16,
+        }
+
+        buffer = create_excel([licitacao])
+
+        with open_workbook(buffer) as wb:
+            ws = wb["Licitações Uniformes"]
+
+        # Verificar link gerado com formato correto: /editais/{cnpj}/{ano}/{seq}
+        assert ws["K2"].hyperlink.target == "https://pncp.gov.br/app/editais/83845701000159/2026/16"
+
+    def test_create_excel_fallback_link_without_cnpj(self):
+        """Deve gerar link de busca se CNPJ/ano/sequencial não existirem."""
         licitacao = {"codigoCompra": "ABC123"}
 
         buffer = create_excel([licitacao])
@@ -213,8 +230,8 @@ class TestCreateExcel:
         with open_workbook(buffer) as wb:
             ws = wb["Licitações Uniformes"]
 
-        # Verificar link gerado automaticamente
-        assert ws["K2"].hyperlink.target == "https://pncp.gov.br/app/editais/ABC123"
+        # Fallback: search URL when structured fields are missing
+        assert ws["K2"].hyperlink.target == "https://pncp.gov.br/app/editais?q=ABC123"
 
     def test_create_excel_frozen_panes(self):
         """Deve congelar a primeira linha (headers)."""
