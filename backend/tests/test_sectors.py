@@ -14,7 +14,7 @@ class TestSectorConfig:
     def test_all_sectors_exist(self):
         sectors = list_sectors()
         ids = {s["id"] for s in sectors}
-        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos"}
+        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos", "hospitalar"}
 
     def test_get_sector_returns_config(self):
         s = get_sector("vestuario")
@@ -575,4 +575,242 @@ class TestAlimentosSector:
 
     def test_excludes_oleo_lubrificante(self):
         ok, _ = self._match("Aquisição de óleo lubrificante para máquinas")
+        assert ok is False
+
+
+class TestHospitalarSector:
+    """Tests for Equipamentos e Material Hospitalar sector."""
+
+    def _match(self, texto):
+        s = SECTORS["hospitalar"]
+        return match_keywords(texto, s.keywords, s.exclusions)
+
+    # --- True positives: equipamentos medicos ---
+
+    def test_matches_equipamento_medico(self):
+        ok, _ = self._match("AQUISIÇÃO DE EQUIPAMENTO MÉDICO PARA HOSPITAL REGIONAL")
+        assert ok is True
+
+    def test_matches_equipamento_hospitalar(self):
+        ok, _ = self._match("Registro de preços para aquisição de equipamentos hospitalares")
+        assert ok is True
+
+    def test_matches_aparelho_medico(self):
+        ok, _ = self._match("AQUISIÇÃO DE APARELHO MÉDICO PARA UPA")
+        assert ok is True
+
+    # --- True positives: diagnostico por imagem ---
+
+    def test_matches_raio_x(self):
+        ok, _ = self._match("AQUISIÇÃO DE APARELHO DE RAIO-X DIGITAL PARA HOSPITAL")
+        assert ok is True
+
+    def test_matches_ultrassom(self):
+        ok, _ = self._match("Registro de preços para aquisição de aparelho de ultrassom")
+        assert ok is True
+
+    def test_matches_tomografo(self):
+        ok, _ = self._match("AQUISIÇÃO DE TOMÓGRAFO COMPUTADORIZADO 64 CANAIS")
+        assert ok is True
+
+    def test_matches_ressonancia_magnetica(self):
+        ok, _ = self._match("Aquisição de aparelho de ressonância magnética 1.5T")
+        assert ok is True
+
+    # --- True positives: monitoramento e suporte a vida ---
+
+    def test_matches_desfibrilador(self):
+        ok, _ = self._match("AQUISIÇÃO DE DESFIBRILADOR EXTERNO AUTOMÁTICO")
+        assert ok is True
+
+    def test_matches_monitor_multiparametro(self):
+        ok, _ = self._match("Registro de preços para aquisição de monitor multiparâmetro")
+        assert ok is True
+
+    def test_matches_ventilador_pulmonar(self):
+        ok, _ = self._match("AQUISIÇÃO DE VENTILADOR PULMONAR PARA UTI")
+        assert ok is True
+
+    def test_matches_bomba_infusao(self):
+        ok, _ = self._match("Aquisição de bomba de infusão volumétrica")
+        assert ok is True
+
+    def test_matches_incubadora_neonatal(self):
+        ok, _ = self._match("AQUISIÇÃO DE INCUBADORA NEONATAL PARA MATERNIDADE")
+        assert ok is True
+
+    def test_matches_aparelho_anestesia(self):
+        ok, _ = self._match("Registro de preços para aquisição de aparelho de anestesia")
+        assert ok is True
+
+    # --- True positives: esterilizacao ---
+
+    def test_matches_autoclave(self):
+        ok, _ = self._match("AQUISIÇÃO DE AUTOCLAVE HOSPITALAR 100 LITROS")
+        assert ok is True
+
+    def test_matches_estufa_esterilizacao(self):
+        ok, _ = self._match("Aquisição de estufa de esterilização para CME")
+        assert ok is True
+
+    # --- True positives: laboratorio ---
+
+    def test_matches_microscopio(self):
+        ok, _ = self._match("AQUISIÇÃO DE MICROSCÓPIO BINOCULAR PARA LABORATÓRIO")
+        assert ok is True
+
+    def test_matches_centrifuga_laboratorial(self):
+        ok, _ = self._match("Registro de preços para aquisição de centrífuga laboratorial")
+        assert ok is True
+
+    def test_matches_eletrocardiografo(self):
+        ok, _ = self._match("AQUISIÇÃO DE ELETROCARDIÓGRAFO 12 CANAIS")
+        assert ok is True
+
+    # --- True positives: instrumentos de medicao ---
+
+    def test_matches_oximetro(self):
+        ok, _ = self._match("Aquisição de oxímetro de pulso portátil")
+        assert ok is True
+
+    def test_matches_esfigmomanometro(self):
+        ok, _ = self._match("AQUISIÇÃO DE ESFIGMOMANÔMETRO ANEROIDE")
+        assert ok is True
+
+    def test_matches_estetoscopio(self):
+        ok, _ = self._match("Registro de preços para aquisição de estetoscópio")
+        assert ok is True
+
+    # --- True positives: mobilidade hospitalar ---
+
+    def test_matches_cama_hospitalar(self):
+        ok, _ = self._match("AQUISIÇÃO DE CAMA HOSPITALAR ELÉTRICA COM GRADES")
+        assert ok is True
+
+    def test_matches_maca(self):
+        ok, _ = self._match("Aquisição de maca hospitalar com rodízios")
+        assert ok is True
+
+    def test_matches_cadeira_de_rodas(self):
+        ok, _ = self._match("AQUISIÇÃO DE CADEIRA DE RODAS DOBRÁVEL")
+        assert ok is True
+
+    def test_matches_muleta(self):
+        ok, _ = self._match("Registro de preços para aquisição de muletas e andadores")
+        assert ok is True
+
+    # --- True positives: orteses e proteses ---
+
+    def test_matches_opme(self):
+        ok, _ = self._match("AQUISIÇÃO DE MATERIAIS OPME PARA CIRURGIAS ORTOPÉDICAS")
+        assert ok is True
+
+    def test_matches_protese(self):
+        ok, _ = self._match("Registro de preços para aquisição de prótese de quadril")
+        assert ok is True
+
+    def test_matches_ortese(self):
+        ok, _ = self._match("AQUISIÇÃO DE ÓRTESES PARA REABILITAÇÃO")
+        assert ok is True
+
+    # --- True positives: centro cirurgico ---
+
+    def test_matches_mesa_cirurgica(self):
+        ok, _ = self._match("AQUISIÇÃO DE MESA CIRÚRGICA COM ACESSÓRIOS")
+        assert ok is True
+
+    def test_matches_foco_cirurgico(self):
+        ok, _ = self._match("Registro de preços para aquisição de foco cirúrgico LED")
+        assert ok is True
+
+    # --- True positives: odontologia ---
+
+    def test_matches_cadeira_odontologica(self):
+        ok, _ = self._match("AQUISIÇÃO DE CADEIRA ODONTOLÓGICA COMPLETA")
+        assert ok is True
+
+    def test_matches_compressor_odontologico(self):
+        ok, _ = self._match("Registro de preços para aquisição de compressor odontológico")
+        assert ok is True
+
+    def test_matches_fotopolimerizador(self):
+        ok, _ = self._match("AQUISIÇÃO DE FOTOPOLIMERIZADOR LED PARA CONSULTÓRIO")
+        assert ok is True
+
+    def test_matches_equipo_odontologico(self):
+        ok, _ = self._match("Aquisição de equipo odontológico com refletor")
+        assert ok is True
+
+    # --- True negatives (exclusions) ---
+
+    def test_excludes_equipamento_informatica(self):
+        """Exclusion: 'equipamento de informática' should not match."""
+        ok, _ = self._match("AQUISIÇÃO DE EQUIPAMENTO DE INFORMÁTICA PARA SECRETARIA")
+        assert ok is False
+
+    def test_excludes_monitor_video(self):
+        """Exclusion: 'monitor de vídeo' should not match via 'monitor'."""
+        ok, _ = self._match("Aquisição de monitor de vídeo 24 polegadas para escritório")
+        assert ok is False
+
+    def test_excludes_monitor_lcd(self):
+        """Exclusion: 'monitor LCD' should not match."""
+        ok, _ = self._match("AQUISIÇÃO DE MONITOR LCD PARA ESTAÇÃO DE TRABALHO")
+        assert ok is False
+
+    def test_excludes_mesa_escritorio(self):
+        """Exclusion: 'mesa de escritório' should not match via 'mesa'."""
+        ok, _ = self._match("Aquisição de mesa de escritório com gavetas")
+        assert ok is False
+
+    def test_excludes_mesa_reuniao(self):
+        """Exclusion: 'mesa de reunião' should not match."""
+        ok, _ = self._match("AQUISIÇÃO DE MESA DE REUNIÃO OVAL 12 LUGARES")
+        assert ok is False
+
+    def test_excludes_cadeira_escritorio(self):
+        """Exclusion: 'cadeira de escritório' should not match via 'cadeira'."""
+        ok, _ = self._match("Aquisição de cadeira de escritório ergonômica")
+        assert ok is False
+
+    def test_excludes_cadeira_giratoria(self):
+        """Exclusion: 'cadeira giratória' should not match."""
+        ok, _ = self._match("AQUISIÇÃO DE CADEIRA GIRATÓRIA COM BRAÇO")
+        assert ok is False
+
+    def test_excludes_respirador_epi(self):
+        """Exclusion: generic EPI respirator should not match."""
+        ok, _ = self._match("Aquisição de respirador descartável PFF2 para uso geral")
+        assert ok is False
+
+    def test_excludes_centrifuga_industrial(self):
+        """Exclusion: industrial centrifuge should not match."""
+        ok, _ = self._match("AQUISIÇÃO DE CENTRÍFUGA INDUSTRIAL PARA USINA")
+        assert ok is False
+
+    def test_excludes_centrifuga_acucar(self):
+        """Exclusion: sugar centrifuge should not match."""
+        ok, _ = self._match("Aquisição de centrífuga de açúcar para indústria alimentícia")
+        assert ok is False
+
+    def test_excludes_equipamento_escritorio(self):
+        """Exclusion: office equipment should not match."""
+        ok, _ = self._match("AQUISIÇÃO DE EQUIPAMENTO DE ESCRITÓRIO PARA ADMINISTRAÇÃO")
+        assert ok is False
+
+    # --- Cross-sector overlap: hospitalar vs saude ---
+
+    def test_no_false_match_medicamentos(self):
+        """Should NOT match pure medication procurement (saude sector)."""
+        ok, _ = self._match("AQUISIÇÃO DE MEDICAMENTOS PARA A REDE MUNICIPAL DE SAÚDE")
+        assert ok is False
+
+    def test_no_false_match_seringas(self):
+        """Should NOT match consumable supplies (saude sector)."""
+        ok, _ = self._match("AQUISIÇÃO DE SERINGAS E AGULHAS DESCARTÁVEIS")
+        assert ok is False
+
+    def test_no_false_match_soro(self):
+        """Should NOT match IV fluids (saude sector)."""
+        ok, _ = self._match("AQUISIÇÃO DE SORO FISIOLÓGICO 500ML")
         assert ok is False

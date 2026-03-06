@@ -571,6 +571,77 @@ SECTORS: Dict[str, SectorConfig] = {
             "arbitragem",
         },
     ),
+    "hospitalar": SectorConfig(
+        id="hospitalar",
+        name="Equipamentos e Material Hospitalar",
+        description="Equipamentos médicos, laboratoriais, odontológicos, mobiliário hospitalar",
+        keywords={
+            # Equipamentos medicos gerais
+            "equipamento medico", "equipamento médico",
+            "equipamento hospitalar", "equipamentos hospitalares",
+            "aparelho medico", "aparelho médico",
+            # Diagnostico por imagem
+            "raio-x", "raio x", "aparelho de raio-x",
+            "ultrassom", "ultrassonografia",
+            "tomografo", "tomógrafo", "tomografia",
+            "ressonancia magnetica", "ressonância magnética",
+            # Monitoramento e suporte a vida
+            "desfibrilador", "desfibriladores",
+            "monitor multiparametro", "monitor multiparâmetro",
+            "monitor cardiaco", "monitor cardíaco",
+            "ventilador pulmonar", "respirador mecanico", "respirador mecânico",
+            "bomba de infusao", "bomba de infusão",
+            "incubadora neonatal", "incubadora",
+            "aparelho de anestesia",
+            # Esterilizacao
+            "autoclave", "autoclaves",
+            "estufa hospitalar", "estufa de esterilizacao", "estufa de esterilização",
+            # Laboratorio
+            "microscopio", "microscópio",
+            "centrifuga laboratorial", "centrífuga laboratorial", "centrifuga", "centrífuga",
+            "eletrocardiografo", "eletrocardiógrafo", "ECG",
+            "eletroencefalografo", "eletroencefalógrafo",
+            # Instrumentos de medicao
+            "oximetro", "oxímetro",
+            "esfigmomanometro", "esfigmomanômetro",
+            "estetoscopio", "estetoscópio",
+            # Mobilidade e acessibilidade hospitalar
+            "cama hospitalar", "camas hospitalares",
+            "maca", "maca hospitalar",
+            "cadeira de rodas", "cadeiras de rodas",
+            "muleta", "muletas", "andador", "andadores",
+            # Orteses, proteses e materiais especiais
+            "ortese", "órtese", "orteses", "órteses",
+            "protese", "prótese", "proteses", "próteses",
+            "OPME",
+            # Centro cirurgico
+            "mesa cirurgica", "mesa cirúrgica",
+            "foco cirurgico", "foco cirúrgico",
+            "foco de luz cirurgico", "foco de luz cirúrgico",
+            # Odontologia
+            "cadeira odontologica", "cadeira odontológica",
+            "compressor odontologico", "compressor odontológico",
+            "fotopolimerizador",
+            "equipo odontologico", "equipo odontológico",
+        },
+        exclusions={
+            # Informatica (evitar confusao com "monitor")
+            "equipamento de informatica", "equipamento de informática",
+            "equipamento de escritorio", "equipamento de escritório",
+            "monitor de video", "monitor de vídeo",
+            "monitor LCD", "monitor LED",
+            # Mobiliario (evitar confusao com "mesa", "cadeira")
+            "mesa de escritorio", "mesa de escritório",
+            "mesa de reuniao", "mesa de reunião",
+            "cadeira de escritorio", "cadeira de escritório",
+            "cadeira giratoria", "cadeira giratória",
+            # Respirador como EPI generico
+            "respirador de EPI", "respirador descartavel", "respirador descartável",
+            # Centrifuga industrial
+            "centrifuga industrial", "centrífuga industrial",
+            "centrifuga de acucar", "centrífuga de açúcar",
+        },
+    ),
 }
 
 
