@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
 
     let response: Response;
     try {
-      // Timeout de 5 minutos — consultas com muitos estados podem demorar
+      // Timeout de 8 minutos — consultas com muitos estados podem demorar
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+      const timeout = setTimeout(() => controller.abort(), 8 * 60 * 1000);
 
       response = await fetch(`${backendUrl}/buscar`, {
         method: "POST",
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       const isTimeout = error instanceof DOMException && error.name === "AbortError";
       const message = isTimeout
-        ? "A consulta excedeu o tempo limite (5 min). Tente com menos estados ou um período menor."
+        ? "A consulta excedeu o tempo limite (8 min). Tente com menos estados ou um período menor."
         : `Backend indisponível em ${backendUrl}: ${error instanceof Error ? error.message : 'conexão recusada'}`;
       console.error(`Erro ao conectar com backend em ${backendUrl}:`, error);
       return NextResponse.json(

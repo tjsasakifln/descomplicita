@@ -5,6 +5,7 @@ import random
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any, Callable, Dict, Generator, List
 
@@ -20,6 +21,22 @@ from exceptions import PNCPAPIError
 PNCP_PAGE_SIZE = 50
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CacheEntry:
+    """A single cache entry with TTL support."""
+    data: list
+    created_at: float
+    ttl: float
+    last_accessed: float = 0.0
+
+    def __post_init__(self):
+        self.last_accessed = self.created_at
+
+    @property
+    def is_expired(self) -> bool:
+        return (time.time() - self.created_at) > self.ttl
 
 
 def calculate_delay(attempt: int, config: RetryConfig) -> float:
@@ -70,6 +87,72 @@ class PNCPClient:
         self._request_count = 0
         self._last_request_time = 0.0
         self._lock = threading.Lock()
+        # 429 rate limit monitoring
+        self._rate_limit_count = 0
+        self._total_fetch_count = 0
+        # Cache layer (SP-001.2)
+        self._cache: Dict[str, CacheEntry] = {}
+        self._cache_lock = threading.Lock()
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self.cache_ttl = 4 * 3600  # 4 hours
+        self.max_cache_entries = 500
+
+    @staticmethod
+    def _cache_key(uf: str | None, modalidade: int, data_inicial: str, data_final: str) -> str:
+        """Generate cache key from query parameters."""
+        return f"{uf or 'ALL'}:{modalidade}:{data_inicial}:{data_final}"
+
+    def _cache_get(self, key: str) -> list | None:
+        """Get data from cache if present and not expired (thread-safe)."""
+        with self._cache_lock:
+            entry = self._cache.get(key)
+            if entry is None:
+                self._cache_misses += 1
+                return None
+            if entry.is_expired:
+                del self._cache[key]
+                self._cache_misses += 1
+                return None
+            entry.last_accessed = time.time()
+            self._cache_hits += 1
+            return entry.data
+
+    def _cache_put(self, key: str, data: list) -> None:
+        """Store data in cache with LRU eviction (thread-safe)."""
+        with self._cache_lock:
+            # Evict expired entries first
+            now = time.time()
+            expired = [k for k, v in self._cache.items() if v.is_expired]
+            for k in expired:
+                del self._cache[k]
+            # LRU eviction if at capacity
+            while len(self._cache) >= self.max_cache_entries:
+                lru_key = min(self._cache, key=lambda k: self._cache[k].last_accessed)
+                del self._cache[lru_key]
+            self._cache[key] = CacheEntry(
+                data=data, created_at=now, ttl=self.cache_ttl
+            )
+
+    def cache_stats(self) -> Dict[str, Any]:
+        """Return cache statistics."""
+        with self._cache_lock:
+            total = self._cache_hits + self._cache_misses
+            return {
+                "entries": len(self._cache),
+                "hits": self._cache_hits,
+                "misses": self._cache_misses,
+                "hit_ratio": round(self._cache_hits / total, 3) if total > 0 else 0.0,
+            }
+
+    def cache_clear(self) -> int:
+        """Clear all cache entries. Returns number of entries removed."""
+        with self._cache_lock:
+            count = len(self._cache)
+            self._cache.clear()
+            self._cache_hits = 0
+            self._cache_misses = 0
+            return count
 
     def _create_session(self) -> requests.Session:
         """
@@ -181,8 +264,20 @@ class PNCPClient:
                     url, params=params, timeout=self.config.timeout
                 )
 
+                # Track total fetches for 429 monitoring
+                with self._lock:
+                    self._total_fetch_count += 1
+
                 # Handle rate limiting specifically
                 if response.status_code == 429:
+                    with self._lock:
+                        self._rate_limit_count += 1
+                        ratio = self._rate_limit_count / self._total_fetch_count
+                        if ratio > 0.20:
+                            logger.warning(
+                                f"High 429 rate: {self._rate_limit_count}/{self._total_fetch_count} "
+                                f"({ratio:.0%}) requests rate-limited"
+                            )
                     retry_after = int(response.headers.get("Retry-After", 60))
                     logger.warning(
                         f"Rate limited (429). Waiting {retry_after}s "
@@ -307,10 +402,20 @@ class PNCPClient:
         Used by ThreadPoolExecutor in fetch_all for parallel fetching.
         """
         label = f"modalidade={modalidade}, UF={uf or 'ALL'}"
+        cache_key = self._cache_key(uf, modalidade, data_inicial, data_final)
+
+        # Check cache first
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            logger.info(f"Cache hit for {uf or 'ALL'}:{modalidade} ({len(cached)} items)")
+            return cached
+
         logger.info(f"Fetching {label}")
         try:
             items = list(self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress))
             logger.info(f"Completed {label}: {len(items)} items")
+            # Store raw results in cache
+            self._cache_put(cache_key, items)
             return items
         except PNCPAPIError as e:
             logger.warning(f"Skipping {label}: {e}")
@@ -375,8 +480,8 @@ class PNCPClient:
             )
 
             # Parallel fetch: each UF×modalidade runs in its own thread
-            # Max 6 workers to avoid overwhelming the PNCP API
-            max_workers = min(len(tasks), 6)
+            # Max 12 workers for better throughput on multi-UF searches
+            max_workers = min(len(tasks), 12)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_task = {
                     executor.submit(

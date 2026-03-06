@@ -122,10 +122,37 @@ async def health():
     }
 
 
+# Shared PNCPClient instance for cache persistence across requests
+_pncp_client: PNCPClient | None = None
+
+
+def _get_pncp_client() -> PNCPClient:
+    """Get or create the shared PNCPClient instance."""
+    global _pncp_client
+    if _pncp_client is None:
+        _pncp_client = PNCPClient()
+    return _pncp_client
+
+
 @app.get("/setores")
 async def listar_setores():
     """Return available procurement sectors for frontend dropdown."""
     return {"setores": list_sectors()}
+
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Return cache statistics: entries, hits, misses, hit ratio."""
+    client = _get_pncp_client()
+    return client.cache_stats()
+
+
+@app.post("/cache/clear")
+async def cache_clear():
+    """Clear all cache entries manually (for debug/deploy)."""
+    client = _get_pncp_client()
+    removed = client.cache_clear()
+    return {"cleared": removed}
 
 
 @app.get("/debug/pncp-test")
@@ -136,7 +163,7 @@ async def debug_pncp_test():
 
     start = t.time()
     try:
-        client = PNCPClient()
+        client = _get_pncp_client()
         hoje = date.today()
         tres_dias = hoje - timedelta(days=3)
         response = client.fetch_page(
@@ -229,7 +256,7 @@ async def buscar_licitacoes(request: BuscaRequest):
 
         # Step 1: Fetch from PNCP (generator → list for reusability in filter + LLM)
         logger.info("Fetching bids from PNCP API")
-        client = PNCPClient()
+        client = _get_pncp_client()
         licitacoes_raw = list(
             client.fetch_all(
                 data_inicial=request.data_inicial,
@@ -321,22 +348,38 @@ async def buscar_licitacoes(request: BuscaRequest):
             )
             return response
 
-        # Step 3: Generate executive summary via LLM (with automatic fallback)
-        logger.info("Generating executive summary")
-        try:
-            resumo = gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
-            logger.info("LLM summary generated successfully")
-        except Exception as e:
-            logger.warning(
-                f"LLM generation failed, using fallback mechanism: {e}",
-                exc_info=True,
-            )
-            resumo = gerar_resumo_fallback(licitacoes_filtradas, sector_name=sector.name)
-            logger.info("Fallback summary generated successfully")
+        # Steps 3+4: Generate LLM summary and Excel report in parallel
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor as _TPE
+
+        def _generate_resumo():
+            try:
+                r = gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
+                logger.info("LLM summary generated successfully")
+                return r
+            except Exception as e:
+                logger.warning(
+                    f"LLM generation failed, using fallback mechanism: {e}",
+                    exc_info=True,
+                )
+                r = gerar_resumo_fallback(licitacoes_filtradas, sector_name=sector.name)
+                logger.info("Fallback summary generated successfully")
+                return r
+
+        def _generate_excel():
+            buf = create_excel(licitacoes_filtradas)
+            b64 = base64.b64encode(buf.read()).decode("utf-8")
+            logger.info(f"Excel report generated ({len(b64)} base64 chars)")
+            return b64
+
+        logger.info("Generating LLM summary + Excel report in parallel")
+        loop = asyncio.get_event_loop()
+        with _TPE(max_workers=2) as pool:
+            resumo_future = loop.run_in_executor(pool, _generate_resumo)
+            excel_future = loop.run_in_executor(pool, _generate_excel)
+            resumo, excel_base64 = await asyncio.gather(resumo_future, excel_future)
 
         # CRITICAL: Override LLM-generated counts with actual computed values.
-        # The LLM may hallucinate total_oportunidades (often returning 0),
-        # which causes the frontend to show "no results found".
         actual_total = len(licitacoes_filtradas)
         actual_valor = sum(
             lic.get("valorTotalEstimado", 0) or 0 for lic in licitacoes_filtradas
@@ -348,12 +391,6 @@ async def buscar_licitacoes(request: BuscaRequest):
             )
         resumo.total_oportunidades = actual_total
         resumo.valor_total = actual_valor
-
-        # Step 4: Generate Excel report
-        logger.info("Generating Excel report")
-        excel_buffer = create_excel(licitacoes_filtradas)
-        excel_base64 = base64.b64encode(excel_buffer.read()).decode("utf-8")
-        logger.info(f"Excel report generated ({len(excel_base64)} base64 chars)")
 
         # Step 5: Return response
         response = BuscaResponse(

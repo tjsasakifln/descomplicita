@@ -367,7 +367,7 @@ class TestBuscarEndpoint:
             )
 
         # Apply mocks
-        monkeypatch.setattr("main.PNCPClient", mock_pncp_client)
+        monkeypatch.setattr("main._get_pncp_client", mock_pncp_client)
         monkeypatch.setattr("main.filter_batch", mock_filter_batch)
         monkeypatch.setattr("main.create_excel", mock_create_excel)
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
@@ -391,7 +391,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -426,7 +426,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
 
         excel_content = b"PK\x03\x04fake-excel-header"
@@ -458,7 +458,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -492,7 +492,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.side_effect = PNCPAPIError("Connection timeout")
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
         response = client.post("/buscar", json=valid_request)
         assert response.status_code == 502
@@ -508,7 +508,7 @@ class TestBuscarEndpoint:
         error.retry_after = 120
         mock_client_instance.fetch_all.side_effect = error
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
         response = client.post("/buscar", json=valid_request)
         assert response.status_code == 503
@@ -522,7 +522,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.side_effect = RuntimeError("Internal bug with sensitive data")
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
         response = client.post("/buscar", json=valid_request)
         assert response.status_code == 500
@@ -538,7 +538,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([])  # Empty generator
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"empty-excel"))
 
@@ -570,7 +570,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter(mock_licitacoes_raw)
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (mock_licitacoes_filtradas, {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -597,7 +597,7 @@ class TestBuscarEndpoint:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -619,8 +619,7 @@ class TestBuscarEndpoint:
         assert "Starting procurement search" in log_messages
         assert "Fetching bids from PNCP API" in log_messages
         assert "Applying filters" in log_messages
-        assert "Generating executive summary" in log_messages
-        assert "Generating Excel report" in log_messages
+        assert "Generating LLM summary + Excel report in parallel" in log_messages
         assert "Search completed successfully" in log_messages
 
 
@@ -647,7 +646,7 @@ class TestBuscarIntegration:
         mock_client_instance = Mock()
         mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
 
-        monkeypatch.setattr("main.PNCPClient", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
         # Mock only LLM to avoid API calls
         def mock_gerar_resumo(bids, **kwargs):
