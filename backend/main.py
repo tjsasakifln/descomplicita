@@ -252,6 +252,10 @@ async def buscar_licitacoes(request: BuscaRequest):
             valor_max=10_000_000.0,  # Expanded from R$ 5M to capture larger contracts
             keywords=active_keywords,
             exclusions=sector.exclusions if not custom_terms else set(),
+            keywords_a=sector.keywords_a if not custom_terms else None,
+            keywords_b=sector.keywords_b if not custom_terms else None,
+            keywords_c=sector.keywords_c if not custom_terms else None,
+            threshold=sector.threshold if not custom_terms else 0.6,
         )
 
         # Detailed logging for debugging and monitoring
@@ -274,7 +278,7 @@ async def buscar_licitacoes(request: BuscaRequest):
             for lic in licitacoes_raw[:200]:
                 obj = lic.get("objetoCompra", "")
                 from filter import match_keywords, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO
-                matched, _ = match_keywords(obj, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+                matched, _, _score = match_keywords(obj, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
                 if not matched:
                     keyword_rejected_sample.append(obj[:120])
                     if len(keyword_rejected_sample) >= 3:

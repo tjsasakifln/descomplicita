@@ -77,10 +77,10 @@ def audit_filter(items: list[dict]) -> dict:
         uf = item.get("uf", "")
 
         # Run keyword match separately for analysis
-        kw_match, kw_found = match_keywords(objeto, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+        kw_match, kw_found, _score = match_keywords(objeto, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
 
         # Also check if it would match WITHOUT exclusions (to detect exclusion effectiveness)
-        kw_match_no_exc, kw_found_no_exc = match_keywords(objeto, KEYWORDS_UNIFORMES, None)
+        kw_match_no_exc, kw_found_no_exc, _score = match_keywords(objeto, KEYWORDS_UNIFORMES, None)
 
         # Run full filter
         approved, reason = filter_licitacao(item, ufs_set)

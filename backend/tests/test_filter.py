@@ -66,7 +66,7 @@ class TestMatchKeywords:
 
     def test_simple_match(self):
         """Should match simple uniform keywords."""
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Aquisição de uniformes escolares", KEYWORDS_UNIFORMES
         )
         assert matched is True
@@ -74,7 +74,7 @@ class TestMatchKeywords:
 
     def test_no_match(self):
         """Should return False when no keywords match."""
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Aquisição de software de gestão", KEYWORDS_UNIFORMES
         )
         assert matched is False
@@ -82,43 +82,43 @@ class TestMatchKeywords:
 
     def test_case_insensitive_matching(self):
         """Should match regardless of case."""
-        matched, _ = match_keywords("JALECO MÉDICO", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("JALECO MÉDICO", KEYWORDS_UNIFORMES)
         assert matched is True
 
-        matched, _ = match_keywords("jaleco médico", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("jaleco médico", KEYWORDS_UNIFORMES)
         assert matched is True
 
-        matched, _ = match_keywords("Jaleco Médico", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("Jaleco Médico", KEYWORDS_UNIFORMES)
         assert matched is True
 
     def test_accent_insensitive_matching(self):
         """Should match with or without accents."""
-        matched, _ = match_keywords("jaleco medico", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("jaleco medico", KEYWORDS_UNIFORMES)
         assert matched is True
 
-        matched, _ = match_keywords("jáleco médico", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("jáleco médico", KEYWORDS_UNIFORMES)
         assert matched is True
 
     def test_word_boundary_matching(self):
         """Should use word boundaries to prevent partial matches."""
         # "uniforme" should match
-        matched, _ = match_keywords("Compra de uniformes", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("Compra de uniformes", KEYWORDS_UNIFORMES)
         assert matched is True
 
         # "uniformemente" should NOT match (partial word)
-        matched, _ = match_keywords(
+        matched, _, _score = match_keywords(
             "Distribuição uniformemente espaçada", KEYWORDS_UNIFORMES
         )
         assert matched is False
 
         # "uniformização" should NOT match (partial word)
-        matched, _ = match_keywords("Uniformização de processos", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("Uniformização de processos", KEYWORDS_UNIFORMES)
         assert matched is False
 
     def test_exclusion_keywords_prevent_match(self):
         """Should return False if exclusion keywords found."""
         # Has "uniforme" but also has exclusion
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Uniformização de procedimento padrão",
             KEYWORDS_UNIFORMES,
             KEYWORDS_EXCLUSAO,
@@ -127,7 +127,7 @@ class TestMatchKeywords:
         assert keywords == []
 
         # Another exclusion case
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Padrão uniforme de qualidade", KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO
         )
         assert matched is False
@@ -135,7 +135,7 @@ class TestMatchKeywords:
 
     def test_multiple_keyword_matches(self):
         """Should return all matched keywords."""
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Fornecimento de jaleco e camiseta para hospital", KEYWORDS_UNIFORMES
         )
         assert matched is True
@@ -145,7 +145,7 @@ class TestMatchKeywords:
 
     def test_compound_keyword_matching(self):
         """Should match multi-word keywords."""
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Aquisição de uniforme escolar", KEYWORDS_UNIFORMES
         )
         assert matched is True
@@ -153,24 +153,24 @@ class TestMatchKeywords:
 
     def test_punctuation_does_not_prevent_match(self):
         """Should match even with punctuation."""
-        matched, _ = match_keywords("uniforme-escolar", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("uniforme-escolar", KEYWORDS_UNIFORMES)
         assert matched is True
 
-        matched, _ = match_keywords("jaleco!!!", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("jaleco!!!", KEYWORDS_UNIFORMES)
         assert matched is True
 
-        matched, _ = match_keywords("kit: uniformes", KEYWORDS_UNIFORMES)
+        matched, _, _score = match_keywords("kit: uniformes", KEYWORDS_UNIFORMES)
         assert matched is True
 
     def test_empty_objeto_returns_no_match(self):
         """Should handle empty object description."""
-        matched, keywords = match_keywords("", KEYWORDS_UNIFORMES)
+        matched, keywords, _score = match_keywords("", KEYWORDS_UNIFORMES)
         assert matched is False
         assert keywords == []
 
     def test_exclusions_none_parameter(self):
         """Should work correctly when exclusions=None."""
-        matched, keywords = match_keywords(
+        matched, keywords, _score = match_keywords(
             "Compra de uniformes", KEYWORDS_UNIFORMES, exclusions=None
         )
         assert matched is True
@@ -188,7 +188,7 @@ class TestMatchKeywords:
         ]
 
         for caso in test_cases_valid:
-            matched, _ = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+            matched, _, _score = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
             assert matched is True, f"Should match: {caso}"
 
         # Invalid (non-uniform procurement)
@@ -200,7 +200,7 @@ class TestMatchKeywords:
         ]
 
         for caso in test_cases_invalid:
-            matched, _ = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+            matched, _, _score = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
             assert matched is False, f"Should NOT match: {caso}"
 
     def test_epi_keywords_match(self):
@@ -216,7 +216,7 @@ class TestMatchKeywords:
             "Aquisição de Materiais de Proteção Individual EPIS",
         ]
         for caso in epi_cases:
-            matched, kw = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+            matched, kw, _score = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
             assert matched is True, f"Should match EPI case: {caso}"
 
     def test_real_world_exclusions_from_audit(self):
@@ -237,7 +237,7 @@ class TestMatchKeywords:
             "Fornecimento de colete balístico para polícia militar",
         ]
         for caso in exclusion_cases:
-            matched, _ = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+            matched, _, _score = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
             assert matched is False, f"Should NOT match: {caso}"
 
     def test_real_world_approved_from_audit(self):
@@ -251,7 +251,7 @@ class TestMatchKeywords:
             "REGISTRO DE PREÇOS PARA EVENTUAL AQUISIÇÃO DE UNIFORMES ESPORTIVOS E ACESSÓRIOS PERSONALIZADOS",
         ]
         for caso in approved_cases:
-            matched, _ = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
+            matched, _, _score = match_keywords(caso, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
             assert matched is True, f"Should match: {caso}"
 
 

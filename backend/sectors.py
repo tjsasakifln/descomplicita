@@ -20,22 +20,71 @@ class SectorConfig:
     description: str
     keywords: Set[str]
     exclusions: Set[str] = field(default_factory=set)
+    # Tier-based keyword scoring (optional — if keywords_a is empty, uses flat keywords as tier A)
+    keywords_a: Set[str] = field(default_factory=set)  # Unambiguous (weight 1.0)
+    keywords_b: Set[str] = field(default_factory=set)  # Strong (weight 0.7)
+    keywords_c: Set[str] = field(default_factory=set)  # Ambiguous (weight 0.3)
+    threshold: float = 0.6  # Minimum score to approve
 
 
 SECTORS: Dict[str, SectorConfig] = {
+    # EPI-only contextual rule: handled at filter level via EPI_ONLY_KEYWORDS.
+    # When calling filter_licitacao for vestuario, pass epi_only_keywords=EPI_ONLY_KEYWORDS
+    # to reject procurements matching ONLY generic EPI terms without clothing context.
     "vestuario": SectorConfig(
         id="vestuario",
         name="Vestuário e Uniformes",
         description="Uniformes, fardamentos, roupas profissionais, EPIs de vestuário",
         keywords=KEYWORDS_UNIFORMES,
         exclusions=KEYWORDS_EXCLUSAO,
+        keywords_a={
+            "uniforme", "uniformes", "fardamento", "fardamentos", "farda", "fardas",
+            "jaleco", "jalecos", "camiseta", "camisetas",
+            "calça", "calças", "vestuario", "vestimenta", "vestimentas",
+            "roupa", "roupas", "roupa profissional", "vestuario profissional",
+            "indumentaria", "guarda-pó", "guarda-pós",
+            "uniforme escolar", "uniforme hospitalar", "uniforme administrativo",
+            "uniforme esportivo", "uniformes esportivos", "uniforme profissional",
+            "fardamento militar", "fardamento escolar",
+            "kit uniforme", "conjunto uniforme",
+            "confecção de uniforme", "confecção de uniformes",
+            "confeccao de uniforme", "confeccao de uniformes",
+            "aquisição de uniforme", "aquisição de uniformes",
+            "fornecimento de uniforme", "fornecimento de uniformes",
+            "aquisição de vestuario", "fornecimento de vestuario",
+            "aquisição de fardamento", "fornecimento de fardamento",
+            "macacão", "macacoes",
+            "bermuda", "bermudas", "saia", "saias",
+            "sapato", "sapatos",
+        },
+        keywords_b={
+            "camisa", "camisas", "camisa polo", "camisas polo",
+            "blusa", "blusas",
+            "agasalho", "agasalhos",
+            "jaqueta", "jaquetas",
+            "gandola", "gandolas",
+            "jardineira", "jardineiras",
+            "boné", "bonés",
+            "confecção de camiseta", "confecção de camisetas",
+            "confeccao de camiseta", "confeccao de camisetas",
+            "epi vestuario", "epi vestimenta",
+        },
+        keywords_c={
+            "epi", "epis",
+            "equipamento de protecao individual", "equipamentos de protecao individual",
+            "confecção", "confecções", "confeccao", "confeccoes",
+            "costura",
+            "bota", "botas",
+            "meia", "meias",
+            "avental", "aventais",
+            "colete", "coletes",
+        },
     ),
     "alimentos": SectorConfig(
         id="alimentos",
         name="Alimentos e Merenda",
         description="Gêneros alimentícios, merenda escolar, refeições, rancho",
         keywords={
-            # High precision compound terms
             "genero alimenticio", "generos alimenticios",
             "gênero alimentício", "gêneros alimentícios",
             "merenda", "merenda escolar",
@@ -46,7 +95,6 @@ SECTORS: Dict[str, SectorConfig] = {
             "fornecimento de alimentação", "fornecimento de alimentacao",
             "serviço de alimentação", "servico de alimentacao",
             "aquisição de alimentos", "aquisicao de alimentos",
-            # Specific staple items
             "carne bovina", "carne suina", "carne suína",
             "leite", "laticinio", "laticinios", "laticínio", "laticínios",
             "arroz", "feijão", "feijao", "farinha",
@@ -57,13 +105,48 @@ SECTORS: Dict[str, SectorConfig] = {
             "macarrão", "macarrao",
             "conserva", "conservas", "enlatado", "enlatados",
             "congelado", "congelados",
-            # Restored standalone terms (guarded by exclusions)
             "sal", "óleo", "oleo", "café", "cafe",
             "fruta", "frutas", "verdura", "verduras", "legume", "legumes",
             "carne", "frango", "peixe",
             "pão", "pao", "pães", "paes",
             "bebida", "bebidas", "suco", "sucos",
         },
+        keywords_a={
+            "genero alimenticio", "generos alimenticios",
+            "gênero alimentício", "gêneros alimentícios",
+            "merenda", "merenda escolar",
+            "cesta basica", "cesta básica",
+            "carne bovina", "carne suina", "carne suína",
+            "arroz",
+            "kit alimentação", "kit alimentacao",
+            "fornecimento de alimentação", "fornecimento de alimentacao",
+            "serviço de alimentação", "servico de alimentacao",
+            "aquisição de alimentos", "aquisicao de alimentos",
+            "rancho militar",
+            "hortifruti", "hortifrutigranjeiro",
+            "açúcar", "acucar",
+            "água mineral", "agua mineral",
+            "congelado", "congelados",
+            "conserva", "conservas", "enlatado", "enlatados",
+        },
+        keywords_b={
+            "leite", "laticinio", "laticinios", "laticínio", "laticínios",
+            "feijão", "feijao", "farinha",
+            "biscoito", "biscoitos", "bolacha", "bolachas",
+            "macarrão", "macarrao",
+            "refeição", "refeicao", "refeições", "refeicoes",
+            "suco", "sucos",
+            "verdura", "verduras", "legume", "legumes",
+            # Standalone food terms — legitimate when alone (FPs guarded by exclusions)
+            "café", "cafe",
+            "óleo", "oleo",
+            "sal",
+            "carne", "frango", "peixe",
+            "bebida", "bebidas",
+            "fruta", "frutas",
+            "pão", "pao", "pães", "paes",
+        },
+        keywords_c=set(),  # No tier C for alimentos — exclusions handle FPs
         exclusions={
             # "alimentação" in non-food context
             "alimentação de dados",
@@ -79,6 +162,17 @@ SECTORS: Dict[str, SectorConfig] = {
             "óleo diesel", "oleo diesel",
             "óleo hidráulico", "oleo hidraulico",
             "troca de óleo", "troca de oleo",
+            # "oleo" in automotive context (complement existing)
+            "oleo de motor", "óleo de motor",
+            "oleo 2 tempos", "óleo 2 tempos",
+            "oleo dois tempos", "óleo dois tempos",
+            "oleo de motosserra", "óleo de motosserra",
+            "oleo de rocadeira", "óleo de roçadeira",
+            # "cafe" as equipment (not food)
+            "moinho para cafe", "moinho para café",
+            "moinho de cafe", "moinho de café",
+            "maquina de cafe", "máquina de café",
+            "cafeteira",
             # "bebida" — exclude non-procurement
             "bebida alcoólica", "bebida alcoolica",
         },
@@ -109,7 +203,6 @@ SECTORS: Dict[str, SectorConfig] = {
             "informática", "informatica",
             "tecnologia da informação", "tecnologia da informacao",
             "equipamento de informatica", "equipamento de informática",
-            # Restored standalone terms (guarded by exclusions)
             "servidor", "servidores",
             "monitor", "monitores",
             "mouse", "mouses",
@@ -117,6 +210,37 @@ SECTORS: Dict[str, SectorConfig] = {
             "hd", "ssd", "storage",
             "projetor", "projetores",
             "placa de video", "placa de vídeo",
+        },
+        keywords_a={
+            "notebook", "notebooks", "impressora", "impressoras",
+            "software", "softwares", "licença de software", "licenca de software",
+            "toner", "toners", "cartucho", "cartuchos",
+            "nobreak", "nobreaks", "firewall",
+            "roteador", "roteadores",
+            "informática", "informatica",
+            "tecnologia da informação", "tecnologia da informacao",
+            "equipamento de informatica", "equipamento de informática",
+            "cabo de rede", "cabeamento estruturado",
+            "memória ram", "memoria ram",
+            "processador", "processadores",
+            "sistema operacional",
+            "teclado", "teclados",
+            "placa de video", "placa de vídeo",
+        },
+        keywords_b={
+            "computador", "computadores",
+            "desktop", "desktops",
+            "scanner", "scanners",
+            "tablet", "tablets",
+            "antivirus", "antivírus",
+            "mouse", "mouses",
+        },
+        keywords_c={
+            "servidor", "servidores",
+            "monitor", "monitores",
+            "switch", "switches",
+            "hd", "ssd", "storage",
+            "projetor", "projetores",
         },
         exclusions={
             "informática educativa",
@@ -138,11 +262,35 @@ SECTORS: Dict[str, SectorConfig] = {
             "folha de pagamento dos servidores",
             "servidores e colaboradores",
             "proteção dos servidores", "protecao dos servidores",
+            # "servidores" in beneficiary/professional context
+            "destinados aos servidores", "destinado aos servidores",
+            "para os servidores", "para servidores",
+            "dos servidores", "aos servidores",
+            "servidores e vereadores", "vereadores e servidores",
+            "servidores das secretarias",
+            "servidores da prefeitura",
+            "servidores da camara", "servidores da câmara",
+            "servidores do municipio", "servidores do município",
+            "uso dos servidores",
+            "consumo dos servidores",
+            "servidores que trabalham",
+            "servidores que realizam",
+            "formacao de servidores", "formação de servidores",
+            "capacitacao de servidores", "capacitação de servidores",
+            "qualificacao de servidores", "qualificação de servidores",
+            "treinamento de servidores",
             # "monitor" in non-IT context
             "monitor de aluno", "monitor de alunos",
             "monitor de pátio", "monitor de patio",
             "monitor de transporte",
             "monitor social",
+            # "monitor" in medical/health context
+            "monitor de glicose",
+            "monitor de pressao", "monitor de pressão",
+            "glicosimetro", "glicosímetro",
+            # "monitor" in education context
+            "monitor escolar",
+            "monitores escolares",
             # "switch" in non-IT context (unlikely but guard)
             "switch grass",
         },
@@ -173,7 +321,6 @@ SECTORS: Dict[str, SectorConfig] = {
             "serviço de limpeza", "servico de limpeza",
             "limpeza e conservação", "limpeza e conservacao",
             "limpeza predial",
-            # Restored standalone terms (guarded by exclusions)
             "limpeza",
             "sabão", "sabao", "sabonete",
             "cloro",
@@ -182,6 +329,41 @@ SECTORS: Dict[str, SectorConfig] = {
             "higiene", "higienização", "higienizacao",
             "descartável", "descartaveis", "descartáveis",
             "copa e cozinha",
+            "inseticida",
+        },
+        keywords_a={
+            "material de limpeza", "materiais de limpeza",
+            "produto de limpeza", "produtos de limpeza",
+            "detergente", "detergentes",
+            "desinfetante", "desinfetantes",
+            "alvejante", "alvejantes",
+            "água sanitária", "agua sanitaria",
+            "saneante", "saneantes",
+            "papel higienico", "papel higiênico",
+            "papel toalha",
+            "saco de lixo", "sacos de lixo",
+            "luva de limpeza", "luvas de limpeza",
+            "desengordurante", "limpa vidro",
+            "material de higienização", "material de higienizacao",
+            "serviço de limpeza", "servico de limpeza",
+            "limpeza e conservação", "limpeza e conservacao",
+            "limpeza predial",
+            "pano de chão", "pano de chao",
+            "cloro",
+        },
+        keywords_b={
+            "vassoura", "vassouras",
+            "rodo", "rodos",
+            "esponja", "esponjas",
+            "sabão", "sabao", "sabonete",
+            "copa e cozinha",
+        },
+        keywords_c={
+            "limpeza",
+            "higiene", "higienização", "higienizacao",
+            "descartável", "descartaveis", "descartáveis",
+            "cera",
+            "balde", "baldes",
             "inseticida",
         },
         exclusions={
@@ -210,6 +392,20 @@ SECTORS: Dict[str, SectorConfig] = {
             # "higiene" in non-product context
             "higiene ocupacional",
             "higiene do trabalho",
+            # "limpeza" in urban/public services context (not cleaning products)
+            "limpeza urbana",
+            "limpeza publica", "limpeza pública",
+            "limpeza de via", "limpeza de vias",
+            "limpeza de estrada", "limpeza de estradas",
+            "limpeza de logradouro", "limpeza de logradouros",
+            "servico de limpeza urbana", "serviço de limpeza urbana",
+            # "descartavel" in medical/surgical context (not cleaning supplies)
+            "descartavel cirurgico", "descartável cirúrgico",
+            "descartavel hospitalar", "descartável hospitalar",
+            "campo cirurgico descartavel", "campo cirúrgico descartável",
+            "kit cirurgico descartavel", "kit cirúrgico descartável",
+            "avental descartavel", "avental descartável",
+            "lencol descartavel", "lençol descartável",
         },
     ),
     "mobiliario": SectorConfig(
@@ -274,6 +470,15 @@ SECTORS: Dict[str, SectorConfig] = {
             # "rack" in non-furniture context
             "rack de servidor", "rack de servidores",
             "rack de rede",
+            # "rack" in IT context (complement existing)
+            "rack 19 polegadas",
+            "rack de telecomunicacao", "rack de telecomunicação",
+            "rack para equipamentos de informatica", "rack para equipamentos de informática",
+            # "banco" in financial context (complement existing)
+            "servicos bancarios", "serviços bancários",
+            "servico bancario", "serviço bancário",
+            "arrecadacao bancaria", "arrecadação bancária",
+            "taxa bancaria", "taxa bancária",
         },
     ),
     "papelaria": SectorConfig(
@@ -474,6 +679,9 @@ SECTORS: Dict[str, SectorConfig] = {
             # "abastecimento" em contexto nao-combustivel
             "abastecimento de agua", "abastecimento de água",
             "abastecimento hidrico", "abastecimento hídrico",
+            # "abastecimento" in public water supply context
+            "abastecimento publico", "abastecimento público",
+            "sistema de abastecimento de agua", "sistema de abastecimento de água",
         },
     ),
     "engenharia": SectorConfig(
@@ -481,7 +689,6 @@ SECTORS: Dict[str, SectorConfig] = {
         name="Engenharia e Construção",
         description="Obras, reformas, construção civil, pavimentação, infraestrutura",
         keywords={
-            # High precision compound terms
             "construção civil", "construcao civil",
             "pavimentação", "pavimentacao",
             "recapeamento", "recapeamento asfaltico", "recapeamento asfáltico",
@@ -498,12 +705,10 @@ SECTORS: Dict[str, SectorConfig] = {
             "laudo técnico", "laudo tecnico",
             "obra de engenharia",
             "serviço de engenharia", "servico de engenharia",
-            # Construction materials
             "alvenaria",
             "concreto armado", "concreto",
             "asfalto", "asfaltamento",
             "drenagem",
-            # Restored standalone terms (guarded by exclusions)
             "obra", "obras",
             "reforma", "reformas",
             "engenharia",
@@ -519,6 +724,51 @@ SECTORS: Dict[str, SectorConfig] = {
             "telhado", "cobertura",
             "piso", "revestimento",
             "elevador", "elevadores",
+        },
+        keywords_a={
+            "construção civil", "construcao civil",
+            "pavimentação", "pavimentacao",
+            "recapeamento", "recapeamento asfaltico", "recapeamento asfáltico",
+            "alvenaria", "terraplanagem",
+            "concreto armado", "concreto",
+            "manutenção predial", "manutencao predial",
+            "impermeabilização", "impermeabilizacao",
+            "pintura predial", "pintura de fachada",
+            "instalação elétrica", "instalacao eletrica",
+            "instalação hidráulica", "instalacao hidraulica",
+            "saneamento básico", "saneamento basico",
+            "projeto arquitetônico", "projeto arquitetonico",
+            "laudo técnico", "laudo tecnico",
+            "obra de engenharia",
+            "serviço de engenharia", "servico de engenharia",
+            "engenharia",
+            "construção", "construcao",
+            "edificação", "edificacao",
+            "demolição", "demolicao",
+            "cimento",
+            "elevador", "elevadores",
+        },
+        keywords_b={
+            "obra", "obras",
+            "reforma", "reformas",
+            "asfalto", "asfaltamento",
+            "drenagem",
+            "ampliação", "ampliacao",
+            "restauração", "restauracao",
+            "ar condicionado",
+            "climatização", "climatizacao",
+            "aço", "aco",
+            "tijolo", "tijolos",
+            "brita", "cascalho",
+            "telhado",
+        },
+        keywords_c={
+            "infraestrutura",
+            "cobertura",
+            "piso", "revestimento",
+            "ferro",
+            "madeira",
+            "areia",
         },
         exclusions={
             "engenharia de software",
@@ -569,6 +819,20 @@ SECTORS: Dict[str, SectorConfig] = {
             "serviços de borracharia", "servicos de borracharia",
             # Sports context matching "areia" (sand courts)
             "arbitragem",
+            # "infraestrutura" in connectivity/logistics context (not civil works)
+            "infraestrutura de conectividade",
+            "infraestrutura de fibra", "infraestrutura de fibra optica", "infraestrutura de fibra óptica",
+            "infraestrutura produtiva",
+            "infraestrutura logistica", "infraestrutura logística",
+            # "cobertura" in insurance/aviation/health context (not roofing)
+            "cobertura total",
+            "cobertura ambulatorial",
+            "cobertura veicular",
+            "cobertura aerea", "cobertura aérea",
+            "cobertura aeronautica", "cobertura aeronáutica",
+            "cobertura de casco",
+            "cobertura hospitalar",
+            "cobertura obstetra", "cobertura obstétrica",
         },
     ),
     "hospitalar": SectorConfig(
@@ -798,6 +1062,10 @@ SECTORS: Dict[str, SectorConfig] = {
             # "alarme" em contexto nao-seguranca
             "alarme falso",
             "falso alarme",
+            # "vigilancia" in public health/environmental context
+            "vigilancia de vetores", "vigilância de vetores",
+            "vigilancia de zoonoses", "vigilância de zoonoses",
+            "vigilancia ambiental", "vigilância ambiental",
         },
     ),
 }

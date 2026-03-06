@@ -1,0 +1,35 @@
+name: Filter Quality Audit
+
+on:
+  pull_request:
+    paths:
+      - 'backend/sectors.py'
+      - 'backend/filter.py'
+      - 'backend/pncp_client.py'
+      - 'backend/scripts/audit_quality_gate.py'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run filter quality gate
+        run: python scripts/audit_quality_gate.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-report
+          path: |
+            backend/scripts/audit_report.md
+            backend/scripts/audit_quality_gate_results.json

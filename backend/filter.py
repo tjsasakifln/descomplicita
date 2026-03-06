@@ -280,6 +280,14 @@ KEYWORDS_EXCLUSAO: Set[str] = {
 }
 
 
+# EPI terms that alone (without clothing context) indicate a non-vestuario procurement
+EPI_ONLY_KEYWORDS: Set[str] = {
+    "epi", "epis",
+    "equipamento de protecao individual",
+    "equipamentos de protecao individual",
+}
+
+
 def normalize_text(text: str) -> str:
     """
     Normalize text for keyword matching.
@@ -327,34 +335,33 @@ def normalize_text(text: str) -> str:
 
 
 def match_keywords(
-    objeto: str, keywords: Set[str], exclusions: Set[str] | None = None
-) -> Tuple[bool, List[str]]:
+    objeto: str, keywords: Set[str], exclusions: Set[str] | None = None,
+    epi_only_keywords: Set[str] | None = None,
+    keywords_a: Set[str] | None = None,
+    keywords_b: Set[str] | None = None,
+    keywords_c: Set[str] | None = None,
+    threshold: float = 0.6,
+) -> Tuple[bool, List[str], float]:
     """
-    Check if procurement object description contains uniform-related keywords.
+    Check if procurement object description contains sector keywords.
 
-    Uses word boundary matching to prevent partial matches:
-    - "uniforme" matches "Aquisição de uniformes"
-    - "uniforme" does NOT match "uniformemente" or "uniformização"
+    Supports two modes:
+    - Binary mode (default): any keyword match approves the item (score=1.0)
+    - Tier scoring mode: when keywords_a is provided, uses weighted scoring
+      where A=1.0, B=0.7, C=0.3 and score must meet threshold
 
     Args:
         objeto: Procurement object description (objetoCompra from PNCP API)
-        keywords: Set of keywords to search for (KEYWORDS_UNIFORMES)
-        exclusions: Optional set of exclusion keywords (KEYWORDS_EXCLUSAO)
+        keywords: Set of keywords to search for (flat set, all treated as tier A)
+        exclusions: Optional set of exclusion keywords
+        epi_only_keywords: Optional set of EPI-only terms for vestuario context check
+        keywords_a: Tier A keywords (unambiguous, weight 1.0)
+        keywords_b: Tier B keywords (strong, weight 0.7)
+        keywords_c: Tier C keywords (ambiguous, weight 0.3)
+        threshold: Minimum score to approve (default 0.6)
 
     Returns:
-        Tuple containing:
-        - bool: True if at least one keyword matched (and no exclusions found)
-        - List[str]: List of matched keywords (original form, not normalized)
-
-    Examples:
-        >>> match_keywords("Aquisição de uniformes escolares", KEYWORDS_UNIFORMES)
-        (True, ['uniformes', 'uniforme escolar'])
-
-        >>> match_keywords("Uniformização de procedimento", KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
-        (False, [])
-
-        >>> match_keywords("Software de gestão", KEYWORDS_UNIFORMES)
-        (False, [])
+        Tuple of (approved, matched_keywords, score)
     """
     objeto_norm = normalize_text(objeto)
 
@@ -362,23 +369,51 @@ def match_keywords(
     if exclusions:
         for exc in exclusions:
             exc_norm = normalize_text(exc)
-            # Use word boundary for exclusions too
             pattern = rf"\b{re.escape(exc_norm)}\b"
             if re.search(pattern, objeto_norm):
-                return False, []
+                return False, [], 0.0
 
-    # Search for matching keywords
-    matched: List[str] = []
+    # Tier scoring mode: use weighted keyword matching
+    if keywords_a:
+        score = 0.0
+        matched: List[str] = []
+        for kw in keywords_a:
+            kw_norm = normalize_text(kw)
+            pattern = rf"\b{re.escape(kw_norm)}\b"
+            if re.search(pattern, objeto_norm):
+                score = max(score, 1.0)
+                matched.append(kw)
+        for kw in (keywords_b or set()):
+            kw_norm = normalize_text(kw)
+            pattern = rf"\b{re.escape(kw_norm)}\b"
+            if re.search(pattern, objeto_norm):
+                score = max(score, 0.7)
+                matched.append(kw)
+        for kw in (keywords_c or set()):
+            kw_norm = normalize_text(kw)
+            pattern = rf"\b{re.escape(kw_norm)}\b"
+            if re.search(pattern, objeto_norm):
+                score = max(score, 0.3)
+                matched.append(kw)
+        return score >= threshold, matched, score
+
+    # Binary mode: any keyword match approves (backward compat)
+    matched = []
     for kw in keywords:
         kw_norm = normalize_text(kw)
-
-        # Match by complete word (word boundary)
-        # \b ensures we don't match partial words
         pattern = rf"\b{re.escape(kw_norm)}\b"
         if re.search(pattern, objeto_norm):
             matched.append(kw)
 
-    return len(matched) > 0, matched
+    # EPI-only contextual check
+    if epi_only_keywords and matched:
+        matched_normalized = {normalize_text(kw) for kw in matched}
+        epi_normalized = {normalize_text(kw) for kw in epi_only_keywords}
+        if matched_normalized <= epi_normalized:
+            return False, [], 0.0
+
+    score = 1.0 if matched else 0.0
+    return len(matched) > 0, matched, score
 
 
 def filter_licitacao(
@@ -388,6 +423,11 @@ def filter_licitacao(
     valor_max: float = 5_000_000.0,
     keywords: Set[str] | None = None,
     exclusions: Set[str] | None = None,
+    epi_only_keywords: Set[str] | None = None,
+    keywords_a: Set[str] | None = None,
+    keywords_b: Set[str] | None = None,
+    keywords_c: Set[str] | None = None,
+    threshold: float = 0.6,
 ) -> Tuple[bool, Optional[str]]:
     """
     Apply all filters to a single procurement bid (fail-fast sequential filtering).
@@ -440,7 +480,12 @@ def filter_licitacao(
     kw = keywords if keywords is not None else KEYWORDS_UNIFORMES
     exc = exclusions if exclusions is not None else KEYWORDS_EXCLUSAO
     objeto = licitacao.get("objetoCompra", "")
-    match, keywords_found = match_keywords(objeto, kw, exc)
+    match, keywords_found, _score = match_keywords(
+        objeto, kw, exc,
+        epi_only_keywords=epi_only_keywords,
+        keywords_a=keywords_a, keywords_b=keywords_b,
+        keywords_c=keywords_c, threshold=threshold,
+    )
 
     if not match:
         return False, "Não contém keywords do setor"
@@ -472,6 +517,11 @@ def filter_batch(
     valor_max: float = 5_000_000.0,
     keywords: Set[str] | None = None,
     exclusions: Set[str] | None = None,
+    epi_only_keywords: Set[str] | None = None,
+    keywords_a: Set[str] | None = None,
+    keywords_b: Set[str] | None = None,
+    keywords_c: Set[str] | None = None,
+    threshold: float = 0.6,
 ) -> Tuple[List[dict], Dict[str, int]]:
     """
     Filter a batch of procurement bids and return statistics.
@@ -524,7 +574,10 @@ def filter_batch(
     }
 
     for lic in licitacoes:
-        aprovada, motivo = filter_licitacao(lic, ufs_selecionadas, valor_min, valor_max, keywords, exclusions)
+        aprovada, motivo = filter_licitacao(
+            lic, ufs_selecionadas, valor_min, valor_max, keywords, exclusions,
+            epi_only_keywords, keywords_a, keywords_b, keywords_c, threshold,
+        )
 
         if aprovada:
             aprovadas.append(lic)

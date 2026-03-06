@@ -64,8 +64,8 @@ def audit_sector(items: list[dict], sector: SectorConfig) -> dict:
         uf = item.get("uf", "")
 
         # Keyword analysis
-        kw_match, kw_found = match_keywords(objeto, sector.keywords, sector.exclusions)
-        kw_match_no_exc, kw_found_no_exc = match_keywords(objeto, sector.keywords, None)
+        kw_match, kw_found, _score = match_keywords(objeto, sector.keywords, sector.exclusions)
+        kw_match_no_exc, kw_found_no_exc, _score = match_keywords(objeto, sector.keywords, None)
 
         # Full filter (using sector keywords)
         fake_lic = {"uf": uf, "valorTotalEstimado": valor, "objetoCompra": objeto}
