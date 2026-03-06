@@ -223,10 +223,10 @@ describe("POST /api/buscar", () => {
 
     await POST(request);
 
-    // Verify setTimeout was called with 10 minutes (600000ms)
+    // Verify setTimeout was called with 1 hour (3600000ms) default TTL
     expect(setTimeoutSpy).toHaveBeenCalledWith(
       expect.any(Function),
-      10 * 60 * 1000
+      60 * 60 * 1000
     );
 
     setTimeoutSpy.mockRestore();

@@ -4,6 +4,8 @@ import { writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
+const DOWNLOAD_TTL_MS = parseInt(process.env.DOWNLOAD_TTL_MS || String(60 * 60 * 1000), 10); // 1 hour
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
     // Only save Excel to filesystem if there are actual results
     let downloadId: string | null = null;
     if (data.excel_base64) {
-      downloadId = randomUUID();
+      downloadId = `${Date.now()}_${randomUUID()}`;
       const buffer = Buffer.from(data.excel_base64, "base64");
       const tmpDir = tmpdir();
       const filePath = join(tmpDir, `bidiq_${downloadId}.xlsx`);
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
         await writeFile(filePath, buffer);
         console.log(`✅ Excel saved to: ${filePath}`);
 
-        // Limpar arquivo após 10 minutos
+        // Limpar arquivo após TTL (default: 1 hora)
         setTimeout(async () => {
           try {
             const { unlink } = await import("fs/promises");
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
           } catch (error) {
             console.error(`Failed to clean up ${downloadId}:`, error);
           }
-        }, 10 * 60 * 1000);
+        }, DOWNLOAD_TTL_MS);
       } catch (error) {
         console.error("Failed to save Excel to filesystem:", error);
         // Continue without download_id (user will see error when trying to download)

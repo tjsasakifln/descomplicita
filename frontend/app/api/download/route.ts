@@ -1,7 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "fs/promises";
+import { readFile, readdir, unlink, stat } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+
+const DOWNLOAD_TTL_MS = parseInt(process.env.DOWNLOAD_TTL_MS || String(60 * 60 * 1000), 10); // 1 hour
+
+async function cleanupExpiredDownloads() {
+  const dir = tmpdir();
+  try {
+    const files = await readdir(dir);
+    const now = Date.now();
+    for (const file of files) {
+      if (!file.startsWith("bidiq_")) continue;
+      const filePath = join(dir, file);
+      try {
+        // Try timestamp from filename first (format: bidiq_{timestamp}_{uuid}.xlsx)
+        const tsMatch = file.match(/^bidiq_(\d+)_/);
+        if (tsMatch) {
+          const createdAt = parseInt(tsMatch[1], 10);
+          if (now - createdAt > DOWNLOAD_TTL_MS) {
+            await unlink(filePath);
+          }
+          continue;
+        }
+        // Fallback to file mtime for legacy filenames
+        const { mtimeMs } = await stat(filePath);
+        if (now - mtimeMs > DOWNLOAD_TTL_MS) {
+          await unlink(filePath);
+        }
+      } catch { /* file already deleted or inaccessible */ }
+    }
+  } catch { /* tmpdir read failed, skip cleanup */ }
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -14,7 +44,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Read from filesystem instead of memory cache
+  // Lazy cleanup of expired downloads
+  cleanupExpiredDownloads().catch(() => {});
+
+  // Read from filesystem
   const tmpDir = tmpdir();
   const filePath = join(tmpDir, `bidiq_${id}.xlsx`);
 
