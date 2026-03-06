@@ -14,7 +14,7 @@ class TestSectorConfig:
     def test_all_sectors_exist(self):
         sectors = list_sectors()
         ids = {s["id"] for s in sectors}
-        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude"}
+        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos"}
 
     def test_get_sector_returns_config(self):
         s = get_sector("vestuario")
@@ -355,6 +355,196 @@ class TestSaudeSector:
 
     def test_excludes_saude_do_solo(self):
         ok, _ = self._match("Análise da saúde do solo para projeto agrícola")
+        assert ok is False
+
+
+class TestVeiculosSector:
+    """Tests for Veículos, Peças e Combustíveis sector."""
+
+    def _match(self, texto):
+        s = SECTORS["veiculos"]
+        return match_keywords(texto, s.keywords, s.exclusions)
+
+    # --- True positives: veiculos ---
+
+    def test_matches_veiculos(self):
+        ok, _ = self._match("AQUISIÇÃO DE VEÍCULOS PARA A FROTA MUNICIPAL")
+        assert ok is True
+
+    def test_matches_caminhao(self):
+        ok, _ = self._match("Registro de preços para aquisição de caminhão basculante")
+        assert ok is True
+
+    def test_matches_onibus(self):
+        ok, _ = self._match("AQUISIÇÃO DE ÔNIBUS ESCOLAR PARA TRANSPORTE DE ALUNOS")
+        assert ok is True
+
+    def test_matches_motocicleta(self):
+        ok, _ = self._match("Aquisição de motocicletas para fiscalização de trânsito")
+        assert ok is True
+
+    def test_matches_ambulancia(self):
+        ok, _ = self._match("AQUISIÇÃO DE AMBULÂNCIA TIPO D PARA O SAMU")
+        assert ok is True
+
+    def test_matches_viatura(self):
+        ok, _ = self._match("Registro de preços para aquisição de viaturas para a Guarda Municipal")
+        assert ok is True
+
+    def test_matches_caminhonete(self):
+        ok, _ = self._match("AQUISIÇÃO DE CAMINHONETES 4X4 PARA A SECRETARIA DE OBRAS")
+        assert ok is True
+
+    def test_matches_van(self):
+        ok, _ = self._match("Aquisição de vans para transporte de pacientes")
+        assert ok is True
+
+    def test_matches_utilitario(self):
+        ok, _ = self._match("REGISTRO DE PREÇOS PARA AQUISIÇÃO DE VEÍCULO UTILITÁRIO")
+        assert ok is True
+
+    # --- True positives: combustiveis ---
+
+    def test_matches_combustivel(self):
+        ok, _ = self._match("REGISTRO DE PREÇOS PARA AQUISIÇÃO DE COMBUSTÍVEL")
+        assert ok is True
+
+    def test_matches_gasolina(self):
+        ok, _ = self._match("Aquisição de gasolina comum para a frota municipal")
+        assert ok is True
+
+    def test_matches_diesel(self):
+        ok, _ = self._match("AQUISIÇÃO DE ÓLEO DIESEL S10 PARA FROTA")
+        assert ok is True
+
+    def test_matches_etanol(self):
+        ok, _ = self._match("Registro de preços para fornecimento de etanol hidratado")
+        assert ok is True
+
+    def test_matches_abastecimento(self):
+        ok, _ = self._match("CONTRATAÇÃO DE POSTO PARA ABASTECIMENTO DA FROTA MUNICIPAL")
+        assert ok is True
+
+    # --- True positives: pecas e manutencao ---
+
+    def test_matches_pneus(self):
+        ok, _ = self._match("AQUISIÇÃO DE PNEUS PARA VEÍCULOS DA PREFEITURA")
+        assert ok is True
+
+    def test_matches_bateria_automotiva(self):
+        ok, _ = self._match("Registro de preços para aquisição de baterias automotivas")
+        assert ok is True
+
+    def test_matches_filtro_oleo(self):
+        ok, _ = self._match("AQUISIÇÃO DE FILTRO DE ÓLEO PARA FROTA")
+        assert ok is True
+
+    def test_matches_pastilha_freio(self):
+        ok, _ = self._match("Aquisição de pastilha de freio para veículos leves")
+        assert ok is True
+
+    def test_matches_amortecedor(self):
+        ok, _ = self._match("REGISTRO DE PREÇOS PARA AQUISIÇÃO DE AMORTECEDORES")
+        assert ok is True
+
+    def test_matches_lubrificante(self):
+        ok, _ = self._match("Aquisição de lubrificantes para manutenção da frota")
+        assert ok is True
+
+    def test_matches_pecas_reposicao(self):
+        ok, _ = self._match("AQUISIÇÃO DE PEÇAS DE REPOSIÇÃO PARA VEÍCULOS PESADOS")
+        assert ok is True
+
+    # --- True positives: servicos veiculares ---
+
+    def test_matches_manutencao_frota(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE MANUTENÇÃO DE FROTA")
+        assert ok is True
+
+    def test_matches_locacao_veiculos(self):
+        ok, _ = self._match("Registro de preços para locação de veículos sem motorista")
+        assert ok is True
+
+    def test_matches_seguro_veicular(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SEGURO VEICULAR PARA A FROTA MUNICIPAL")
+        assert ok is True
+
+    def test_matches_rastreamento_veicular(self):
+        ok, _ = self._match("Contratação de serviço de rastreamento veicular por GPS")
+        assert ok is True
+
+    def test_matches_funilaria(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇOS DE FUNILARIA E PINTURA AUTOMOTIVA")
+        assert ok is True
+
+    def test_matches_revisao_veicular(self):
+        ok, _ = self._match("Contratação de serviço de revisão veicular preventiva")
+        assert ok is True
+
+    def test_matches_lavagem_frota(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE LAVAGEM DE FROTA MUNICIPAL")
+        assert ok is True
+
+    # --- True negatives (exclusions) ---
+
+    def test_excludes_veiculo_comunicacao(self):
+        ok, _ = self._match("Contratação de veículo de comunicação para campanha publicitária")
+        assert ok is False
+
+    def test_excludes_veiculo_imprensa(self):
+        ok, _ = self._match("Credenciamento de veículo de imprensa para cobertura de eventos")
+        assert ok is False
+
+    def test_excludes_veiculo_informacao(self):
+        ok, _ = self._match("Desenvolvimento de veículo de informação institucional")
+        assert ok is False
+
+    def test_excludes_pecas_processuais(self):
+        ok, _ = self._match("Elaboração de peças processuais para a Procuradoria")
+        assert ok is False
+
+    def test_excludes_pecas_teatrais(self):
+        ok, _ = self._match("Produção de peças teatrais para festival cultural")
+        assert ok is False
+
+    def test_excludes_pecas_roupa(self):
+        ok, _ = self._match("Aquisição de peças de roupa para abrigo municipal")
+        assert ok is False
+
+    def test_excludes_bateria_musical(self):
+        ok, _ = self._match("Aquisição de bateria musical para escola de música")
+        assert ok is False
+
+    def test_excludes_bateria_cozinha(self):
+        ok, _ = self._match("Aquisição de bateria de cozinha para restaurante popular")
+        assert ok is False
+
+    def test_excludes_bateria_testes(self):
+        ok, _ = self._match("Aplicação de bateria de testes para concurso público")
+        assert ok is False
+
+    def test_excludes_filtro_agua(self):
+        ok, _ = self._match("Aquisição de filtro de água para escolas municipais")
+        assert ok is False
+
+    def test_excludes_filtro_solar(self):
+        ok, _ = self._match("Aquisição de filtro solar para agentes de saúde")
+        assert ok is False
+
+    def test_excludes_abastecimento_agua(self):
+        ok, _ = self._match("Contratação de serviço de abastecimento de água por caminhão-pipa")
+        assert ok is False
+
+    def test_excludes_abastecimento_hidrico(self):
+        ok, _ = self._match("Projeto de abastecimento hídrico para zona rural")
+        assert ok is False
+
+    def test_excludes_pecas_juridicas(self):
+        ok, _ = self._match("Confecção de peças jurídicas para defesa do município")
+        assert ok is False
+
+    def test_excludes_filtro_linha(self):
+        ok, _ = self._match("Aquisição de filtro de linha para equipamentos de informática")
         assert ok is False
 
 

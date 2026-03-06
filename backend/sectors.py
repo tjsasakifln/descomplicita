@@ -411,6 +411,71 @@ SECTORS: Dict[str, SectorConfig] = {
             "sonda espacial",
         },
     ),
+    "veiculos": SectorConfig(
+        id="veiculos",
+        name="Veículos, Peças e Combustíveis",
+        description="Veículos, peças automotivas, combustíveis, manutenção de frota",
+        keywords={
+            # Veiculos - termos compostos
+            "veiculo", "veiculos", "veículo", "veículos",
+            "automovel", "automoveis", "automóvel", "automóveis",
+            "caminhao", "caminhoes", "caminhão", "caminhões",
+            "onibus", "ônibus",
+            "motocicleta", "motocicletas", "moto", "motos",
+            "ambulancia", "ambulancias", "ambulância", "ambulâncias",
+            "viatura", "viaturas",
+            "caminhonete", "caminhonetes", "camionete",
+            "van", "vans", "micro-onibus", "micro-ônibus",
+            "utilitario", "utilitário",
+            # Combustiveis
+            "combustivel", "combustiveis", "combustível", "combustíveis",
+            "gasolina", "diesel", "oleo diesel", "óleo diesel",
+            "etanol", "gnv", "gas natural veicular", "gás natural veicular",
+            "abastecimento", "posto de combustivel", "posto de combustível",
+            # Pecas e manutencao veicular
+            "peca automotiva", "pecas automotivas", "peça automotiva", "peças automotivas",
+            "peca de reposicao", "pecas de reposicao", "peça de reposição", "peças de reposição",
+            "pneu", "pneus",
+            "bateria automotiva", "baterias automotivas",
+            "filtro de oleo", "filtro de óleo",
+            "filtro de ar", "filtro de combustivel", "filtro de combustível",
+            "pastilha de freio", "disco de freio",
+            "amortecedor", "amortecedores",
+            "lubrificante", "lubrificantes", "oleo lubrificante", "óleo lubrificante",
+            # Servicos veiculares
+            "retifica", "funilaria", "lanternagem",
+            "manutencao veicular", "manutenção veicular",
+            "manutencao de frota", "manutenção de frota",
+            "locacao de veiculo", "locação de veículo",
+            "locacao de veiculos", "locação de veículos",
+            "seguro veicular", "seguro de veiculo", "seguro de veículo",
+            "rastreamento veicular", "rastreador veicular",
+            "lavagem de veiculo", "lavagem de veículo",
+            "lavagem de frota",
+            "revisao veicular", "revisão veicular",
+        },
+        exclusions={
+            # "veiculo" em contexto nao-automotivo
+            "veiculo de comunicacao", "veículo de comunicação",
+            "veiculo de imprensa", "veículo de imprensa",
+            "veiculo de informacao", "veículo de informação",
+            # "pecas" em contexto nao-automotivo
+            "pecas de roupa", "peças de roupa",
+            "pecas processuais", "peças processuais",
+            "pecas juridicas", "peças jurídicas",
+            "pecas teatrais", "peças teatrais",
+            # "bateria" em contexto nao-automotivo
+            "bateria musical", "bateria de cozinha",
+            "bateria de testes",
+            # "filtro" em contexto nao-automotivo
+            "filtro de agua", "filtro de água",
+            "filtro de linha",
+            "filtro solar",
+            # "abastecimento" em contexto nao-combustivel
+            "abastecimento de agua", "abastecimento de água",
+            "abastecimento hidrico", "abastecimento hídrico",
+        },
+    ),
     "engenharia": SectorConfig(
         id="engenharia",
         name="Engenharia e Construção",
