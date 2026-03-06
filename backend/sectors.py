@@ -339,6 +339,78 @@ SECTORS: Dict[str, SectorConfig] = {
             "fora de expediente",
         },
     ),
+    "saude": SectorConfig(
+        id="saude",
+        name="Saúde e Medicamentos",
+        description="Medicamentos, insumos hospitalares, materiais de enfermagem, EPIs hospitalares",
+        keywords={
+            # Medicamentos - termos compostos (alta precisao)
+            "medicamento", "medicamentos",
+            "remedio", "remedios", "remédio", "remédios",
+            "farmaco", "fármaco", "farmaceutico", "farmacêutico",
+            "medicamento generico", "medicamento genérico",
+            "medicamento similar", "medicamento de referencia", "medicamento de referência",
+            "insumo hospitalar", "insumos hospitalares",
+            "material hospitalar", "materiais hospitalares",
+            # Formas farmaceuticas
+            "comprimido", "comprimidos", "capsula", "capsulas", "cápsula", "cápsulas",
+            "ampola", "ampolas", "frasco-ampola",
+            "pomada", "pomadas", "creme dermatologico", "creme dermatológico",
+            "solucao injetavel", "solução injetável",
+            "xarope", "xaropes", "suspensao oral", "suspensão oral",
+            # Materiais de enfermagem/curativo
+            "seringa", "seringas", "agulha", "agulhas",
+            "luva cirurgica", "luva cirúrgica", "luva de procedimento",
+            "gaze", "atadura", "ataduras",
+            "soro", "soro fisiologico", "soro fisiológico",
+            "curativo", "curativos", "material de curativo",
+            "cateter", "cateteres", "sonda", "sondas",
+            "bisturi", "fio de sutura", "sutura",
+            "equipo", "equipos",
+            # Categorias terapeuticas
+            "anestesico", "anestésico", "antibiotico", "antibiótico",
+            "anti-inflamatorio", "anti-inflamatório",
+            "analgesico", "analgésico", "antipiretico", "antipirético",
+            "vacina", "vacinas", "imunobiologico", "imunobiológico",
+            "hemoderivado", "hemoderivados",
+            "insulina", "hipoglicemiante",
+            # Diagnostico
+            "reagente laboratorial", "reagente", "reagentes",
+            "kit diagnostico", "kit diagnóstico",
+            "teste rapido", "teste rápido", "tira reagente",
+            "contraste radiologico", "contraste radiológico",
+            # EPIs hospitalares
+            "mascara cirurgica", "máscara cirúrgica",
+            "avental hospitalar", "avental cirurgico", "avental cirúrgico",
+            "touca cirurgica", "touca cirúrgica",
+            "propé", "prope",
+            # Termos gerais (guardados por exclusions)
+            "material de enfermagem",
+            "produto farmaceutico", "produto farmacêutico",
+            "produto para saude", "produto para saúde",
+            "dispositivo medico", "dispositivo médico",
+        },
+        exclusions={
+            # Saude em contexto nao-produto
+            "saude financeira", "saúde financeira",
+            "saude do solo", "saúde do solo",
+            "saude animal", "saúde animal",
+            "medicamento veterinario", "medicamento veterinário",
+            "uso veterinario", "uso veterinário",
+            # Regulatorio (nao e produto)
+            "vigilancia sanitaria", "vigilância sanitária",
+            "anvisa",
+            "registro de medicamento",
+            "farmacovigilancia", "farmacovigilância",
+            # "soro" em contexto nao-medico
+            "soro de leite",
+            # "reagente" em contexto quimico industrial
+            "reagente quimico industrial",
+            # "sonda" em contexto nao-medico
+            "sonda de perfuracao", "sonda de perfuração",
+            "sonda espacial",
+        },
+    ),
     "engenharia": SectorConfig(
         id="engenharia",
         name="Engenharia e Construção",

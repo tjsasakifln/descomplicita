@@ -14,7 +14,7 @@ class TestSectorConfig:
     def test_all_sectors_exist(self):
         sectors = list_sectors()
         ids = {s["id"] for s in sectors}
-        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia"}
+        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude"}
 
     def test_get_sector_returns_config(self):
         s = get_sector("vestuario")
@@ -215,6 +215,146 @@ class TestEngenhariaSector:
     def test_excludes_carroceria_madeira(self):
         """Audit FP: vehicle with wooden body matched 'madeira'."""
         ok, _ = self._match("Locação de caminhão toco com cabine suplementar e carroceria de madeira")
+        assert ok is False
+
+
+class TestSaudeSector:
+    """Tests for Saúde e Medicamentos sector."""
+
+    def _match(self, texto):
+        s = SECTORS["saude"]
+        return match_keywords(texto, s.keywords, s.exclusions)
+
+    # --- True positives ---
+
+    def test_matches_medicamentos(self):
+        ok, _ = self._match("AQUISIÇÃO DE MEDICAMENTOS PARA A REDE MUNICIPAL DE SAÚDE")
+        assert ok is True
+
+    def test_matches_insumos_hospitalares(self):
+        ok, _ = self._match("Registro de Preços para aquisição de insumos hospitalares")
+        assert ok is True
+
+    def test_matches_seringas_agulhas(self):
+        ok, _ = self._match("AQUISIÇÃO DE SERINGAS E AGULHAS DESCARTÁVEIS")
+        assert ok is True
+
+    def test_matches_luva_cirurgica(self):
+        ok, _ = self._match("Aquisição de luva cirúrgica estéril")
+        assert ok is True
+
+    def test_matches_soro_fisiologico(self):
+        ok, _ = self._match("AQUISIÇÃO DE SORO FISIOLÓGICO 500ML")
+        assert ok is True
+
+    def test_matches_antibiotico(self):
+        ok, _ = self._match("Registro de preços para aquisição de antibiótico injetável")
+        assert ok is True
+
+    def test_matches_vacinas(self):
+        ok, _ = self._match("AQUISIÇÃO DE VACINAS PARA CAMPANHA DE IMUNIZAÇÃO")
+        assert ok is True
+
+    def test_matches_reagente_laboratorial(self):
+        ok, _ = self._match("Aquisição de reagente laboratorial para análises clínicas")
+        assert ok is True
+
+    def test_matches_curativo(self):
+        ok, _ = self._match("AQUISIÇÃO DE MATERIAL DE CURATIVO PARA UBS")
+        assert ok is True
+
+    def test_matches_cateter(self):
+        ok, _ = self._match("Registro de preços para aquisição de cateteres intravenosos")
+        assert ok is True
+
+    def test_matches_kit_diagnostico(self):
+        ok, _ = self._match("AQUISIÇÃO DE KIT DIAGNÓSTICO PARA TESTE RÁPIDO DE COVID")
+        assert ok is True
+
+    def test_matches_insulina(self):
+        ok, _ = self._match("Aquisição de insulina NPH para a rede de saúde")
+        assert ok is True
+
+    def test_matches_comprimidos(self):
+        ok, _ = self._match("REGISTRO DE PREÇOS PARA AQUISIÇÃO DE COMPRIMIDOS DIVERSOS")
+        assert ok is True
+
+    def test_matches_mascara_cirurgica(self):
+        ok, _ = self._match("Aquisição de máscara cirúrgica descartável tripla camada")
+        assert ok is True
+
+    def test_matches_material_enfermagem(self):
+        ok, _ = self._match("AQUISIÇÃO DE MATERIAL DE ENFERMAGEM PARA HOSPITAL MUNICIPAL")
+        assert ok is True
+
+    def test_matches_hemoderivados(self):
+        ok, _ = self._match("Registro de preços para aquisição de hemoderivados")
+        assert ok is True
+
+    def test_matches_avental_hospitalar(self):
+        ok, _ = self._match("Aquisição de avental hospitalar descartável")
+        assert ok is True
+
+    def test_matches_bisturi(self):
+        ok, _ = self._match("AQUISIÇÃO DE BISTURI DESCARTÁVEL N. 23")
+        assert ok is True
+
+    def test_matches_fio_sutura(self):
+        ok, _ = self._match("Registro de preços para aquisição de fio de sutura absorvível")
+        assert ok is True
+
+    def test_matches_equipo(self):
+        ok, _ = self._match("AQUISIÇÃO DE EQUIPOS DE SORO MACROGOTAS")
+        assert ok is True
+
+    # --- True negatives (exclusions) ---
+
+    def test_excludes_medicamento_veterinario(self):
+        ok, _ = self._match("Aquisição de medicamento veterinário para controle de zoonoses")
+        assert ok is False
+
+    def test_excludes_uso_veterinario(self):
+        ok, _ = self._match("REGISTRO DE PREÇOS PARA AQUISIÇÃO DE SERINGAS DE USO VETERINÁRIO")
+        assert ok is False
+
+    def test_excludes_saude_financeira(self):
+        ok, _ = self._match("Consultoria para avaliação da saúde financeira do município")
+        assert ok is False
+
+    def test_excludes_saude_animal(self):
+        ok, _ = self._match("Programa de saúde animal para controle de raiva")
+        assert ok is False
+
+    def test_excludes_vigilancia_sanitaria(self):
+        ok, _ = self._match("Contratação de serviços de vigilância sanitária municipal")
+        assert ok is False
+
+    def test_excludes_soro_de_leite(self):
+        ok, _ = self._match("Aquisição de soro de leite em pó para merenda escolar")
+        assert ok is False
+
+    def test_excludes_sonda_perfuracao(self):
+        ok, _ = self._match("Contratação de sonda de perfuração para poço artesiano")
+        assert ok is False
+
+    def test_excludes_sonda_espacial(self):
+        ok, _ = self._match("Projeto educacional sobre sonda espacial para escolas")
+        assert ok is False
+
+    def test_excludes_anvisa(self):
+        ok, _ = self._match("Contratação de consultoria para registro na ANVISA")
+        assert ok is False
+
+    def test_excludes_farmacovigilancia(self):
+        ok, _ = self._match("Sistema de farmacovigilância para notificação de eventos adversos")
+        assert ok is False
+
+    def test_excludes_reagente_quimico_industrial(self):
+        ok, _ = self._match("Aquisição de reagente químico industrial para tratamento de água")
+        assert ok is False
+
+    def test_excludes_saude_do_solo(self):
+        ok, _ = self._match("Análise da saúde do solo para projeto agrícola")
         assert ok is False
 
 
