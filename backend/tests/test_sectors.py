@@ -14,7 +14,7 @@ class TestSectorConfig:
     def test_all_sectors_exist(self):
         sectors = list_sectors()
         ids = {s["id"] for s in sectors}
-        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos", "hospitalar", "seguranca"}
+        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos", "hospitalar", "seguranca", "servicos_gerais"}
 
     def test_get_sector_returns_config(self):
         s = get_sector("vestuario")
@@ -1037,4 +1037,262 @@ class TestSegurancaSector:
 
     def test_excludes_cybersecurity(self):
         ok, _ = self._match("Contratação de serviço de cybersecurity para infraestrutura de TI")
+        assert ok is False
+
+
+class TestServicosGeraisSector:
+    """Tests for Serviços Gerais e Manutenção sector."""
+
+    def _match(self, texto):
+        s = SECTORS["servicos_gerais"]
+        return match_keywords(texto, s.keywords, s.exclusions)
+
+    # --- True positives: termos gerais ---
+
+    def test_matches_servicos_gerais(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇOS GERAIS PARA PRÉDIO DA PREFEITURA")
+        assert ok is True
+
+    def test_matches_terceirizacao(self):
+        ok, _ = self._match("Contratação de empresa para terceirização de serviços")
+        assert ok is True
+
+    def test_matches_facilities(self):
+        ok, _ = self._match("CONTRATAÇÃO DE EMPRESA DE FACILITIES PARA O CAMPUS")
+        assert ok is True
+
+    def test_matches_servico_terceirizado(self):
+        ok, _ = self._match("Registro de preços para contratação de serviço terceirizado")
+        assert ok is True
+
+    # --- True positives: manutencao predial ---
+
+    def test_matches_manutencao_ar_condicionado(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE MANUTENÇÃO DE AR CONDICIONADO")
+        assert ok is True
+
+    def test_matches_manutencao_elevador(self):
+        ok, _ = self._match("Contratação de empresa para manutenção de elevadores")
+        assert ok is True
+
+    def test_matches_manutencao_climatizacao(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE CLIMATIZAÇÃO PARA O HOSPITAL")
+        assert ok is True
+
+    # --- True positives: jardinagem e paisagismo ---
+
+    def test_matches_jardinagem(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE JARDINAGEM PARA ÁREAS VERDES")
+        assert ok is True
+
+    def test_matches_paisagismo(self):
+        ok, _ = self._match("Contratação de serviço de paisagismo para praça pública")
+        assert ok is True
+
+    def test_matches_poda_arvores(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE PODA DE ÁRVORES EM VIAS PÚBLICAS")
+        assert ok is True
+
+    def test_matches_rocagem(self):
+        ok, _ = self._match("Contratação de serviço de roçagem em terrenos públicos")
+        assert ok is True
+
+    # --- True positives: controle de pragas ---
+
+    def test_matches_controle_pragas(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE CONTROLE DE PRAGAS PARA ESCOLAS")
+        assert ok is True
+
+    def test_matches_dedetizacao(self):
+        ok, _ = self._match("Registro de preços para serviço de dedetização em prédios públicos")
+        assert ok is True
+
+    def test_matches_desratizacao(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE DESRATIZAÇÃO PARA DEPÓSITOS")
+        assert ok is True
+
+    def test_matches_desinsetizacao(self):
+        ok, _ = self._match("Contratação de empresa para desinsetização de unidades de saúde")
+        assert ok is True
+
+    # --- True positives: portaria e recepcao ---
+
+    def test_matches_servico_portaria(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE PORTARIA PARA PRÉDIOS ADMINISTRATIVOS")
+        assert ok is True
+
+    def test_matches_porteiro(self):
+        ok, _ = self._match("Contratação de empresa para fornecimento de porteiros")
+        assert ok is True
+
+    def test_matches_recepcao(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE RECEPÇÃO PARA O FÓRUM")
+        assert ok is True
+
+    def test_matches_recepcionista(self):
+        ok, _ = self._match("Registro de preços para contratação de recepcionista")
+        assert ok is True
+
+    # --- True positives: copa e copeiragem ---
+
+    def test_matches_copeiragem(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE COPEIRAGEM PARA A SECRETARIA")
+        assert ok is True
+
+    # --- True positives: lavanderia ---
+
+    def test_matches_lavanderia_hospitalar(self):
+        ok, _ = self._match("Contratação de serviço de lavanderia hospitalar para o HM")
+        assert ok is True
+
+    def test_matches_lavanderia_industrial(self):
+        ok, _ = self._match("CONTRATAÇÃO DE LAVANDERIA INDUSTRIAL PARA UNIFORMES")
+        assert ok is True
+
+    # --- True positives: zeladoria ---
+
+    def test_matches_zeladoria(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE ZELADORIA PARA CONDOMÍNIO PÚBLICO")
+        assert ok is True
+
+    def test_matches_zelador(self):
+        ok, _ = self._match("Contratação de empresa para fornecimento de zelador")
+        assert ok is True
+
+    # --- True positives: prevencao e combate a incendio ---
+
+    def test_matches_brigada_incendio(self):
+        ok, _ = self._match("CONTRATAÇÃO DE BRIGADA DE INCÊNDIO PARA PRÉDIOS PÚBLICOS")
+        assert ok is True
+
+    def test_matches_avcb(self):
+        ok, _ = self._match("Contratação de empresa para obtenção de AVCB")
+        assert ok is True
+
+    def test_matches_recarga_extintor(self):
+        ok, _ = self._match("REGISTRO DE PREÇOS PARA RECARGA DE EXTINTOR DE INCÊNDIO")
+        assert ok is True
+
+    # --- True positives: manutencao de sistemas prediais ---
+
+    def test_matches_grupo_gerador(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE GRUPO GERADOR PARA HOSPITAL")
+        assert ok is True
+
+    def test_matches_manutencao_eletrica(self):
+        ok, _ = self._match("Contratação de serviço de manutenção elétrica predial")
+        assert ok is True
+
+    def test_matches_manutencao_hidraulica(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO HIDRÁULICA PARA ESCOLAS")
+        assert ok is True
+
+    def test_matches_manutencao_subestacao(self):
+        ok, _ = self._match("Contratação de serviço de manutenção de subestação elétrica")
+        assert ok is True
+
+    def test_matches_manutencao_preventiva_predial(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO PREVENTIVA PREDIAL PARA SECRETARIAS")
+        assert ok is True
+
+    # --- True positives: servicos especificos ---
+
+    def test_matches_limpeza_caixa_dagua(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE LIMPEZA DE CAIXA D'ÁGUA")
+        assert ok is True
+
+    def test_matches_tratamento_piscina(self):
+        ok, _ = self._match("Contratação de serviço de tratamento de piscina pública")
+        assert ok is True
+
+    # --- True negatives: manutencao de TI ---
+
+    def test_excludes_manutencao_software(self):
+        ok, _ = self._match("Contratação de serviço de manutenção de software ERP")
+        assert ok is False
+
+    def test_excludes_manutencao_sistema(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE SISTEMA DE GESTÃO")
+        assert ok is False
+
+    def test_excludes_manutencao_rede(self):
+        ok, _ = self._match("Contratação de serviço de manutenção de rede corporativa")
+        assert ok is False
+
+    def test_excludes_manutencao_computador(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE COMPUTADOR PARA ESCOLAS")
+        assert ok is False
+
+    # --- True negatives: manutencao veicular ---
+
+    def test_excludes_manutencao_veiculo(self):
+        ok, _ = self._match("Contratação de manutenção de veículo da frota municipal")
+        assert ok is False
+
+    def test_excludes_manutencao_frota(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE FROTA PARA SECRETARIA")
+        assert ok is False
+
+    def test_excludes_manutencao_veicular(self):
+        ok, _ = self._match("Registro de preços para manutenção veicular preventiva")
+        assert ok is False
+
+    def test_excludes_manutencao_automotiva(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE MANUTENÇÃO AUTOMOTIVA")
+        assert ok is False
+
+    # --- True negatives: manutencao hospitalar ---
+
+    def test_excludes_manutencao_equipamento_medico(self):
+        ok, _ = self._match("Contratação de manutenção de equipamento médico para hospital")
+        assert ok is False
+
+    def test_excludes_manutencao_equipamento_hospitalar(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE EQUIPAMENTO HOSPITALAR")
+        assert ok is False
+
+    # --- True negatives: manutencao de infraestrutura viaria ---
+
+    def test_excludes_manutencao_estrada(self):
+        ok, _ = self._match("Contratação de serviço de manutenção de estrada rural")
+        assert ok is False
+
+    def test_excludes_manutencao_rodovia(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE RODOVIA ESTADUAL")
+        assert ok is False
+
+    def test_excludes_manutencao_ponte(self):
+        ok, _ = self._match("Contratação de empresa para manutenção de ponte sobre o rio")
+        assert ok is False
+
+    def test_excludes_manutencao_pavimento(self):
+        ok, _ = self._match("CONTRATAÇÃO DE MANUTENÇÃO DE PAVIMENTO ASFÁLTICO")
+        assert ok is False
+
+    # --- True negatives: servicos intelectuais ---
+
+    def test_excludes_consultoria(self):
+        ok, _ = self._match("Contratação de serviço de consultoria em gestão pública")
+        assert ok is False
+
+    def test_excludes_auditoria(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE AUDITORIA CONTÁBIL")
+        assert ok is False
+
+    def test_excludes_contabilidade(self):
+        ok, _ = self._match("Contratação de serviço de contabilidade para o município")
+        assert ok is False
+
+    def test_excludes_servico_juridico(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO JURÍDICO PARA A PROCURADORIA")
+        assert ok is False
+
+    # --- True negatives: terceirizacao em contexto politico ---
+
+    def test_excludes_lei_terceirizacao(self):
+        ok, _ = self._match("Adequação à lei de terceirização para contratos vigentes")
+        assert ok is False
+
+    def test_excludes_reforma_trabalhista(self):
+        ok, _ = self._match("Treinamento sobre reforma trabalhista para servidores")
         assert ok is False

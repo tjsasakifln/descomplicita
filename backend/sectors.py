@@ -642,6 +642,85 @@ SECTORS: Dict[str, SectorConfig] = {
             "centrifuga de acucar", "centrífuga de açúcar",
         },
     ),
+    "servicos_gerais": SectorConfig(
+        id="servicos_gerais",
+        name="Serviços Gerais e Manutenção",
+        description="Manutenção predial, facilities, jardinagem, controle de pragas, portaria, zeladoria",
+        keywords={
+            # Termos gerais
+            "servicos gerais", "serviços gerais",
+            "servico terceirizado", "serviço terceirizado",
+            "terceirizacao", "terceirização",
+            "facilities", "facility management",
+            # Manutencao predial (HVAC, elevadores)
+            "manutencao de ar condicionado", "manutenção de ar condicionado",
+            "manutencao de climatizacao", "manutenção de climatização",
+            "manutencao de elevador", "manutenção de elevador",
+            "manutencao de elevadores", "manutenção de elevadores",
+            # Jardinagem e paisagismo
+            "jardinagem", "paisagismo",
+            "poda de arvore", "poda de árvore", "poda de arvores", "poda de árvores",
+            "rocagem", "roçagem", "rocada", "roçada",
+            # Controle de pragas
+            "controle de pragas", "dedetizacao", "dedetização",
+            "desinsetizacao", "desinsetização",
+            "desratizacao", "desratização",
+            # Portaria e recepcao
+            "servico de portaria", "serviço de portaria",
+            "porteiro", "porteiros",
+            "recepcao", "recepção", "recepcionista",
+            "servico de recepcao", "serviço de recepção",
+            # Copa e copeiragem
+            "copeiragem", "copeiro", "copeira",
+            # Lavanderia
+            "lavanderia hospitalar", "lavanderia industrial",
+            # Zeladoria
+            "zeladoria", "zelador",
+            # Prevencao e combate a incendio
+            "brigada de incendio", "brigada de incêndio",
+            "AVCB", "PPCI",
+            "recarga de extintor", "extintor de incendio", "extintor de incêndio",
+            # Manutencao de sistemas prediais
+            "manutencao de grupo gerador", "manutenção de grupo gerador",
+            "grupo gerador",
+            "manutencao eletrica", "manutenção elétrica",
+            "manutencao hidraulica", "manutenção hidráulica",
+            "manutencao de subestacao", "manutenção de subestação",
+            "manutencao preventiva predial", "manutenção preventiva predial",
+            # Servicos especificos
+            "limpeza de caixa d'agua", "limpeza de caixa d'água",
+            "manutencao de piscina", "manutenção de piscina",
+            "tratamento de piscina",
+        },
+        exclusions={
+            # Manutencao em contexto de TI
+            "manutencao de software", "manutenção de software",
+            "manutencao de sistema", "manutenção de sistema",
+            "manutencao de rede", "manutenção de rede",
+            "manutencao de computador", "manutenção de computador",
+            # Manutencao veicular (setor veiculos)
+            "manutencao de veiculo", "manutenção de veículo",
+            "manutencao de frota", "manutenção de frota",
+            "manutencao veicular", "manutenção veicular",
+            "manutencao automotiva", "manutenção automotiva",
+            # Manutencao de equipamento medico (setor hospitalar)
+            "manutencao de equipamento medico", "manutenção de equipamento médico",
+            "manutencao de equipamento hospitalar", "manutenção de equipamento hospitalar",
+            # Manutencao de infraestrutura viaria (setor engenharia)
+            "manutencao de estrada", "manutenção de estrada",
+            "manutencao de rodovia", "manutenção de rodovia",
+            "manutencao de ponte", "manutenção de ponte",
+            "manutencao de pavimento", "manutenção de pavimento",
+            # Servicos intelectuais/profissionais (nao sao servicos gerais)
+            "servico de consultoria", "serviço de consultoria",
+            "servico de auditoria", "serviço de auditoria",
+            "servico de contabilidade", "serviço de contabilidade",
+            "servico juridico", "serviço jurídico",
+            # "terceirizacao" em contexto generico/politico
+            "lei de terceirizacao", "lei de terceirização",
+            "reforma trabalhista",
+        },
+    ),
     "seguranca": SectorConfig(
         id="seguranca",
         name="Segurança e Vigilância",
