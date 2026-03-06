@@ -2,42 +2,11 @@
  * @jest-environment node
  */
 
-// Set poll interval to 0 and timeout short for fast tests.
-// These must be set BEFORE importing the route module.
-process.env.POLL_INTERVAL_MS = "0";
-process.env.POLL_TIMEOUT_MS = "1000";
-
 import { POST } from "@/app/api/buscar/route";
 import { NextRequest } from "next/server";
 
-// Mock fetch globally
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
-
-/**
- * Helper: mock the 3-step async flow (create job -> poll status -> get result).
- * Returns the job ID used.
- */
-function mockAsyncJobFlow(resultData: Record<string, unknown>, jobId = "test-job-1234") {
-  mockFetch
-    // 1. POST /buscar -> create job
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ job_id: jobId, status: "queued" }),
-    })
-    // 2. GET /buscar/{job_id}/status -> completed
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ job_id: jobId, status: "completed" }),
-    })
-    // 3. GET /buscar/{job_id}/result -> result data
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ job_id: jobId, status: "completed", ...resultData }),
-    });
-
-  return jobId;
-}
 
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost:3000/api/buscar", {
@@ -52,26 +21,12 @@ const validBody = {
   data_final: "2026-01-07",
 };
 
-const mockResult = {
-  resumo: {
-    resumo_executivo: "Test summary",
-    total_oportunidades: 5,
-    valor_total: 100000,
-    destaques: ["Test"],
-    alerta_urgencia: null,
-  },
-  excel_base64: Buffer.from("test").toString("base64"),
-  total_raw: 10,
-  total_filtrado: 5,
-  filter_stats: null,
-};
-
 describe("POST /api/buscar", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  // --- Validation tests (no fetch calls needed) ---
+  // --- Validation tests ---
 
   it("should validate missing UFs", async () => {
     const response = await POST(
@@ -107,20 +62,20 @@ describe("POST /api/buscar", () => {
     expect(data.message).toBe("Selecione pelo menos um estado");
   });
 
-  // --- Async job flow tests ---
+  // --- Job creation tests ---
 
-  it("should proxy valid request to backend and return result", async () => {
-    mockAsyncJobFlow(mockResult);
+  it("should create job and return job_id", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ job_id: "test-job-123", status: "queued" }),
+    });
 
     const response = await POST(makeRequest(validBody));
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.resumo).toEqual(mockResult.resumo);
-    expect(data.download_id).toBeDefined();
-    expect(typeof data.download_id).toBe("string");
+    expect(data.job_id).toBe("test-job-123");
 
-    // Verify first fetch was POST to /buscar
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/buscar"),
       expect.objectContaining({
@@ -168,62 +123,17 @@ describe("POST /api/buscar", () => {
     expect(data.message).toContain("Backend indisponível");
   });
 
-  it("should handle failed job result", async () => {
-    const jobId = "test-job-failed";
-
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "queued" }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "failed" }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "failed", error: "PNCP timeout" }),
-      });
-
-    const response = await POST(makeRequest(validBody));
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.message).toBe("PNCP timeout");
-  });
-
-  it("should save Excel and return download_id", async () => {
-    mockAsyncJobFlow(mockResult);
-
-    const response = await POST(makeRequest(validBody));
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.download_id).toBeDefined();
-    expect(typeof data.download_id).toBe("string");
-    // download_id format: timestamp_uuid
-    expect(data.download_id).toMatch(/_/);
-  });
-
-  it("should return statistics from result", async () => {
-    mockAsyncJobFlow({ ...mockResult, total_raw: 100, total_filtrado: 15 });
-
-    const response = await POST(makeRequest(validBody));
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.total_raw).toBe(100);
-    expect(data.total_filtrado).toBe(15);
-  });
-
   it("should use BACKEND_URL from environment", async () => {
     const originalEnv = process.env.BACKEND_URL;
     process.env.BACKEND_URL = "http://custom:9000";
 
-    mockAsyncJobFlow(mockResult);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ job_id: "test-job", status: "queued" }),
+    });
+
     await POST(makeRequest(validBody));
 
-    // First call should be to custom backend URL
     expect(mockFetch).toHaveBeenCalledWith(
       "http://custom:9000/buscar",
       expect.any(Object)
@@ -232,54 +142,34 @@ describe("POST /api/buscar", () => {
     process.env.BACKEND_URL = originalEnv;
   });
 
-  it("should poll status until completed", async () => {
-    const jobId = "test-poll-job";
-
-    mockFetch
-      // 1. POST /buscar
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "queued" }),
-      })
-      // 2. First poll -> still running
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "running" }),
-      })
-      // 3. Second poll -> completed
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "completed" }),
-      })
-      // 4. GET result
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ job_id: jobId, status: "completed", ...mockResult }),
-      });
-
-    const response = await POST(makeRequest(validBody));
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.resumo).toEqual(mockResult.resumo);
-    // Should have made 4 fetch calls total
-    expect(mockFetch).toHaveBeenCalledTimes(4);
-  });
-
-  it("should handle no excel gracefully", async () => {
-    mockAsyncJobFlow({
-      resumo: mockResult.resumo,
-      excel_base64: "",
-      total_raw: 50,
-      total_filtrado: 0,
-      filter_stats: null,
+  it("should pass setor_id and termos_busca to backend", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ job_id: "test-job", status: "queued" }),
     });
 
-    const response = await POST(makeRequest(validBody));
-    const data = await response.json();
+    await POST(
+      makeRequest({
+        ...validBody,
+        setor_id: "informatica",
+        termos_busca: "notebook laptop",
+      })
+    );
 
-    expect(response.status).toBe(200);
-    expect(data.download_id).toBeNull();
-    expect(data.total_filtrado).toBe(0);
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(callBody.setor_id).toBe("informatica");
+    expect(callBody.termos_busca).toBe("notebook laptop");
+  });
+
+  it("should default setor_id to vestuario when null", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ job_id: "test-job", status: "queued" }),
+    });
+
+    await POST(makeRequest({ ...validBody, setor_id: null }));
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(callBody.setor_id).toBe("vestuario");
   });
 });

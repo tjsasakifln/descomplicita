@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import type { BuscaResult, ValidationErrors, Setor } from "./types";
+import { useState, useEffect, useRef, useCallback } from "react";
+import type { BuscaResult, ValidationErrors, Setor, SearchPhase } from "./types";
 import { LoadingProgress } from "./components/LoadingProgress";
 import { EmptyState } from "./components/EmptyState";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -66,13 +66,23 @@ export default function HomePage() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [result, setResult] = useState<BuscaResult | null>(null);
   const [rawCount, setRawCount] = useState(0);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+
+  // Polling state
+  const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
+  const [ufsCompleted, setUfsCompleted] = useState(0);
+  const [ufsTotal, setUfsTotal] = useState(0);
+  const [itemsFetched, setItemsFetched] = useState(0);
+  const [itemsFiltered, setItemsFiltered] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobIdRef = useRef<string | null>(null);
+  const searchStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
     fetch("/api/setores")
@@ -147,6 +157,127 @@ export default function HomePage() {
       ? `"${termosArray.join('", "')}"`
       : "Licitações";
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    jobIdRef.current = null;
+  }, []);
+
+  const resetProgressState = useCallback(() => {
+    setSearchPhase("idle");
+    setUfsCompleted(0);
+    setUfsTotal(0);
+    setItemsFetched(0);
+    setItemsFiltered(0);
+    setElapsedSeconds(0);
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    stopPolling();
+    setLoading(false);
+    resetProgressState();
+    trackEvent("search_cancelled", {
+      elapsed_time_ms: Date.now() - searchStartTimeRef.current,
+      last_phase: searchPhase,
+    });
+  }, [stopPolling, resetProgressState, trackEvent, searchPhase]);
+
+  const fetchResult = useCallback(async (jobId: string) => {
+    const response = await fetch(`/api/buscar/result?job_id=${jobId}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Erro ao obter resultado da busca");
+    }
+
+    const data = await response.json();
+
+    if (data.status === "running") {
+      return null; // still running
+    }
+
+    return data as BuscaResult;
+  }, []);
+
+  const startPolling = useCallback((jobId: string) => {
+    const POLL_INTERVAL = 2000;
+    const POLL_TIMEOUT = 10 * 60 * 1000; // 10 min
+    const deadline = Date.now() + POLL_TIMEOUT;
+
+    pollingRef.current = setInterval(async () => {
+      if (Date.now() > deadline) {
+        stopPolling();
+        setError("A consulta excedeu o tempo limite. Tente com menos estados ou um período menor.");
+        setLoading(false);
+        resetProgressState();
+        return;
+      }
+
+      try {
+        // Poll status
+        const statusRes = await fetch(`/api/buscar/status?job_id=${jobId}`);
+        if (!statusRes.ok) return; // silently retry next interval
+
+        const statusData = await statusRes.json();
+        const progress = statusData.progress || {};
+
+        setSearchPhase(progress.phase || statusData.status || "queued");
+        setUfsCompleted(progress.ufs_completed || 0);
+        setUfsTotal(progress.ufs_total || 0);
+        setItemsFetched(progress.items_fetched || 0);
+        setItemsFiltered(progress.items_filtered || 0);
+        setElapsedSeconds(Math.round(statusData.elapsed_seconds || 0));
+
+        // Check if done
+        if (statusData.status === "completed" || statusData.status === "failed") {
+          stopPolling();
+
+          try {
+            const resultData = await fetchResult(jobId);
+
+            if (resultData) {
+              setResult(resultData);
+              setRawCount(resultData.total_raw || 0);
+
+              const timeElapsed = Date.now() - searchStartTimeRef.current;
+              trackEvent("search_completed", {
+                time_elapsed_ms: timeElapsed,
+                time_elapsed_readable: `${Math.floor(timeElapsed / 1000)}s`,
+                total_raw: resultData.total_raw || 0,
+                total_filtered: resultData.total_filtrado || 0,
+                filter_ratio: resultData.total_raw > 0
+                  ? ((resultData.total_filtrado / resultData.total_raw) * 100).toFixed(1) + "%"
+                  : "0%",
+                valor_total: resultData.resumo?.valor_total || 0,
+                has_summary: !!resultData.resumo?.resumo_executivo,
+              });
+            }
+          } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : "Erro ao obter resultado";
+            setError(errorMessage);
+            trackEvent("search_failed", {
+              error_message: errorMessage,
+              time_elapsed_ms: Date.now() - searchStartTimeRef.current,
+            });
+          }
+
+          setLoading(false);
+          resetProgressState();
+        }
+      } catch {
+        // Network error — silently retry next interval
+      }
+    }, POLL_INTERVAL);
+  }, [stopPolling, resetProgressState, fetchResult, trackEvent]);
+
   const buscar = async () => {
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
@@ -154,16 +285,18 @@ export default function HomePage() {
       return;
     }
 
+    stopPolling();
     setLoading(true);
-    setLoadingStep(1);
     setError(null);
     setResult(null);
     setRawCount(0);
+    resetProgressState();
+    setSearchPhase("queued");
 
-    const searchStartTime = Date.now();
+    searchStartTimeRef.current = Date.now();
 
     // Track search_started event
-    trackEvent('search_started', {
+    trackEvent("search_started", {
       ufs: Array.from(ufsSelecionadas),
       uf_count: ufsSelecionadas.size,
       date_range: {
@@ -187,7 +320,7 @@ export default function HomePage() {
           data_final: dataFinal,
           setor_id: searchMode === "setor" ? setorId : null,
           termos_busca: searchMode === "termos" ? termosArray.join(" ") : null,
-        })
+        }),
       });
 
       if (!response.ok) {
@@ -195,45 +328,29 @@ export default function HomePage() {
         throw new Error(err.message || "Erro ao buscar licitações");
       }
 
-      const data: BuscaResult = await response.json();
-      setResult(data);
-      setRawCount(data.total_raw || 0);
+      const data = await response.json();
+      const jobId = data.job_id;
 
-      const searchEndTime = Date.now();
-      const timeElapsed = searchEndTime - searchStartTime;
+      if (!jobId) {
+        throw new Error("Erro: job_id não retornado pelo servidor");
+      }
 
-      // Track search_completed event
-      trackEvent('search_completed', {
-        time_elapsed_ms: timeElapsed,
-        time_elapsed_readable: `${Math.floor(timeElapsed / 1000)}s`,
-        total_raw: data.total_raw || 0,
-        total_filtered: data.total_filtrado || 0,
-        filter_ratio: data.total_raw > 0
-          ? ((data.total_filtrado / data.total_raw) * 100).toFixed(1) + '%'
-          : '0%',
-        valor_total: data.resumo?.valor_total || 0,
-        has_summary: !!data.resumo?.resumo_executivo,
-        ufs: Array.from(ufsSelecionadas),
-        uf_count: ufsSelecionadas.size,
-        search_mode: searchMode,
-      });
-
+      jobIdRef.current = jobId;
+      startPolling(jobId);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Erro desconhecido";
       setError(errorMessage);
+      setLoading(false);
+      resetProgressState();
 
-      // Track search_failed event
-      trackEvent('search_failed', {
+      trackEvent("search_failed", {
         error_message: errorMessage,
-        error_type: e instanceof Error ? e.constructor.name : 'unknown',
-        time_elapsed_ms: Date.now() - searchStartTime,
+        error_type: e instanceof Error ? e.constructor.name : "unknown",
+        time_elapsed_ms: Date.now() - searchStartTimeRef.current,
         ufs: Array.from(ufsSelecionadas),
         uf_count: ufsSelecionadas.size,
         search_mode: searchMode,
       });
-    } finally {
-      setLoading(false);
-      setLoadingStep(1);
     }
   };
 
@@ -679,9 +796,13 @@ export default function HomePage() {
         {loading && (
           <div aria-live="polite">
             <LoadingProgress
-              currentStep={loadingStep}
-              estimatedTime={Math.max(30, ufsSelecionadas.size * 6)}
-              stateCount={ufsSelecionadas.size}
+              phase={searchPhase}
+              ufsCompleted={ufsCompleted}
+              ufsTotal={ufsTotal}
+              itemsFetched={itemsFetched}
+              itemsFiltered={itemsFiltered}
+              elapsedSeconds={elapsedSeconds}
+              onCancel={handleCancel}
             />
           </div>
         )}

@@ -61,3 +61,39 @@ export interface ValidationErrors {
   data_final?: string;
   date_range?: string;
 }
+
+/** Search phase from backend job status */
+export type SearchPhase =
+  | "idle"
+  | "queued"
+  | "fetching"
+  | "filtering"
+  | "summarizing"
+  | "generating_excel"
+  | "completed"
+  | "failed";
+
+/** Real-time search progress from backend polling */
+export interface SearchProgress {
+  phase: SearchPhase;
+  ufs_completed: number;
+  ufs_total: number;
+  items_fetched: number;
+  items_filtered: number;
+  elapsed_seconds: number;
+}
+
+/** Backend job status response */
+export interface JobStatusResponse {
+  job_id: string;
+  status: string;
+  progress: {
+    phase: string;
+    ufs_completed: number;
+    ufs_total: number;
+    items_fetched: number;
+    items_filtered: number;
+  };
+  created_at: string;
+  elapsed_seconds: number;
+}

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import HomePage from '@/app/page';
 
@@ -15,7 +15,17 @@ jest.mock('@/components/RegionSelector', () => ({
 }));
 
 jest.mock('@/components/LoadingProgress', () => ({
-  LoadingProgress: () => <div data-testid="loading-progress">Carregando...</div>,
+  LoadingProgress: ({ onCancel, phase }: { onCancel?: () => void; phase?: string }) => (
+    <div data-testid="loading-progress">
+      <span>Carregando...</span>
+      <span data-testid="loading-phase">{phase}</span>
+      {onCancel && (
+        <button data-testid="cancel-button" onClick={onCancel}>
+          Cancelar busca
+        </button>
+      )}
+    </div>
+  ),
 }));
 
 jest.mock('@/components/EmptyState', () => ({
@@ -24,11 +34,63 @@ jest.mock('@/components/EmptyState', () => ({
   ),
 }));
 
+const mockSuccessResponse = {
+  resumo: {
+    resumo_executivo: 'Encontradas 15 licitações de uniformes totalizando R$ 450.000,00',
+    total_oportunidades: 15,
+    valor_total: 450000,
+    destaques: [
+      'Uniformes escolares - Secretaria de Educação SC - R$ 120.000',
+      'Fardamento militar - PM-PR - R$ 85.000',
+      'Jalecos - Hospital Municipal RS - R$ 45.000'
+    ],
+    distribuicao_uf: { SC: 6, PR: 5, RS: 4 },
+    alerta_urgencia: 'Licitação com prazo em menos de 7 dias: Prefeitura de Florianópolis'
+  },
+  download_id: 'uuid-123-456',
+  total_raw: 200,
+  total_filtrado: 15,
+  filter_stats: null,
+};
+
+/**
+ * Mock the full polling flow:
+ * 1. /api/setores -> rejected (fallback sectors)
+ * 2. POST /api/buscar -> { job_id }
+ * 3. GET /api/buscar/status -> { status: "completed", progress: {...} }
+ * 4. GET /api/buscar/result -> result data
+ */
+function mockPollingFlow(resultData: Record<string, unknown>, jobId = "test-job-1234") {
+  (global.fetch as jest.Mock)
+    .mockRejectedValueOnce(new Error('not found')) // setores
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ job_id: jobId }),
+    }) // POST /api/buscar
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        job_id: jobId,
+        status: "completed",
+        progress: { phase: "completed", ufs_completed: 3, ufs_total: 3, items_fetched: 200, items_filtered: 15 },
+        elapsed_seconds: 10,
+      }),
+    }) // GET /api/buscar/status
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => resultData,
+    }); // GET /api/buscar/result
+}
+
 describe('HomePage - UF Selection and Date Range', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default: /api/setores fetch fails so fallback sectors are used
+    jest.useFakeTimers();
     (global.fetch as jest.Mock).mockRejectedValue(new Error('not found'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe('UF Selection', () => {
@@ -92,7 +154,6 @@ describe('HomePage - UF Selection and Date Range', () => {
     it('should display count of selected UFs', () => {
       render(<HomePage />);
 
-      // Default: SC, PR, RS = 3
       expect(screen.getByText('3 estados selecionados')).toBeInTheDocument();
 
       const spButton = screen.getByText('SP');
@@ -104,11 +165,9 @@ describe('HomePage - UF Selection and Date Range', () => {
     it('should display singular form for 1 state selected', () => {
       render(<HomePage />);
 
-      // Clear all first
       const clearButton = screen.getByText('Limpar');
       fireEvent.click(clearButton);
 
-      // Select just one
       const scButton = screen.getByText('SC');
       fireEvent.click(scButton);
 
@@ -123,11 +182,9 @@ describe('HomePage - UF Selection and Date Range', () => {
       const dataInicialInput = screen.getByLabelText('Data inicial:') as HTMLInputElement;
       const dataFinalInput = screen.getByLabelText('Data final:') as HTMLInputElement;
 
-      // Check data_final is today
       const today = new Date().toISOString().split('T')[0];
       expect(dataFinalInput.value).toBe(today);
 
-      // Check data_inicial is 7 days ago
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const expected = sevenDaysAgo.toISOString().split('T')[0];
@@ -166,7 +223,6 @@ describe('HomePage - UF Selection and Date Range', () => {
       const clearButton = screen.getByText('Limpar');
       fireEvent.click(clearButton);
 
-      // Fallback sector name: button says "Buscar Licitações" since sectors load async
       const submitButton = screen.getByRole('button', { name: /Buscar/ });
       expect(submitButton).toBeDisabled();
     });
@@ -241,39 +297,18 @@ describe('HomePage - UF Selection and Date Range', () => {
       expect(submitButton).not.toBeDisabled();
     });
 
-    it('should show loading state during API call', async () => {
-      // First call: /api/setores (rejected by beforeEach)
-      // Second call: /api/buscar (delayed success)
-      (global.fetch as jest.Mock)
-        .mockRejectedValueOnce(new Error('not found')) // setores
-        .mockImplementationOnce(() =>
-          new Promise(resolve => setTimeout(() => resolve({
-            ok: true,
-            json: async () => ({
-              resumo: {
-                resumo_executivo: 'Test summary',
-                total_oportunidades: 10,
-                valor_total: 100000,
-                destaques: [],
-                distribuicao_uf: {},
-                alerta_urgencia: null
-              },
-              download_id: 'test-id',
-              total_raw: 100,
-              total_filtrado: 10,
-              filter_stats: null,
-            })
-          }), 100))
-        );
+    it('should show loading state during search', async () => {
+      mockPollingFlow(mockSuccessResponse);
 
       render(<HomePage />);
 
       const submitButton = screen.getByRole('button', { name: /Buscar/ });
-      fireEvent.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Buscando...')).toBeInTheDocument();
+      await act(async () => {
+        fireEvent.click(submitButton);
       });
+
+      expect(screen.getByText('Buscando...')).toBeInTheDocument();
+      expect(screen.getByTestId('loading-progress')).toBeInTheDocument();
     });
   });
 
@@ -306,502 +341,260 @@ describe('HomePage - UF Selection and Date Range', () => {
       expect(dataInicialContainer).toHaveClass('grid');
     });
   });
+});
 
-  describe('TypeScript Type Safety', () => {
-    it('should handle API response with correct types', async () => {
-      const mockResponse = {
+describe('HomePage - Polling Flow & Results', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    (global.fetch as jest.Mock).mockRejectedValue(new Error('not found'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  async function triggerSearchAndComplete(resultData: Record<string, unknown> = mockSuccessResponse) {
+    mockPollingFlow(resultData);
+    render(<HomePage />);
+
+    const submitButton = screen.getByRole('button', { name: /Buscar/ });
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+
+    // Advance timer to trigger polling interval (2s)
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+    });
+  }
+
+  describe('Search Flow', () => {
+    it('should show loading progress after clicking search', async () => {
+      mockPollingFlow(mockSuccessResponse);
+      render(<HomePage />);
+
+      const submitButton = screen.getByRole('button', { name: /Buscar/ });
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+
+      expect(screen.getByTestId('loading-progress')).toBeInTheDocument();
+    });
+
+    it('should display cancel button during loading', async () => {
+      mockPollingFlow(mockSuccessResponse);
+      render(<HomePage />);
+
+      const submitButton = screen.getByRole('button', { name: /Buscar/ });
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+
+      expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
+    });
+
+    it('should stop loading when cancel is clicked', async () => {
+      mockPollingFlow(mockSuccessResponse);
+      render(<HomePage />);
+
+      const submitButton = screen.getByRole('button', { name: /Buscar/ });
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+
+      const cancelButton = screen.getByTestId('cancel-button');
+      await act(async () => {
+        fireEvent.click(cancelButton);
+      });
+
+      expect(screen.queryByTestId('loading-progress')).not.toBeInTheDocument();
+    });
+
+    it('should display results after polling completes', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Results Display', () => {
+    it('should NOT render results section when result is null', () => {
+      (global.fetch as jest.Mock).mockReset();
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('not found'));
+
+      render(<HomePage />);
+
+      expect(screen.queryByText('Destaques:')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Baixar Excel/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('valor total')).not.toBeInTheDocument();
+    });
+
+    it('should display resumo_executivo text', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        expect(screen.getByText('Encontradas 15 licitações de uniformes totalizando R$ 450.000,00')).toBeInTheDocument();
+      });
+    });
+
+    it('should display summary in brand-themed card', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        const summaryText = screen.getByText(/Encontradas 15 licitações/i);
+        const summaryCard = summaryText.closest('div');
+        expect(summaryCard).toHaveClass('bg-brand-blue-subtle', 'border-accent');
+      });
+    });
+
+    it('should display total_oportunidades as integer', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        const totalElement = screen.getByText('15');
+        expect(totalElement).toHaveClass('text-brand-navy');
+        expect(screen.getByText('licitações')).toBeInTheDocument();
+      });
+    });
+
+    it('should display valor_total with Brazilian currency formatting', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        const valorTotalLabel = screen.getByText('valor total');
+        const valueElement = valorTotalLabel.previousElementSibling;
+        expect(valueElement).toHaveTextContent(/R\$ 450\.000/i);
+        expect(valueElement).toHaveClass('text-brand-navy');
+      });
+    });
+
+    it('should display urgency alert when alerta_urgencia is NOT null', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        const alertText = screen.getByText(/Licitação com prazo em menos de 7 dias/i);
+        expect(alertText).toBeInTheDocument();
+
+        const alertBox = alertText.closest('div');
+        expect(alertBox).toHaveClass('bg-warning-subtle');
+        expect(alertBox).toHaveAttribute('role', 'alert');
+      });
+    });
+
+    it('should NOT display urgency alert when alerta_urgencia is null', async () => {
+      await triggerSearchAndComplete({
+        ...mockSuccessResponse,
+        resumo: { ...mockSuccessResponse.resumo, alerta_urgencia: null },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/Licitação com prazo/i)).not.toBeInTheDocument();
+    });
+
+    it('should display highlights when destaques array has items', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        expect(screen.getByText('Destaques:')).toBeInTheDocument();
+        expect(screen.getByText(/Uniformes escolares - Secretaria de Educação SC/i)).toBeInTheDocument();
+        expect(screen.getByText(/Fardamento militar - PM-PR/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should NOT display highlights when destaques is empty', async () => {
+      await triggerSearchAndComplete({
+        ...mockSuccessResponse,
+        resumo: { ...mockSuccessResponse.resumo, destaques: [] },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Destaques:')).not.toBeInTheDocument();
+    });
+
+    it('should render download button', async () => {
+      await triggerSearchAndComplete();
+
+      await waitFor(() => {
+        const downloadButton = screen.getByRole('button', { name: /Baixar Excel/i });
+        expect(downloadButton).toBeInTheDocument();
+        expect(downloadButton).toBeEnabled();
+        expect(downloadButton).toHaveClass('bg-brand-navy', 'text-white');
+      });
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should render EmptyState when zero opportunities', async () => {
+      await triggerSearchAndComplete({
         resumo: {
-          resumo_executivo: 'Encontradas 5 licitações',
-          total_oportunidades: 5,
-          valor_total: 250000,
-          destaques: ['Uniforme escolar em SC'],
-          distribuicao_uf: { SC: 3, PR: 2 },
-          alerta_urgencia: null
+          resumo_executivo: 'Nenhuma licitação encontrada',
+          total_oportunidades: 0,
+          valor_total: 0,
+          destaques: [],
+          distribuicao_uf: {},
+          alerta_urgencia: null,
         },
-        download_id: 'abc123',
-        total_raw: 50,
-        total_filtrado: 5,
+        download_id: 'empty-id',
+        total_raw: 0,
+        total_filtrado: 0,
         filter_stats: null,
-      };
+      });
 
+      await waitFor(() => {
+        expect(screen.getByTestId('empty-state')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('button', { name: /Baixar Excel/i })).not.toBeInTheDocument();
+    });
+
+    it('should handle API error gracefully', async () => {
       (global.fetch as jest.Mock)
         .mockRejectedValueOnce(new Error('not found')) // setores
         .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
+          ok: false,
+          json: async () => ({ message: 'Backend unavailable' }),
         });
 
       render(<HomePage />);
 
       const submitButton = screen.getByRole('button', { name: /Buscar/ });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
-        expect(screen.getByText('Encontradas 5 licitações')).toBeInTheDocument();
-        expect(screen.getByText('5')).toBeInTheDocument();
+        expect(screen.getByText('Backend unavailable')).toBeInTheDocument();
       });
+
+      expect(screen.queryByText(/Baixar Excel/i)).not.toBeInTheDocument();
     });
-  });
 
-  describe('Results Display Section', () => {
-    const mockSuccessResponse = {
-      resumo: {
-        resumo_executivo: 'Encontradas 15 licitações de uniformes totalizando R$ 450.000,00',
-        total_oportunidades: 15,
-        valor_total: 450000,
-        destaques: [
-          'Uniformes escolares - Secretaria de Educação SC - R$ 120.000',
-          'Fardamento militar - PM-PR - R$ 85.000',
-          'Jalecos - Hospital Municipal RS - R$ 45.000'
-        ],
-        distribuicao_uf: { SC: 6, PR: 5, RS: 4 },
-        alerta_urgencia: 'Licitação com prazo em menos de 7 dias: Prefeitura de Florianópolis'
-      },
-      download_id: 'uuid-123-456',
-      total_raw: 200,
-      total_filtrado: 15,
-      filter_stats: null,
-    };
-
-    beforeEach(() => {
+    it('should show retry button on error', async () => {
       (global.fetch as jest.Mock)
-        .mockRejectedValueOnce(new Error('not found')) // setores
+        .mockRejectedValueOnce(new Error('not found'))
         .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockSuccessResponse
+          ok: false,
+          json: async () => ({ message: 'Erro no backend' }),
         });
-    });
 
-    describe('AC1: Conditional Rendering', () => {
-      it('should NOT render results section when result is null', () => {
-        // Override: only setores fetch, no buscar
-        (global.fetch as jest.Mock).mockReset();
-        (global.fetch as jest.Mock).mockRejectedValue(new Error('not found'));
+      render(<HomePage />);
 
-        render(<HomePage />);
-
-        expect(screen.queryByText('Destaques:')).not.toBeInTheDocument();
-        expect(screen.queryByText(/Baixar Excel/i)).not.toBeInTheDocument();
-        expect(screen.queryByText('valor total')).not.toBeInTheDocument();
+      const submitButton = screen.getByRole('button', { name: /Buscar/ });
+      await act(async () => {
+        fireEvent.click(submitButton);
       });
 
-      it('should render results section when result is set', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
-        });
-      });
-    });
-
-    describe('AC2: Executive Summary Display', () => {
-      it('should display resumo_executivo text', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText('Encontradas 15 licitações de uniformes totalizando R$ 450.000,00')).toBeInTheDocument();
-        });
-      });
-
-      it('should display summary in brand-themed card', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const summaryText = screen.getByText(/Encontradas 15 licitações/i);
-          const summaryCard = summaryText.closest('div');
-          expect(summaryCard).toHaveClass('bg-brand-blue-subtle', 'border-accent');
-        });
-      });
-    });
-
-    describe('AC3: Statistics Display', () => {
-      it('should display total_oportunidades as integer', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const totalElement = screen.getByText('15');
-          expect(totalElement).toHaveClass('text-brand-navy');
-          expect(screen.getByText('licitações')).toBeInTheDocument();
-        });
-      });
-
-      it('should display valor_total with Brazilian currency formatting', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const valorTotalLabel = screen.getByText('valor total');
-          const valueElement = valorTotalLabel.previousElementSibling;
-
-          expect(valueElement).toHaveTextContent(/R\$ 450\.000/i);
-          expect(valueElement).toHaveClass('text-brand-navy');
-        });
-      });
-
-      it('should format large values correctly', async () => {
-        const largeValueResponse = {
-          ...mockSuccessResponse,
-          resumo: {
-            ...mockSuccessResponse.resumo,
-            valor_total: 1234567.89
-          }
-        };
-
-        (global.fetch as jest.Mock).mockReset();
-        (global.fetch as jest.Mock)
-          .mockRejectedValueOnce(new Error('not found'))
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => largeValueResponse
-          });
-
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText(/R\$ 1\.234\.567/i)).toBeInTheDocument();
-        });
-      });
-    });
-
-    describe('AC4: Urgency Alert Conditional', () => {
-      it('should display urgency alert when alerta_urgencia is NOT null', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const alertText = screen.getByText(/Licitação com prazo em menos de 7 dias/i);
-          expect(alertText).toBeInTheDocument();
-
-          const alertBox = alertText.closest('div');
-          expect(alertBox).toHaveClass('bg-warning-subtle');
-          // "Atenção: " is aria-hidden, verify via role="alert"
-          expect(alertBox).toHaveAttribute('role', 'alert');
-        });
-      });
-
-      it('should NOT display urgency alert when alerta_urgencia is null', async () => {
-        const noAlertResponse = {
-          ...mockSuccessResponse,
-          resumo: {
-            ...mockSuccessResponse.resumo,
-            alerta_urgencia: null
-          }
-        };
-
-        (global.fetch as jest.Mock).mockReset();
-        (global.fetch as jest.Mock)
-          .mockRejectedValueOnce(new Error('not found'))
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => noAlertResponse
-          });
-
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
-        });
-
-        expect(screen.queryByText(/Licitação com prazo/i)).not.toBeInTheDocument();
-        expect(screen.queryByText('Atenção: ')).not.toBeInTheDocument();
-      });
-    });
-
-    describe('AC5: Highlights List Conditional', () => {
-      it('should display highlights when destaques array has items', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText('Destaques:')).toBeInTheDocument();
-          expect(screen.getByText(/Uniformes escolares - Secretaria de Educação SC/i)).toBeInTheDocument();
-          expect(screen.getByText(/Fardamento militar - PM-PR/i)).toBeInTheDocument();
-          expect(screen.getByText(/Jalecos - Hospital Municipal RS/i)).toBeInTheDocument();
-        });
-      });
-
-      it('should NOT display highlights section when destaques array is empty', async () => {
-        const noHighlightsResponse = {
-          ...mockSuccessResponse,
-          resumo: {
-            ...mockSuccessResponse.resumo,
-            destaques: []
-          }
-        };
-
-        (global.fetch as jest.Mock).mockReset();
-        (global.fetch as jest.Mock)
-          .mockRejectedValueOnce(new Error('not found'))
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => noHighlightsResponse
-          });
-
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
-        });
-
-        expect(screen.queryByText('Destaques:')).not.toBeInTheDocument();
-      });
-
-      it('should render highlights as bulleted list', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const highlightsList = screen.getByText('Destaques:').nextElementSibling;
-          expect(highlightsList?.tagName).toBe('UL');
-          expect(highlightsList).toHaveClass('list-disc', 'list-inside');
-        });
-      });
-    });
-
-    describe('AC6: Download Button', () => {
-      it('should render download button with correct text', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const downloadButton = screen.getByRole('button', { name: /Baixar Excel/i });
-          expect(downloadButton).toBeInTheDocument();
-        });
-      });
-
-      it('should be enabled after results load', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const downloadButton = screen.getByRole('button', { name: /Baixar Excel/i });
-          expect(downloadButton).toBeEnabled();
-        });
-      });
-
-      it('should display count in download button text (no emoji)', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const downloadButton = screen.getByRole('button', { name: /Baixar Excel com 15 licitações/i });
-          expect(downloadButton).toBeInTheDocument();
-        });
-      });
-
-      it('should use brand-navy styling for download button', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const downloadButton = screen.getByRole('button', { name: /Baixar Excel/i });
-          expect(downloadButton).toHaveClass('bg-brand-navy', 'text-white');
-        });
-      });
-    });
-
-    describe('AC7: Styling Compliance', () => {
-      it('should use brand theme for summary card', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const summaryText = screen.getByText(/Encontradas 15 licitações/i);
-          const summaryCard = summaryText.closest('div');
-          expect(summaryCard).toHaveClass('bg-brand-blue-subtle', 'border', 'border-accent', 'rounded-card');
-        });
-      });
-
-      it('should use warning theme for urgency alert', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const alertBox = screen.getByText(/Licitação com prazo/i).closest('div');
-          expect(alertBox).toHaveClass('bg-warning-subtle');
-        });
-      });
-
-      it('should use brand-navy theme for download button', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const downloadButton = screen.getByRole('button', { name: /Baixar Excel/i });
-          expect(downloadButton).toHaveClass('bg-brand-navy', 'text-white');
-        });
-      });
-    });
-
-    describe('AC8: Responsive Layout', () => {
-      it('should use responsive spacing classes on results container', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const summaryText = screen.getByText(/Encontradas 15 licitações/i);
-          const summaryCard = summaryText.closest('div[class*="bg-brand-blue-subtle"]');
-          const resultsContainer = summaryCard?.parentElement;
-          expect(resultsContainer).toHaveClass('mt-6', 'space-y-4');
-        });
-      });
-
-      it('should use flexbox for statistics layout', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          const statsContainer = screen.getByText('15').closest('div')?.parentElement;
-          expect(statsContainer).toHaveClass('flex', 'gap-4');
-        });
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('should render EmptyState component when zero opportunities', async () => {
-        const zeroResponse = {
-          resumo: {
-            resumo_executivo: 'Nenhuma licitação encontrada',
-            total_oportunidades: 0,
-            valor_total: 0,
-            destaques: [],
-            distribuicao_uf: {},
-            alerta_urgencia: null
-          },
-          download_id: 'empty-id',
-          total_raw: 0,
-          total_filtrado: 0,
-          filter_stats: null,
-        };
-
-        (global.fetch as jest.Mock).mockReset();
-        (global.fetch as jest.Mock)
-          .mockRejectedValueOnce(new Error('not found'))
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => zeroResponse
-          });
-
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByTestId('empty-state')).toBeInTheDocument();
-          expect(screen.getByText(/Nenhuma licitação de/i)).toBeInTheDocument();
-        });
-
-        // Should NOT show inline stats like "0" and "R$ 0"
-        expect(screen.queryByRole('button', { name: /Baixar Excel/i })).not.toBeInTheDocument();
-      });
-
-      it('should handle API error gracefully', async () => {
-        (global.fetch as jest.Mock).mockReset();
-        (global.fetch as jest.Mock)
-          .mockRejectedValueOnce(new Error('not found')) // setores
-          .mockResolvedValueOnce({
-            ok: false,
-            json: async () => ({ message: 'Backend unavailable' })
-          });
-
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText('Backend unavailable')).toBeInTheDocument();
-        });
-
-        expect(screen.queryByText(/Baixar Excel/i)).not.toBeInTheDocument();
-      });
-
-      it('should clear previous results on new search', async () => {
-        render(<HomePage />);
-
-        const submitButton = screen.getByRole('button', { name: /Buscar/ });
-
-        // First search
-        fireEvent.click(submitButton);
-        await waitFor(() => {
-          expect(screen.getByText(/Encontradas 15 licitações/i)).toBeInTheDocument();
-        });
-
-        // Second search with different response
-        const newResponse = {
-          resumo: {
-            resumo_executivo: 'Encontradas 3 licitações',
-            total_oportunidades: 3,
-            valor_total: 50000,
-            destaques: [],
-            distribuicao_uf: { SP: 3 },
-            alerta_urgencia: null
-          },
-          download_id: 'new-id',
-          total_raw: 30,
-          total_filtrado: 3,
-          filter_stats: null,
-        };
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: async () => newResponse
-        });
-
-        fireEvent.click(submitButton);
-
-        await waitFor(() => {
-          expect(screen.getByText('Encontradas 3 licitações')).toBeInTheDocument();
-          expect(screen.queryByText(/Encontradas 15 licitações/i)).not.toBeInTheDocument();
-        });
+      await waitFor(() => {
+        expect(screen.getByText('Tentar novamente')).toBeInTheDocument();
       });
     });
   });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAnalytics } from "../../hooks/useAnalytics";
+import type { SearchPhase } from "../types";
 
 const CURIOSIDADES = [
   { texto: "A Lei 14.133/2021 substituiu a Lei 8.666/93 após 28 anos de vigência, modernizando as contratações públicas.", fonte: "Nova Lei de Licitações" },
@@ -26,78 +27,38 @@ const CURIOSIDADES = [
   { texto: "Monitorar licitações diariamente aumenta em até 3x as chances de encontrar oportunidades relevantes.", fonte: "Melhores Práticas de Mercado" },
 ];
 
-type SearchStage = 'connecting' | 'fetching' | 'filtering' | 'summarizing' | 'generating_excel';
+type StageId = "queued" | "fetching" | "filtering" | "summarizing" | "generating_excel";
 
-interface LoadingProgressProps {
-  currentStep?: number;
-  estimatedTime?: number;
-  stateCount?: number;
-}
-
-// 5-Stage Progress Indicator Configuration
-const STAGES = [
-  {
-    id: 'connecting' as SearchStage,
-    label: "Conectando ao PNCP",
-    icon: "🔍",
-    progressStart: 0,
-    progressEnd: 20,
-  },
-  {
-    id: 'fetching' as SearchStage,
-    label: "Buscando licitações",
-    icon: "📥",
-    progressStart: 20,
-    progressEnd: 50,
-  },
-  {
-    id: 'filtering' as SearchStage,
-    label: "Filtrando resultados",
-    icon: "🎯",
-    progressStart: 50,
-    progressEnd: 75,
-  },
-  {
-    id: 'summarizing' as SearchStage,
-    label: "Gerando resumo IA",
-    icon: "🤖",
-    progressStart: 75,
-    progressEnd: 90,
-  },
-  {
-    id: 'generating_excel' as SearchStage,
-    label: "Preparando planilha",
-    icon: "✅",
-    progressStart: 90,
-    progressEnd: 100,
-  },
+const STAGES: { id: StageId; label: string; icon: string }[] = [
+  { id: "queued", label: "Iniciando busca", icon: "🔍" },
+  { id: "fetching", label: "Buscando licitações", icon: "📥" },
+  { id: "filtering", label: "Filtrando resultados", icon: "🎯" },
+  { id: "summarizing", label: "Gerando resumo IA", icon: "🤖" },
+  { id: "generating_excel", label: "Preparando planilha", icon: "✅" },
 ];
 
-// Time estimation formula (calibrated from baseline data)
-const estimateTotalTime = (ufCount: number): number => {
-  const baseTime = 10; // 10s minimum
-  const perUfTime = 3;  // 3s per state (average)
-  const filteringTime = 2; // 2s filtering
-  const llmTime = 5;      // 5s LLM
-  const excelTime = 1;    // 1s Excel
-
-  return baseTime + (ufCount * perUfTime) + filteringTime + llmTime + excelTime;
-};
+interface LoadingProgressProps {
+  phase: SearchPhase;
+  ufsCompleted: number;
+  ufsTotal: number;
+  itemsFetched: number;
+  itemsFiltered: number;
+  elapsedSeconds: number;
+  onCancel: () => void;
+}
 
 export function LoadingProgress({
-  currentStep = 1,
-  estimatedTime,
-  stateCount = 1,
+  phase,
+  ufsCompleted,
+  ufsTotal,
+  itemsFetched,
+  itemsFiltered,
+  elapsedSeconds,
+  onCancel,
 }: LoadingProgressProps) {
   const [curiosidadeIndex, setCuriosidadeIndex] = useState(0);
-  const [elapsedTime, setElapsedTime] = useState(0);
   const { trackEvent } = useAnalytics();
-
-  // Track which stages have been reached (to avoid duplicate events)
-  const stagesReachedRef = useRef<Set<SearchStage>>(new Set());
-
-  // Use estimated time from formula if not provided
-  const totalEstimatedTime = estimatedTime || estimateTotalTime(stateCount);
+  const stagesReachedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -106,94 +67,92 @@ export function LoadingProgress({
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedTime((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const curiosidade = CURIOSIDADES[curiosidadeIndex];
 
-  // Calculate current stage based on elapsed time
-  const getCurrentStage = (): SearchStage => {
-    const progressPercent = (elapsedTime / totalEstimatedTime) * 100;
-
-    for (const stage of STAGES) {
-      if (progressPercent >= stage.progressStart && progressPercent < stage.progressEnd) {
-        return stage.id;
-      }
+  // Map phase to stage index
+  const phaseToStageIndex = (p: SearchPhase): number => {
+    switch (p) {
+      case "queued": return 0;
+      case "fetching": return 1;
+      case "filtering": return 2;
+      case "summarizing": return 3;
+      case "generating_excel": return 4;
+      default: return 0;
     }
-
-    // If beyond 100%, return last stage
-    return 'generating_excel';
   };
 
-  const currentStage = getCurrentStage();
-  const currentStageIndex = STAGES.findIndex(s => s.id === currentStage);
-  const stageConfig = STAGES[currentStageIndex];
+  const currentStageIndex = phaseToStageIndex(phase);
+  const stageConfig = STAGES[currentStageIndex] || STAGES[0];
 
-  // Calculate progress percentage (0-100) with asymptotic behavior
+  // Calculate real progress percentage based on phase and UF completion
   const calculateProgress = (): number => {
-    const rawProgress = (elapsedTime / totalEstimatedTime) * 100;
-
-    // Asymptotic function: never reaches 100% until actually complete
-    // Progress slows down as it approaches 100%
-    const asymptotic = Math.min(95, rawProgress * 0.95);
-
-    return Math.round(asymptotic);
+    // Phase weight distribution: queued=5%, fetching=50%, filtering=15%, summarizing=20%, excel=10%
+    switch (phase) {
+      case "queued":
+        return 3;
+      case "fetching": {
+        const ufProgress = ufsTotal > 0 ? ufsCompleted / ufsTotal : 0;
+        return Math.round(5 + ufProgress * 50);
+      }
+      case "filtering":
+        return 60;
+      case "summarizing":
+        return 75;
+      case "generating_excel":
+        return 90;
+      default:
+        return 3;
+    }
   };
 
   const progress = calculateProgress();
 
   // Track stage progression (analytics)
   useEffect(() => {
-    if (!stagesReachedRef.current.has(currentStage)) {
-      stagesReachedRef.current.add(currentStage);
-
-      trackEvent('loading_stage_reached', {
-        stage: currentStage,
+    if (!stagesReachedRef.current.has(phase)) {
+      stagesReachedRef.current.add(phase);
+      trackEvent("loading_stage_reached", {
+        stage: phase,
         stage_index: currentStageIndex,
-        elapsed_time_s: elapsedTime,
-        estimated_total_s: totalEstimatedTime,
+        elapsed_time_s: elapsedSeconds,
         progress_percent: progress,
-        state_count: stateCount,
+        ufs_completed: ufsCompleted,
+        ufs_total: ufsTotal,
+        items_fetched: itemsFetched,
       });
     }
-  }, [currentStage, currentStageIndex, elapsedTime, totalEstimatedTime, progress, stateCount, trackEvent]);
+  }, [phase, currentStageIndex, elapsedSeconds, progress, ufsCompleted, ufsTotal, itemsFetched, trackEvent]);
 
-  // Track loading abandonment (user navigates away)
+  // Track loading abandonment
   useEffect(() => {
     const handleBeforeUnload = () => {
-      trackEvent('loading_abandoned', {
-        last_stage: currentStage,
-        last_stage_index: currentStageIndex,
-        elapsed_time_s: elapsedTime,
+      trackEvent("loading_abandoned", {
+        last_stage: phase,
+        elapsed_time_s: elapsedSeconds,
         progress_percent: progress,
-        state_count: stateCount,
+        items_fetched: itemsFetched,
       });
     };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [phase, elapsedSeconds, progress, itemsFetched, trackEvent]);
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [currentStage, currentStageIndex, elapsedTime, progress, stateCount, trackEvent]);
-
-  // Dynamic status messages based on current stage
+  // Dynamic status message from real data
   const getStatusMessage = (): string => {
-    switch (currentStage) {
-      case 'connecting':
-        return "Estabelecendo conexão com Portal Nacional...";
-      case 'fetching':
-        const estimatedPages = Math.ceil(stateCount * 1.5); // Rough estimate
-        return `Consultando ${stateCount} estado${stateCount > 1 ? "s" : ""} em ~${estimatedPages} página${estimatedPages > 1 ? "s" : ""}...`;
-      case 'filtering':
-        return "Aplicando filtros de setor e valor...";
-      case 'summarizing':
-        return "Analisando licitações com IA...";
-      case 'generating_excel':
-        return "Finalizando Excel...";
+    switch (phase) {
+      case "queued":
+        return "Iniciando busca...";
+      case "fetching":
+        if (ufsTotal > 0) {
+          return `Buscando em ${ufsCompleted}/${ufsTotal} estados... ${itemsFetched > 0 ? `(${itemsFetched.toLocaleString("pt-BR")} licitações encontradas)` : ""}`;
+        }
+        return "Buscando licitações...";
+      case "filtering":
+        return `Filtrando resultados...${itemsFetched > 0 ? ` (${itemsFetched.toLocaleString("pt-BR")} licitações)` : ""}`;
+      case "summarizing":
+        return "Gerando resumo inteligente...";
+      case "generating_excel":
+        return "Preparando planilha...";
       default:
         return "Processando...";
     }
@@ -202,21 +161,11 @@ export function LoadingProgress({
   const statusMessage = getStatusMessage();
 
   // Format elapsed time
-  const minutes = Math.floor(elapsedTime / 60);
-  const seconds = elapsedTime % 60;
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
   const timeDisplay = minutes > 0
     ? `${minutes}min ${seconds.toString().padStart(2, "0")}s`
     : `${seconds}s`;
-
-  // Remaining estimate
-  const remaining = Math.max(0, totalEstimatedTime - elapsedTime);
-  const remainingMin = Math.floor(remaining / 60);
-  const remainingSec = remaining % 60;
-  const remainingDisplay = remaining > 0
-    ? remainingMin > 0
-      ? `~${remainingMin}min ${remainingSec}s restantes`
-      : `~${remainingSec}s restantes`
-    : "Finalizando...";
 
   return (
     <div className="mt-8 p-6 bg-surface-1 rounded-card border animate-fade-in-up">
@@ -243,17 +192,37 @@ export function LoadingProgress({
           />
         </div>
         <div className="flex justify-between items-center mt-1.5">
-          <span className="text-xs text-ink-muted">{remainingDisplay}</span>
+          {/* Items counter during fetching */}
+          <span className="text-xs text-ink-muted">
+            {phase === "fetching" && itemsFetched > 0
+              ? `${itemsFetched.toLocaleString("pt-BR")} licitações encontradas até agora`
+              : phase === "filtering" && itemsFiltered > 0
+                ? `${itemsFiltered.toLocaleString("pt-BR")} licitações filtradas`
+                : "\u00A0"}
+          </span>
           <span className="text-xs tabular-nums font-data text-ink-muted">{progress}%</span>
         </div>
       </div>
+
+      {/* UF Progress during fetching phase */}
+      {phase === "fetching" && ufsTotal > 0 && (
+        <div className="mb-4 p-3 bg-surface-0 rounded-lg border border-accent">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-ink">
+              Estados processados
+            </span>
+            <span className="tabular-nums font-data text-brand-navy font-semibold">
+              {ufsCompleted} / {ufsTotal}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 5-Stage Indicators */}
       <div className="flex items-center justify-between mb-6 px-2">
         {STAGES.map((stage, i) => {
           const isPast = i < currentStageIndex;
           const isCurrent = i === currentStageIndex;
-          const isFuture = i > currentStageIndex;
 
           return (
             <div key={stage.id} className="flex items-center gap-1.5">
@@ -316,10 +285,18 @@ export function LoadingProgress({
         </div>
       </div>
 
-      {/* Context Info */}
-      <p className="mt-4 text-xs text-center text-ink-muted">
-        Buscando em {stateCount} estado{stateCount > 1 ? "s" : ""} com 5 modalidades de contratação
-      </p>
+      {/* Cancel button */}
+      <div className="mt-4 flex justify-center">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-ink-muted hover:text-error
+                     hover:bg-error-subtle border border-transparent hover:border-error/20
+                     rounded-button transition-all duration-200"
+        >
+          Cancelar busca
+        </button>
+      </div>
     </div>
   );
 }
