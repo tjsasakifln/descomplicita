@@ -79,7 +79,6 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --service backend --detach
-        working-directory: backend
 
       - name: Wait for deployment
         run: sleep 45
@@ -120,7 +119,6 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --service frontend --detach
-        working-directory: frontend
 
       - name: Wait for deployment
         run: sleep 60
