@@ -642,6 +642,85 @@ SECTORS: Dict[str, SectorConfig] = {
             "centrifuga de acucar", "centrífuga de açúcar",
         },
     ),
+    "seguranca": SectorConfig(
+        id="seguranca",
+        name="Segurança e Vigilância",
+        description="Vigilância patrimonial, monitoramento eletrônico, controle de acesso, CFTV",
+        keywords={
+            # Vigilancia
+            "vigilancia", "vigilância",
+            "vigilancia patrimonial", "vigilância patrimonial",
+            "vigilancia armada", "vigilância armada",
+            "vigilancia desarmada", "vigilância desarmada",
+            "vigilante", "vigilantes",
+            # Seguranca patrimonial (termos compostos - alta precisao)
+            "seguranca patrimonial", "segurança patrimonial",
+            "seguranca armada", "segurança armada",
+            "seguranca desarmada", "segurança desarmada",
+            # Monitoramento eletronico
+            "monitoramento eletronico", "monitoramento eletrônico",
+            "monitoramento de alarme", "monitoramento de alarmes",
+            "camera de seguranca", "câmera de segurança",
+            "camera de monitoramento", "câmera de monitoramento",
+            "CFTV", "circuito fechado de televisao", "circuito fechado de televisão",
+            "circuito fechado",
+            "DVR", "NVR", "camera IP", "câmera IP", "camera dome", "câmera dome",
+            # Alarmes
+            "alarme", "alarme monitorado", "central de alarme",
+            # Barreiras fisicas
+            "cerca eletrica", "cerca elétrica",
+            "cerca concertina", "concertina",
+            # Controle de acesso
+            "controle de acesso",
+            "catraca", "catracas",
+            "cancela", "cancelas",
+            "torniquete",
+            "portaria eletronica", "portaria eletrônica",
+            "portaria remota",
+            "guarita",
+            # Biometria
+            "biometria", "leitor biometrico", "leitor biométrico",
+            # Ronda e escolta
+            "ronda", "ronda motorizada", "ronda noturna",
+            "escolta", "escolta armada",
+            # Deteccao
+            "detector de metais", "detector de metal",
+            "raio-x de bagagem",
+        },
+        exclusions={
+            # Seguranca do trabalho / ocupacional
+            "seguranca do trabalho", "segurança do trabalho",
+            "seguranca ocupacional", "segurança ocupacional",
+            "seguranca e saude do trabalho", "segurança e saúde do trabalho",
+            "SESMT", "CIPA",
+            # Seguranca alimentar
+            "seguranca alimentar", "segurança alimentar",
+            "seguranca nutricional", "segurança nutricional",
+            # Seguranca da informacao / cyber
+            "seguranca da informacao", "segurança da informação",
+            "seguranca cibernetica", "segurança cibernética",
+            "cybersecurity", "ciberseguranca", "cibersegurança",
+            # Seguranca publica (policia, nao terceirizado)
+            "seguranca publica", "segurança pública",
+            "defesa nacional",
+            # Outros contextos de "seguranca"
+            "seguranca viaria", "segurança viária",
+            "seguranca no transito", "segurança no trânsito",
+            "seguranca sanitaria", "segurança sanitária",
+            "seguranca juridica", "segurança jurídica",
+            "seguranca hidrica", "segurança hídrica",
+            # Vigilancia em contexto nao-patrimonial
+            "vigilancia sanitaria", "vigilância sanitária",
+            "vigilancia epidemiologica", "vigilância epidemiológica",
+            "vigilancia em saude", "vigilância em saúde",
+            # Orgaos/conselhos (nao sao servicos)
+            "conselho de seguranca", "conselho de segurança",
+            "secretaria de seguranca", "secretaria de segurança",
+            # "alarme" em contexto nao-seguranca
+            "alarme falso",
+            "falso alarme",
+        },
+    ),
 }
 
 

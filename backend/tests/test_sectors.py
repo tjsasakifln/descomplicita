@@ -14,7 +14,7 @@ class TestSectorConfig:
     def test_all_sectors_exist(self):
         sectors = list_sectors()
         ids = {s["id"] for s in sectors}
-        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos", "hospitalar"}
+        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos", "hospitalar", "seguranca"}
 
     def test_get_sector_returns_config(self):
         s = get_sector("vestuario")
@@ -813,4 +813,228 @@ class TestHospitalarSector:
     def test_no_false_match_soro(self):
         """Should NOT match IV fluids (saude sector)."""
         ok, _ = self._match("AQUISIÇÃO DE SORO FISIOLÓGICO 500ML")
+        assert ok is False
+
+
+class TestSegurancaSector:
+    """Tests for Segurança e Vigilância sector."""
+
+    def _match(self, texto):
+        s = SECTORS["seguranca"]
+        return match_keywords(texto, s.keywords, s.exclusions)
+
+    # --- True positives: vigilancia patrimonial ---
+
+    def test_matches_vigilancia_patrimonial(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE VIGILÂNCIA PATRIMONIAL ARMADA")
+        assert ok is True
+
+    def test_matches_vigilancia_desarmada(self):
+        ok, _ = self._match("Registro de preços para contratação de vigilância desarmada")
+        assert ok is True
+
+    def test_matches_vigilante(self):
+        ok, _ = self._match("CONTRATAÇÃO DE POSTOS DE VIGILANTE PARA PRÉDIOS PÚBLICOS")
+        assert ok is True
+
+    def test_matches_seguranca_patrimonial(self):
+        ok, _ = self._match("Contratação de serviço de segurança patrimonial para o Fórum")
+        assert ok is True
+
+    def test_matches_seguranca_armada(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE SEGURANÇA ARMADA 24 HORAS")
+        assert ok is True
+
+    # --- True positives: monitoramento eletronico ---
+
+    def test_matches_cftv(self):
+        ok, _ = self._match("AQUISIÇÃO DE SISTEMA DE CFTV PARA PRÉDIO DA PREFEITURA")
+        assert ok is True
+
+    def test_matches_camera_seguranca(self):
+        ok, _ = self._match("Registro de preços para aquisição de câmera de segurança IP")
+        assert ok is True
+
+    def test_matches_camera_monitoramento(self):
+        ok, _ = self._match("AQUISIÇÃO DE CÂMERA DE MONITORAMENTO PARA ESCOLAS")
+        assert ok is True
+
+    def test_matches_dvr(self):
+        ok, _ = self._match("Aquisição de DVR 16 canais para sistema de monitoramento")
+        assert ok is True
+
+    def test_matches_monitoramento_eletronico(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE MONITORAMENTO ELETRÔNICO 24H")
+        assert ok is True
+
+    def test_matches_circuito_fechado(self):
+        ok, _ = self._match("Aquisição de sistema de circuito fechado de televisão")
+        assert ok is True
+
+    # --- True positives: alarmes ---
+
+    def test_matches_alarme_monitorado(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE ALARME MONITORADO PARA ESCOLAS")
+        assert ok is True
+
+    def test_matches_central_alarme(self):
+        ok, _ = self._match("Aquisição de central de alarme com sensores")
+        assert ok is True
+
+    # --- True positives: barreiras fisicas ---
+
+    def test_matches_cerca_eletrica(self):
+        ok, _ = self._match("AQUISIÇÃO E INSTALAÇÃO DE CERCA ELÉTRICA PARA PERÍMETRO")
+        assert ok is True
+
+    def test_matches_concertina(self):
+        ok, _ = self._match("Aquisição de cerca concertina para proteção do prédio")
+        assert ok is True
+
+    # --- True positives: controle de acesso ---
+
+    def test_matches_controle_acesso(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SISTEMA DE CONTROLE DE ACESSO BIOMÉTRICO")
+        assert ok is True
+
+    def test_matches_catraca(self):
+        ok, _ = self._match("Aquisição de catracas eletrônicas para acesso ao prédio")
+        assert ok is True
+
+    def test_matches_torniquete(self):
+        ok, _ = self._match("AQUISIÇÃO DE TORNIQUETE DE ACESSO PARA GINÁSIO")
+        assert ok is True
+
+    def test_matches_portaria_remota(self):
+        ok, _ = self._match("Contratação de serviço de portaria remota para condomínio público")
+        assert ok is True
+
+    def test_matches_guarita(self):
+        ok, _ = self._match("CONSTRUÇÃO DE GUARITA PARA CONTROLE DE ACESSO AO PARQUE")
+        assert ok is True
+
+    # --- True positives: biometria ---
+
+    def test_matches_biometria(self):
+        ok, _ = self._match("Aquisição de leitor biométrico para ponto eletrônico")
+        assert ok is True
+
+    # --- True positives: ronda e escolta ---
+
+    def test_matches_ronda_motorizada(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE RONDA MOTORIZADA NOTURNA")
+        assert ok is True
+
+    def test_matches_escolta_armada(self):
+        ok, _ = self._match("Contratação de serviço de escolta armada para transporte de valores")
+        assert ok is True
+
+    # --- True positives: deteccao ---
+
+    def test_matches_detector_metais(self):
+        ok, _ = self._match("AQUISIÇÃO DE DETECTOR DE METAIS PORTAL PARA FÓRUM")
+        assert ok is True
+
+    def test_matches_raio_x_bagagem(self):
+        ok, _ = self._match("Aquisição de equipamento de raio-x de bagagem para tribunal")
+        assert ok is True
+
+    # --- True negatives (exclusions) ---
+
+    def test_excludes_seguranca_do_trabalho(self):
+        """Critical exclusion: 'segurança do trabalho' is very common."""
+        ok, _ = self._match(
+            "Contratação de empresa para prestação de serviços de segurança do trabalho"
+        )
+        assert ok is False
+
+    def test_excludes_seguranca_ocupacional(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE SEGURANÇA OCUPACIONAL E MEDICINA DO TRABALHO")
+        assert ok is False
+
+    def test_excludes_sesmt(self):
+        ok, _ = self._match("Contratação de empresa para gerenciamento do SESMT municipal")
+        assert ok is False
+
+    def test_excludes_cipa(self):
+        ok, _ = self._match("Treinamento de CIPA para servidores da Prefeitura")
+        assert ok is False
+
+    def test_excludes_seguranca_alimentar(self):
+        ok, _ = self._match("Programa de segurança alimentar e nutricional para famílias")
+        assert ok is False
+
+    def test_excludes_seguranca_da_informacao(self):
+        ok, _ = self._match("Contratação de consultoria em segurança da informação")
+        assert ok is False
+
+    def test_excludes_seguranca_cibernetica(self):
+        ok, _ = self._match("CONTRATAÇÃO DE SERVIÇO DE SEGURANÇA CIBERNÉTICA PARA A REDE MUNICIPAL")
+        assert ok is False
+
+    def test_excludes_seguranca_publica(self):
+        ok, _ = self._match("Investimento em segurança pública para o município")
+        assert ok is False
+
+    def test_excludes_seguranca_viaria(self):
+        ok, _ = self._match("Programa de segurança viária e prevenção de acidentes")
+        assert ok is False
+
+    def test_excludes_seguranca_sanitaria(self):
+        ok, _ = self._match("Contratação de serviço de segurança sanitária para o porto")
+        assert ok is False
+
+    def test_excludes_seguranca_juridica(self):
+        ok, _ = self._match("Parecer sobre segurança jurídica dos contratos administrativos")
+        assert ok is False
+
+    def test_excludes_seguranca_hidrica(self):
+        ok, _ = self._match("Projeto de segurança hídrica para abastecimento da região")
+        assert ok is False
+
+    def test_excludes_vigilancia_sanitaria(self):
+        """Critical exclusion: 'vigilância sanitária' is very common."""
+        ok, _ = self._match("Contratação de serviços de vigilância sanitária municipal")
+        assert ok is False
+
+    def test_excludes_vigilancia_epidemiologica(self):
+        ok, _ = self._match("Sistema de vigilância epidemiológica para doenças transmissíveis")
+        assert ok is False
+
+    def test_excludes_vigilancia_em_saude(self):
+        ok, _ = self._match("Fortalecimento da vigilância em saúde no município")
+        assert ok is False
+
+    def test_excludes_conselho_seguranca(self):
+        ok, _ = self._match("Reunião do conselho de segurança do município")
+        assert ok is False
+
+    def test_excludes_secretaria_seguranca(self):
+        ok, _ = self._match("Aquisição de material de expediente para a secretaria de segurança")
+        assert ok is False
+
+    def test_excludes_defesa_nacional(self):
+        ok, _ = self._match("Aquisição de equipamentos para defesa nacional")
+        assert ok is False
+
+    def test_excludes_alarme_falso(self):
+        ok, _ = self._match("Relatório de ocorrências de alarme falso no trimestre")
+        assert ok is False
+
+    def test_excludes_falso_alarme(self):
+        ok, _ = self._match("Análise de incidentes com falso alarme registrados")
+        assert ok is False
+
+    def test_excludes_seguranca_e_saude_trabalho(self):
+        ok, _ = self._match(
+            "CONTRATAÇÃO DE EMPRESA PARA SEGURANÇA E SAÚDE DO TRABALHO NAS OBRAS MUNICIPAIS"
+        )
+        assert ok is False
+
+    def test_excludes_seguranca_nutricional(self):
+        ok, _ = self._match("Programa de segurança nutricional para creches municipais")
+        assert ok is False
+
+    def test_excludes_cybersecurity(self):
+        ok, _ = self._match("Contratação de serviço de cybersecurity para infraestrutura de TI")
         assert ok is False
