@@ -1,6 +1,6 @@
-"""Tests for SOURCES_CONFIG in config.py."""
+"""Tests for SOURCES_CONFIG and DEFAULT_MODALIDADES in config.py."""
 
-from config import SOURCES_CONFIG
+from config import SOURCES_CONFIG, DEFAULT_MODALIDADES
 
 
 class TestSourcesConfig:
@@ -51,6 +51,19 @@ class TestSourcesConfig:
         assert SOURCES_CONFIG["transparencia"]["timeout"] == 90
         assert SOURCES_CONFIG["querido_diario"]["timeout"] == 60
         assert SOURCES_CONFIG["tce_rj"]["timeout"] == 90
+
+    def test_default_modalidades_contains_expected(self):
+        """SE-001.3: DEFAULT_MODALIDADES must include all 7 modalities."""
+        expected = [4, 5, 6, 7, 8, 13, 15]
+        assert DEFAULT_MODALIDADES == expected
+
+    def test_default_modalidades_includes_ata_registro(self):
+        """SE-001.3: Modalidade 13 (Leilão Presencial / Ata Registro) must be present."""
+        assert 13 in DEFAULT_MODALIDADES
+
+    def test_default_modalidades_includes_chamada_publica(self):
+        """SE-001.3: Modalidade 15 (Chamada pública) must be present."""
+        assert 15 in DEFAULT_MODALIDADES
 
     def test_timeouts_are_positive_integers(self):
         for name, cfg in SOURCES_CONFIG.items():

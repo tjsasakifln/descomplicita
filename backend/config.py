@@ -26,14 +26,16 @@ MODALIDADES_PNCP = {
     15: "Chamada pública",
 }
 
-# Default modalities for BidIQ Uniformes search
-# Focus on competitive procurement modalities most likely for uniforms
+# Default modalities for BidIQ search
+# Competitive procurement + high-volume modalities for uniforms, medicines, food
 DEFAULT_MODALIDADES: List[int] = [
-    4,  # Concorrência - Eletrônica
-    5,  # Concorrência - Presencial
-    6,  # Pregão - Eletrônico (most common for uniforms)
-    7,  # Pregão - Presencial
-    8,  # Dispensa
+    4,   # Concorrência - Eletrônica
+    5,   # Concorrência - Presencial
+    6,   # Pregão - Eletrônico (most common for uniforms)
+    7,   # Pregão - Presencial
+    8,   # Dispensa
+    13,  # Leilão - Presencial (SE-001.3: Ata de Registro de Preços)
+    15,  # Chamada pública (SE-001.3: agricultura familiar, medicamentos)
 ]
 
 
@@ -74,7 +76,7 @@ SOURCES_CONFIG = {
         "base_url": "https://pncp.gov.br/api/consulta/v1",
         "auth": None,
         "rate_limit_rps": 10,
-        "timeout": 120,  # 7 UFs x 5 modalidades = 35 combos, needs 2-5min
+        "timeout": 120,  # 7 UFs x 7 modalidades = 49 combos (SE-001.3), needs 2-5min
         "priority": 1,
     },
     # Disabled 2026-03-07: licitacoes/v1 endpoint returns 404.
