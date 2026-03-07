@@ -1,843 +1,841 @@
-# BidIQ Uniformes - System Architecture Documentation
+# System Architecture -- Descomplicita
 
-**Project:** BidIQ Uniformes - POC v0.2
-**Date:** January 2026
-**Version:** 1.0
-**Status:** BROWNFIELD DISCOVERY - PHASE 1
-**Documented by:** @architect
-
----
-
-## Executive Summary
-
-BidIQ Uniformes is a **specialized procurement discovery system** for Brazil's public procurement market (PNCP - Portal Nacional de Contratações Públicas). It automates the identification of uniform/apparel procurement contracts matching specific business criteria, with intelligent filtering, Excel report generation, and AI-powered executive summaries.
-
-**Core Value Proposition:**
-- Automate manual PNCP searches for procurement opportunities
-- Filter by state, value range, and keyword matching
-- Generate downloadable Excel reports with rich formatting
-- Provide AI-powered executive summaries (GPT-4.1-nano)
-- Support multiple simultaneous searches
+**Project:** Descomplicita (formerly BidIQ Uniformes)
+**Date:** March 2026
+**Version:** 2.0
+**Author:** @architect (Atlas)
+**Status:** POC Complete, Multi-Sector Expansion Underway
 
 ---
 
-## 1. High-Level Architecture
+## 1. Executive Summary
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      USER (Browser)                             │
-│              Next.js 14+ SPA at localhost:3000                  │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │ HTTP/REST
-                      ↓
-┌─────────────────────────────────────────────────────────────────┐
-│         FRONTEND LAYER (Next.js App Router)                     │
-│                                                                  │
-│  Components:                                                     │
-│  - UF Multi-Select (27 states)                                  │
-│  - Date Range Picker (default: last 7 days)                    │
-│  - Results Display with GPT Summary Cards                       │
-│  - Excel Download Manager                                       │
-│  - Loading/Error States                                         │
-│                                                                  │
-│  State: React Hooks (useState)                                  │
-│  Styling: Tailwind CSS 3.4+                                    │
-│  Type Safety: TypeScript 5.3+                                   │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │ REST/POST to /api/buscar
-                      │ GET /api/download?id=...
-                      ↓
-┌─────────────────────────────────────────────────────────────────┐
-│        BACKEND LAYER (FastAPI 0.110+ Python 3.11+)             │
-│                                                                  │
-│  Endpoints:                                                      │
-│  - POST /api/buscar → Search & filter & summarize               │
-│  - GET /api/download → Serve generated Excel                    │
-│                                                                  │
-│  Architecture Layers:                                            │
-│  1. HTTP Client (resilient with retry logic)                   │
-│  2. Filtering Engine (sequential fail-fast)                    │
-│  3. LLM Integration (GPT-4.1-nano summaries)                   │
-│  4. Excel Generator (openpyxl with styling)                    │
-│  5. Pydantic Schemas (type validation)                         │
-│                                                                  │
-│  State: In-memory download cache (10min TTL)                   │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │ HTTPS to PNCP API
-                      │ HTTPS to OpenAI API
-                      ↓
-┌────────────────────────────────────────────────────────────────┐
-│              EXTERNAL APIs (Third-Party)                       │
-│                                                                 │
-│  1. PNCP API (pncp.gov.br)                                    │
-│     - Unstable, requires robust retry logic                   │
-│     - Rate limiting: 429 responses                            │
-│     - Max 500 items/page pagination                           │
-│     - Response: JSON with bid details                         │
-│                                                                 │
-│  2. OpenAI API (api.openai.com)                               │
-│     - Model: gpt-4.1-nano                                     │
-│     - Structured output: Pydantic ResumoLicitacoes            │
-│     - Max 500 tokens, temp=0.3                                │
-│     - Fallback: Return results without LLM                    │
-└────────────────────────────────────────────────────────────────┘
-```
+Descomplicita is a Brazilian government procurement search and analysis platform. It ingests bid data from multiple official sources (primarily PNCP -- Portal Nacional de Contratacoes Publicas), applies sector-specific keyword filtering, generates AI-powered executive summaries via GPT-4.1-nano, and produces formatted Excel reports for download.
+
+The system operates as a stateless, async-job-based web application with a Next.js 16 frontend proxying requests to a FastAPI backend. It has no persistent database -- all job state is held in-memory with TTL-based expiration. The platform currently supports 6 procurement sectors (vestuario, alimentos, informatica, medicamentos, engenharia, limpeza) with a tier-based keyword scoring system.
+
+**Current state:** POC complete (34/34 issues), deployed to Railway (backend) and Vercel (frontend). 99.2% backend test coverage, 91.5% frontend test coverage. Two data sources actively enabled (PNCP, Transparencia), three disabled due to upstream API deprecation.
 
 ---
 
-## 2. Component Architecture
+## 2. System Overview
 
-### 2.1 Frontend Architecture (`frontend/app/`)
+### 2.1 Purpose and Business Context
 
-```
-app/
-├── page.tsx                    # Main SPA (UF selector, date picker, results)
-├── layout.tsx                  # Root layout (global styles, providers)
-├── api/
-│   ├── buscar/route.ts         # POST /api/buscar (proxy to backend)
-│   └── download/route.ts       # GET /api/download (serve Excel)
-└── [components/]               # (To be created per atomic design)
-```
+Brazilian public procurement is governed by the PNCP portal, which publishes all government bids. Companies supplying uniforms, food, IT equipment, medicines, and other goods need to monitor thousands of bids across 27 states daily. Descomplicita automates this discovery process by:
 
-**State Management:**
-- `useState` hooks for UF selections, date range, results
-- In-memory download cache with 10-minute TTL
-- Future: Consider Redis for distributed caching
+1. Fetching raw procurement data from multiple government APIs
+2. Filtering results using sector-specific keyword matching with exclusion rules
+3. Generating an AI executive summary highlighting key opportunities
+4. Producing a professionally formatted Excel report for download
 
-**Key Features:**
-- Multi-select UF buttons (27 Brazilian states)
-- Date range picker (defaults to last 7 days)
-- Loading skeleton during search
-- Error boundaries with user-friendly messages
-- Direct Excel download from cache
-- Display of GPT-generated summaries
+### 2.2 Key Features
 
-**Type Safety:**
-- TypeScript strict mode enabled
-- Interfaces for API responses
-- No `any` types
+- **Multi-state search** across all 27 Brazilian UFs (states)
+- **Multi-source data orchestration** with parallel fetch, deduplication, and graceful degradation
+- **6 procurement sectors** with tiered keyword scoring (A/B/C tiers with weighted confidence)
+- **Custom search terms** that override sector keywords
+- **Async job pipeline** with real-time phase-based progress polling
+- **AI executive summary** via GPT-4.1-nano with deterministic fallback
+- **Excel report generation** with hyperlinks, currency formatting, and metadata
+- **Circuit breaker and adaptive rate limiting** for PNCP API resilience
+- **In-memory LRU cache** (4h TTL, 500 entries) for PNCP responses
+- **Dark mode and theme support** (5 themes: light, paperwhite, sepia, dim, dark)
+- **Saved searches** with localStorage persistence
+- **Mixpanel analytics** for search and loading behavior tracking
 
-### 2.2 Backend Architecture (`backend/`)
+### 2.3 Current Maturity Level
 
-**Core Modules:**
-
-#### 1. **pncp_client.py** - Resilient HTTP Client
-
-```python
-class PNCPClient:
-    # Exponential backoff retry: base 2s, max 60s, 5 retries max
-    # Rate limiting: 10 req/s (100ms minimum between requests)
-    # Circuit breaker pattern for API failures
-    # Handles 429 rate limits with Retry-After header
-    # Automatic pagination with fetch_all() generator
-
-    async def fetch_all(
-        self,
-        ufs: list[str],
-        data_inicio: str,     # YYYY-MM-DD
-        data_fim: str         # YYYY-MM-DD
-    ) -> AsyncGenerator[dict]:
-        """Yields all matching bids across all pages"""
-```
-
-**Resilience Strategy:**
-- Retry on: 429 (rate limit), 5xx server errors
-- Not retried: 4xx client errors (e.g., invalid params)
-- Backoff formula: `min(base * 2^attempt, max) + jitter`
-- Timeout: 30 seconds per request
-
-#### 2. **filter.py** - Keyword-Based Filtering Engine
-
-```python
-KEYWORDS_UNIFORMES = {
-    'uniforme', 'jaleco', 'fardamento', 'calça', 'camiseta',
-    'boné', 'meia', 'sapato', 'luva', 'proteção', ...
-}  # ~50 terms total
-
-KEYWORDS_EXCLUSAO = {
-    'militar', 'polícia', 'segurança', ...  # False positive prevention
-}
-
-class FilterEngine:
-    # Fail-fast sequential filters (optimization)
-    # 1. UF check (fastest)
-    # 2. Value range (R$ 50k - R$ 5M)
-    # 3. Keyword matching (most expensive)
-    # 4. Status/date validation
-
-    def apply_filters(licitacao: dict) -> tuple[bool, str | None]:
-        """Returns (approved: bool, rejection_reason: str | None)"""
-```
-
-**Filtering Logic:**
-- Unicode normalization for consistent matching
-- Word boundary regex for precision (not partial matches)
-- All filters must pass (AND logic)
-- Value thresholds: R$ 50k minimum, R$ 5M maximum
-
-#### 3. **excel.py** - Excel Report Generator
-
-```python
-class ExcelGenerator:
-    # openpyxl with styled formatting
-    # Green header (#2E7D32) with bold, white text
-    # Auto-width columns based on content
-    # Frozen header row (first row stays visible)
-    # Currency formatting for value columns
-    # Hyperlinks to PNCP URLs
-    # Metadata sheet with generation stats
-
-    def create_report(
-        bids: list[dict],
-        metadata: dict
-    ) -> bytes:
-        """Returns Excel file as bytes"""
-```
-
-**Report Structure:**
-```
-Columns:
-- Código (codigoCompra)
-- Objeto (objetoCompra - shortened to 200 chars)
-- Órgão (nomeOrgao)
-- UF (uf)
-- Município (municipio)
-- Valor (valorTotalEstimado) - currency format
-- Modalidade (modalidadeCompra)
-- Datas (dataAberturaProposta - dataFechamentoProposta)
-- Status (statusCompra)
-- Link (hyperlink to PNCP)
-
-Metadata Sheet:
-- Data de geração
-- Total de registros
-- Filtros aplicados
-- Tempo de processamento
-```
-
-#### 4. **llm.py** - GPT-4.1-nano Integration
-
-```python
-class LLMSummarizer:
-    # Structured output via Pydantic (ResumoLicitacoes schema)
-    # Input limited to 50 bids to avoid token overflow
-    # Max 500 tokens output, temperature=0.3 (deterministic)
-    # Fallback: Return results without LLM if API fails
-    # Timeout: 30 seconds
-
-    async def summarize(
-        bids: list[dict]  # Max 50
-    ) -> ResumoLicitacoes | None:
-        """Returns structured summary or None on error"""
-
-class ResumoLicitacoes(BaseModel):
-    resumo_executivo: str
-    total_oportunidades: int
-    valor_total: float
-    destaques: list[str]
-    recomendacoes: list[str]
-```
-
-**LLM Strategy:**
-- Summarization prompt: Focus on key opportunities
-- Deduplication of similar contracts
-- Risk/opportunity flagging
-- Language: Portuguese
-- Output: Structured Pydantic model (not raw text)
-
-#### 5. **schemas.py** - Pydantic Models
-
-```python
-class BuscaRequest(BaseModel):
-    ufs: list[str]              # 1-27 states
-    data_inicio: str            # YYYY-MM-DD pattern
-    data_fim: str               # YYYY-MM-DD pattern
-    valor_minimo: float = 50_000.0
-    valor_maximo: float = 5_000_000.0
-
-class BuscaResponse(BaseModel):
-    id: str                     # Unique search ID
-    total: int
-    resultados: list[Licitacao]
-    resumo: ResumoLicitacoes | None
-    gerado_em: datetime
-
-class Licitacao(BaseModel):
-    codigo: str
-    objeto: str
-    orgao: str
-    uf: str
-    municipio: str
-    valor: float
-    status: str
-    link: str
-```
-
-**Validation:**
-- UF list validation (must be valid Brazilian states)
-- Date pattern matching (YYYY-MM-DD)
-- Value range validation
-- All fields required except `resumo` (can be None if LLM fails)
+**POC (Proof of Concept)** -- feature-complete and deployed, but lacking:
+- Persistent database (no user accounts, no search history beyond browser localStorage)
+- Authentication/authorization
+- Horizontal scaling (single-process, in-memory job store)
+- Production-grade CORS (currently `allow_origins=["*"]`)
 
 ---
 
-## 3. Data Flow Diagrams
-
-### 3.1 Search Flow (Happy Path)
+## 3. Architecture Diagram
 
 ```
-USER CLICK "BUSCAR"
-        ↓
-FRONTEND: POST /api/buscar
-  {ufs: ['SP', 'MG'], data_inicio: '2026-01-15', ...}
-        ↓
-BACKEND: BuscaRequest validation
-  ✓ UFs valid? ✓ Dates valid? ✓ Values valid?
-        ↓
-PNCP CLIENT: fetch_all()
-  ├─ Loop through UFs
-  ├─ Paginate through results (max 500/page)
-  └─ Yield each bid with retry logic
-        ↓
-FILTER ENGINE: apply_filters()
-  1. UF ✓
-  2. Value ✓
-  3. Keywords ✓
-  4. Status ✓
-        ↓
-LLM SUMMARIZER: summarize(bids[:50])
-  → GPT-4.1-nano → ResumoLicitacoes (structured)
-  (or None if fails)
-        ↓
-EXCEL GENERATOR: create_report()
-  → Styled Excel file (bytes)
-  → Stored in cache with 10min TTL
-        ↓
-BACKEND: Return BuscaResponse
-  {id: "ABC123", total: 42, resultados: [...], resumo: {...}}
-        ↓
-FRONTEND: Display results
-  ├─ Show summary card (from resumo)
-  ├─ Show results table
-  └─ Show "Download Excel" button
-        ↓
-USER CLICK "Download"
-        ↓
-FRONTEND: GET /api/download?id=ABC123
-        ↓
-BACKEND: Retrieve from cache, serve file
-        ↓
-USER: Excel downloaded
+                        +---------------------------+
+                        |       User Browser        |
+                        +---------------------------+
+                                    |
+                                    | HTTPS
+                                    v
+                    +-------------------------------+
+                    |   Vercel (CDN + Edge)          |
+                    |   Next.js 16 Frontend          |
+                    |   +-------------------------+ |
+                    |   | App Router (app/)        | |
+                    |   |  page.tsx (SPA)          | |
+                    |   |  components/             | |
+                    |   |  api/ (Route Handlers)   | |
+                    |   +-------------------------+ |
+                    +-------------------------------+
+                                    |
+                        API Routes proxy to backend
+                        POST /api/buscar -> POST /buscar
+                        GET /api/buscar/status -> GET /buscar/{id}/status
+                        GET /api/buscar/result -> GET /buscar/{id}/result
+                        GET /api/download -> filesystem read
+                        GET /api/setores -> GET /setores
+                                    |
+                                    v
+                    +-------------------------------+
+                    |   Railway (Container)          |
+                    |   FastAPI Backend              |
+                    |   +-------------------------+ |
+                    |   | main.py                  | |
+                    |   |   /buscar (POST)         | |
+                    |   |   /buscar/{id}/status    | |
+                    |   |   /buscar/{id}/result    | |
+                    |   |   /setores (GET)         | |
+                    |   |   /health (GET)          | |
+                    |   +-------------------------+ |
+                    |   | JobStore (in-memory)     | |
+                    |   | MultiSourceOrchestrator  | |
+                    |   +-------------------------+ |
+                    +-------------------------------+
+                          |         |         |
+               +----------+---------+---------+----------+
+               |                    |                     |
+               v                    v                     v
+    +------------------+  +------------------+  +------------------+
+    | PNCP API         |  | Transparencia    |  | OpenAI API       |
+    | (Gov Procurement)|  | (CGU/Federal)    |  | (GPT-4.1-nano)   |
+    | pncp.gov.br      |  | portaldatrans..  |  | Structured Output|
+    +------------------+  +------------------+  +------------------+
+
+    +------------------+  +------------------+  +------------------+
+    | ComprasGov       |  | Querido Diario   |  | TCE-RJ           |
+    | (DISABLED)       |  | (DISABLED)       |  | (DISABLED)       |
+    | API deprecated   |  | Returns HTML     |  | API 404          |
+    +------------------+  +------------------+  +------------------+
 ```
 
-### 3.2 Error Handling
+### Internal Backend Module Graph
 
 ```
-PNCP API Returns 429 (Rate Limited)
-        ↓
-PNCP CLIENT: Check Retry-After header
-        ↓
-Exponential backoff + jitter
-        ↓
-Retry (max 5 times)
-        ↓
-If still failing: Return cached results or error
-        ↓
-FRONTEND: Show user-friendly error
+main.py
+  |-- schemas.py          (Pydantic request/response models)
+  |-- job_store.py        (In-memory async job store)
+  |-- config.py           (Retry config, modalities, source config)
+  |-- exceptions.py       (Custom exception hierarchy)
+  |-- sectors.py          (6 sector definitions with tiered keywords)
+  |-- sources/
+  |     |-- base.py            (ABC: DataSourceClient, NormalizedRecord)
+  |     |-- orchestrator.py    (Parallel fetch, dedup, graceful degradation)
+  |     |-- pncp_source.py     (Wraps PNCPClient in DataSourceClient)
+  |     |-- comprasgov_source.py    (DISABLED)
+  |     |-- transparencia_source.py (Portal da Transparencia)
+  |     |-- querido_diario_source.py (DISABLED)
+  |     |-- tce_rj_source.py        (DISABLED)
+  |-- pncp_client.py     (Resilient HTTP client with retry, cache, circuit breaker)
+  |-- filter.py           (Keyword matching engine with exclusions)
+  |-- llm.py              (GPT-4.1-nano integration + fallback)
+  |-- excel.py            (openpyxl report generator)
 ```
 
 ---
 
-## 4. PNCP API Integration Details
+## 4. Technology Stack
 
-### 4.1 API Characteristics
+### Backend
 
-- **Base URL:** `https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao`
-- **Instability:** Requires robust retry logic
-- **Rate Limiting:** 429 responses with Retry-After header
-- **Pagination:** Max 500 items/page, uses `temProximaPagina` flag
-- **Response Format:** JSON with nested objects
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| Framework | FastAPI | 0.115.9 |
+| Runtime | Python | 3.11+ |
+| ASGI Server | Uvicorn | 0.34.3 |
+| Validation | Pydantic | 2.11.7 |
+| HTTP Client (PNCP) | requests + urllib3 | 2.32.3 / 2.3.0 |
+| HTTP Client (async) | httpx | 0.28.1 |
+| Excel Generation | openpyxl | 3.1.5 |
+| LLM | OpenAI (GPT-4.1-nano) | 1.91.0 |
+| Testing | pytest + pytest-asyncio | 8.3.5 / 0.25.0 |
+| Linting | ruff | 0.9.6 |
+| Type Checking | mypy | 1.15.0 |
 
-### 4.2 Request Schema
+### Frontend
+
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| Framework | Next.js (App Router) | 16.1.4 |
+| UI Library | React | 18.3.1 |
+| Language | TypeScript | 5.9.3 |
+| Styling | Tailwind CSS | 3.4.19 |
+| Analytics | Mixpanel | 2.74.0 |
+| Testing (Unit) | Jest + Testing Library | 29.7.0 |
+| Testing (E2E) | Playwright | 1.58.0 |
+| Accessibility | axe-core/playwright | 4.11.0 |
+
+### Infrastructure
+
+| Component | Technology | Notes |
+|-----------|-----------|-------|
+| Backend Hosting | Railway | Containerized, auto-deploy from main |
+| Frontend Hosting | Vercel | Edge CDN, Next.js optimized |
+| Local Dev | Docker Compose | backend + frontend containers |
+| CI/CD | GitHub Actions | 8 workflows (tests, deploy, CodeQL, etc.) |
+| Container Base (BE) | python:3.11-slim | Single-stage |
+| Container Base (FE) | node:20-alpine | 3-stage build (deps, build, runner) |
+
+---
+
+## 5. Frontend Architecture
+
+### 5.1 App Router Structure
 
 ```
-Query Parameters:
-- uf: string (e.g., "SP", "RJ")
-- dataInício: string (YYYY-MM-DD)
-- dataFim: string (YYYY-MM-DD)
-- pagina: integer (1-indexed)
+frontend/app/
+  page.tsx              -- Main SPA (search form + results display)
+  layout.tsx            -- Root layout (fonts, theme, analytics providers)
+  globals.css           -- Global CSS with Tailwind
+  types.ts              -- TypeScript interfaces (BuscaResult, SearchPhase, etc.)
+  error.tsx             -- Error boundary with fallback UI
+  api/
+    buscar/
+      route.ts          -- POST: proxy search request to backend /buscar
+      status/route.ts   -- GET: proxy job status polling
+      result/route.ts   -- GET: fetch result, save Excel to tmpdir, return download_id
+    download/route.ts   -- GET: serve Excel file from tmpdir by download_id
+    setores/route.ts    -- GET: proxy sector list from backend
+  components/
+    LoadingProgress.tsx -- 5-stage progress bar with ETA, UF grid, curiosity carousel
+    EmptyState.tsx      -- Illustrated empty state
+    ThemeToggle.tsx     -- 5-theme switcher (light/paperwhite/sepia/dim/dark)
+    ThemeProvider.tsx   -- Context provider for theme state
+    RegionSelector.tsx  -- Geographic region-based UF multi-select
+    SavedSearchesDropdown.tsx -- localStorage-persisted saved searches
+    SourceBadges.tsx    -- Data source status badges with expandable stats
+    AnalyticsProvider.tsx -- Mixpanel initialization wrapper
 ```
 
-### 4.3 Response Schema
+### 5.2 Component Hierarchy
+
+```
+RootLayout (layout.tsx)
+  AnalyticsProvider
+    ThemeProvider
+      HomePage (page.tsx)
+        ThemeToggle
+        RegionSelector
+        SavedSearchesDropdown
+        LoadingProgress (shown during search)
+        SourceBadges (shown with results)
+        EmptyState (shown when no results)
+        Results display (inline in page.tsx)
+```
+
+### 5.3 State Management
+
+The frontend uses React `useState` hooks exclusively -- no external state library. Key state:
+
+- `selectedUfs: string[]` -- selected Brazilian states
+- `dataInicial / dataFinal: string` -- date range
+- `setorId: string` -- selected sector
+- `termosBusca: string` -- custom search terms
+- `loading: boolean` -- search in progress
+- `phase: SearchPhase` -- current pipeline stage (from backend polling)
+- `result: BuscaResult | null` -- search results
+- `validationErrors: ValidationErrors` -- form validation state
+
+Saved searches are persisted to `localStorage` via the `useSavedSearches` custom hook.
+
+### 5.4 API Communication Pattern (Async Job Polling)
+
+```
+1. User submits search
+2. Frontend POST /api/buscar -> Backend POST /buscar
+   Returns: { job_id: "uuid" }
+3. Frontend polls GET /api/buscar/status?job_id=... every 2 seconds
+   Returns: { status, progress: { phase, ufs_completed, items_fetched, ... } }
+4. When status === "completed":
+   Frontend GET /api/buscar/result?job_id=...
+   Backend returns full result with excel_base64
+   Next.js API route saves Excel to tmpdir, returns download_id
+5. User clicks "Download Excel"
+   Frontend GET /api/download?id=download_id
+   Next.js serves file from tmpdir
+```
+
+### 5.5 Error Handling
+
+- **Error boundary** (`error.tsx`) catches render-time errors with reset button
+- **API route error handling** returns appropriate HTTP status codes (400, 404, 500, 503)
+- **Backend unavailability** detected and reported as 503 with user-friendly Portuguese message
+- **Form validation** prevents invalid submissions (no UFs, invalid dates, future dates)
+
+---
+
+## 6. Backend Architecture
+
+### 6.1 FastAPI Application Structure
+
+The application is a single-file FastAPI app (`main.py`) with modular imports. Key design decisions:
+
+- **Single-process deployment** -- no Celery, no Redis, no external queue
+- **asyncio.create_task** for background job execution
+- **ThreadPoolExecutor** for CPU-bound work (filtering, Excel generation) and blocking I/O (PNCP HTTP calls via `requests`)
+- **Global singletons** for PNCPSource, MultiSourceOrchestrator, and JobStore
+
+### 6.2 Module Responsibilities
+
+| Module | Responsibility |
+|--------|---------------|
+| `main.py` | FastAPI app, endpoints, background task orchestration |
+| `config.py` | RetryConfig, PNCP modality codes, SOURCES_CONFIG, logging setup |
+| `schemas.py` | Pydantic models: BuscaRequest, BuscaResponse, ResumoLicitacoes, Job* schemas |
+| `exceptions.py` | PNCPAPIError hierarchy (base, RateLimit, Timeout, ServerError) |
+| `sectors.py` | SectorConfig dataclass, 6 sector definitions with tiered keywords |
+| `pncp_client.py` | Resilient HTTP client: retry, rate limiting, circuit breaker, caching, pagination |
+| `sources/base.py` | ABC DataSourceClient, NormalizedRecord, SearchQuery |
+| `sources/orchestrator.py` | Parallel multi-source search, composite-key dedup, graceful degradation |
+| `sources/pncp_source.py` | PNCP adapter wrapping PNCPClient |
+| `sources/transparencia_source.py` | Portal da Transparencia adapter (httpx async) |
+| `filter.py` | Keyword matching with normalize, match_keywords, filter_batch |
+| `llm.py` | GPT-4.1-nano structured output + deterministic fallback |
+| `excel.py` | openpyxl report: 10 columns, currency format, hyperlinks, metadata tab |
+| `job_store.py` | In-memory async job store with TTL cleanup |
+
+### 6.3 Multi-Source Data Orchestration
+
+The `MultiSourceOrchestrator` manages parallel data fetching:
+
+1. **Source registry** -- 5 sources registered, 2 currently enabled (PNCP, Transparencia)
+2. **Feature flags** -- `SOURCES_CONFIG[name]["enabled"]` or `ENABLED_SOURCES` env override
+3. **Parallel execution** -- `asyncio.gather` with per-source timeouts
+4. **Graceful degradation** -- failed/timed-out sources do not block others
+5. **Partial result recovery** -- PNCPSource exposes `get_partial_results()` for timeout recovery
+6. **Composite-key deduplication** -- primary key: `hash(cnpj + numero + ano)`, fallback: `hash(objeto[:100] + uf + data)`
+7. **Source priority** -- PNCP is canonical (priority 1); on collision, PNCP record is preferred
+8. **Field merging** -- missing fields in the winner are filled from the duplicate
+
+### 6.4 Job Queue / Async Processing
+
+The `JobStore` is an in-memory async store with `asyncio.Lock`:
+
+- **Lifecycle:** `queued` -> `running` -> `completed` | `failed`
+- **Max concurrent jobs:** 10 (returns HTTP 429 when full)
+- **TTL:** 1800s (30 minutes) for completed/failed jobs
+- **Periodic cleanup:** runs every 60 seconds via startup event
+- **Progress phases:** `queued` -> `fetching` -> `filtering` -> `summarizing` -> `generating_excel` -> `done`
+
+### 6.5 Resilience Patterns
+
+#### Circuit Breaker (PNCPClient)
+- Tracks consecutive timeout count across threads
+- After 3 consecutive timeouts: pauses 15s (scales up to 60s max)
+- Resets on first successful response
+
+#### Adaptive Rate Limiting (PNCPClient)
+- Base interval: 300ms between requests
+- Doubles interval (max 2s) when response time > 5s or timeout occurs
+- Decays 20% toward baseline when response time < 2s
+- Thread-safe via `threading.Lock`
+
+#### Retry with Exponential Backoff
+- Max 2 retries per request (configurable)
+- Exponential delay with +/-50% jitter to prevent thundering herd
+- Honors `Retry-After` header on 429 responses
+- Retryable codes: 408, 429, 500, 502, 503, 504
+
+#### Dynamic Pagination Cap
+- Base: 10 pages per UF x modalidade combo (500 items)
+- Dynamic reduction: `min(max_pages, max(2, 600 / num_tasks))`
+- Prevents cascading timeouts when many UFs selected (27 UFs x 7 mod = 189 combos)
+
+#### Modalidade Reduction
+- When >10 UFs selected, reduces from 7 modalities to 3 priority modalities
+- Pregao Eletronico alone covers ~80% of procurement volume
+
+### 6.6 LLM Integration
+
+- **Model:** GPT-4.1-nano (structured output via `beta.chat.completions.parse`)
+- **Temperature:** 0.3 (low creativity, high factual accuracy)
+- **Max tokens:** 500
+- **Input cap:** First 50 bids, descriptions truncated to 200 chars
+- **Output schema:** `ResumoLicitacoes` Pydantic model (enforced by OpenAI)
+- **Post-processing:** LLM-generated counts are overridden with actual computed values
+- **Fallback:** `gerar_resumo_fallback()` -- pure Python statistical summary (top 3 by value, UF distribution, urgency detection)
+- **Failure handling:** Any OpenAI exception triggers fallback (search never fails due to LLM)
+
+---
+
+## 7. API Contracts
+
+### 7.1 Backend API Endpoints
+
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| GET | `/` | Root -- API info and navigation links | None |
+| GET | `/health` | Health check (status, timestamp, version) | None |
+| GET | `/setores` | List available procurement sectors | None |
+| POST | `/buscar` | Start async search job | None |
+| GET | `/buscar/{job_id}/status` | Poll job status and progress | None |
+| GET | `/buscar/{job_id}/result` | Get completed job result (202 if running) | None |
+| GET | `/cache/stats` | PNCP cache statistics | None |
+| POST | `/cache/clear` | Clear PNCP cache | None |
+| GET | `/debug/pncp-test` | Diagnostic: test PNCP API reachability | None |
+
+#### POST /buscar -- Request
 
 ```json
 {
-  "data": [
-    {
-      "codigoCompra": "2026000001",
-      "objetoCompra": "Fornecimento de uniformes escolares...",
-      "valorTotalEstimado": 75000.00,
-      "dataAberturaProposta": "2026-01-20",
-      "dataFechamentoProposta": "2026-02-20",
-      "uf": "SP",
-      "municipio": "São Paulo",
-      "nomeOrgao": "Secretaria de Educação",
-      "modalidadeCompra": "Pregão Eletrônico",
-      "statusCompra": "Aberta"
-    }
-  ],
-  "totalRegistros": 1523,
-  "totalPaginas": 4,
-  "paginaAtual": 1,
-  "temProximaPagina": true
+  "ufs": ["SP", "RJ", "MG"],
+  "data_inicial": "2026-03-01",
+  "data_final": "2026-03-07",
+  "setor_id": "vestuario",
+  "termos_busca": "jaleco avental"
 }
 ```
 
-### 4.4 Field Mapping
+**Validation rules:**
+- `ufs`: min 1 item, Brazilian state codes
+- `data_inicial`, `data_final`: YYYY-MM-DD format, inicial <= final
+- `setor_id`: defaults to "vestuario"
+- `termos_busca`: optional, space-separated custom terms (replace sector keywords)
 
-| PNCP Field | Internal Field | Usage |
-|------------|----------------|-------|
-| `codigoCompra` | `codigo` | Unique ID, PDF link construction |
-| `objetoCompra` | `objeto` | Keyword matching, summary |
-| `valorTotalEstimado` | `valor` | Value range filtering |
-| `dataAberturaProposta` | Date range | Filter by timeline |
-| `uf` | State | UF filtering |
-| `municipio` | Municipality | Display, grouping |
-| `nomeOrgao` | Agency name | Display, analysis |
-| `statusCompra` | Status | Filter by open/closed |
+#### POST /buscar -- Response (201)
 
----
-
-## 5. Technical Debt & Architectural Issues
-
-### 5.1 Current Issues (POC v0.2)
-
-#### CRITICAL
-1. **Frontend Not Initialized**
-   - `package.json` configured but Next.js app structure missing
-   - Issue #21: Set up Next.js 14+ App Router
-   - Impact: Cannot test UI or integration
-   - Effort: 4-6 hours
-   - Blocker: Can't complete end-to-end testing
-
-2. **Backend Structure Incomplete**
-   - `main.py` is placeholder only
-   - Issue #17: Implement FastAPI endpoints
-   - Missing: All core modules (pncp_client, filter, excel, llm)
-   - Impact: API non-functional
-   - Effort: 8-12 hours
-   - Blocker: Can't run actual searches
-
-#### HIGH
-3. **Test Infrastructure Missing**
-   - Issue #27: Configure test frameworks
-   - Backend: pytest configured but tests incomplete
-   - Frontend: Jest/Vitest configured but no tests written
-   - Current coverage: 96.69% for existing tests, but many areas untested
-   - Impact: Risk of regressions
-   - Effort: 6-8 hours (per backend/frontend)
-   - Risk: No automated quality gates
-
-4. **Excel Export Incomplete**
-   - Excel generation module exists but not integrated
-   - Issue #13: Add comprehensive Excel tests
-   - Missing: Test coverage for all styling/formatting
-   - Impact: Generated files may have formatting issues
-   - Effort: 3-4 hours
-
-5. **LLM Integration Incomplete**
-   - GPT-4.1-nano integration designed but not tested
-   - Issue #14: Add LLM summarization tests
-   - Missing: Edge cases (0 bids, 100+ bids, API failures)
-   - Impact: Fallback behavior untested
-   - Effort: 2-3 hours
-
-#### MEDIUM
-6. **Rate Limiting Not Validated**
-   - Retry logic implemented but not tested against real PNCP API
-   - Need: Live integration test or mock with realistic delays
-   - Impact: May fail under actual rate limiting
-   - Effort: 3-4 hours
-
-7. **Download Cache Strategy**
-   - In-memory cache works for POC but not scalable
-   - Issue #18: Implement Redis caching for production
-   - Impact: Multi-instance deployment impossible
-   - Effort: 4-6 hours
-   - Timeline: Post-MVP
-
-8. **Environment Configuration**
-   - `.env.example` has placeholders
-   - Missing: Environment variable validation at startup
-   - Impact: Cryptic errors if vars missing
-   - Effort: 1-2 hours
-
-9. **CORS Configuration**
-   - FastAPI CORS not configured for production
-   - Current: Allow all origins (security risk)
-   - Missing: Environment-based origin whitelist
-   - Impact: Not production-safe
-   - Effort: 1 hour
-
-### 5.2 Future Enhancements (Post-MVP)
-
-10. **Database Integration (Supabase)**
-    - Currently: No persistent storage
-    - Future: Store searches, favorites, saved reports
-    - Impact: Enable user profiles, history, sharing
-    - Effort: 8-12 hours
-
-11. **Real-time Notifications**
-    - Currently: No notifications
-    - Future: WebSocket-based price/status alerts
-    - Impact: Enable subscription-based monitoring
-    - Effort: 6-8 hours
-
-12. **Advanced Filtering**
-    - Currently: Keyword + value + UF only
-    - Future: Regex patterns, semantic search, fuzzy matching
-    - Impact: More precise results
-    - Effort: 4-6 hours
-
-13. **User Authentication**
-    - Currently: None
-    - Future: OAuth/JWT-based user accounts
-    - Impact: Enable per-user settings, history
-    - Effort: 6-8 hours
-
-14. **Deployment Automation**
-    - Currently: Manual
-    - Future: GitHub Actions CI/CD
-    - Impact: Automated testing, deployment
-    - Effort: 4-5 hours
-
----
-
-## 6. Deployment Architecture
-
-### 6.1 Development Environment
-
-```
-Developer Machine
-├── Frontend: http://localhost:3000 (Next.js dev server)
-├── Backend: http://localhost:8000 (FastAPI dev server)
-└── Browser: Dev tools + network inspection
-```
-
-### 6.2 Current Architecture (POC)
-
-```
-┌──────────────────────────────────────────────────────┐
-│          Browser (User)                              │
-└──────────────┬───────────────────────────────────────┘
-               │
-        ┌──────┴──────┐
-        ↓             ↓
-   Next.js 14+    FastAPI
-   (Port 3000)    (Port 8000)
-        │             │
-        └──────┬──────┘
-               ↓
-        PNCP API (external)
-               │
-        OpenAI API (external)
-```
-
-### 6.3 Production Architecture (Future)
-
-```
-┌─────────────────────────────────────────────────────┐
-│            CDN (Cloudflare)                         │
-│         (Static assets cache)                       │
-└──────────────┬──────────────────────────────────────┘
-               │
-        ┌──────┴──────┐
-        ↓             ↓
-   Next.js Frontend   FastAPI Backend
-   (Vercel)          (Railway/Heroku)
-        │                   │
-        └────────┬──────────┘
-                 ↓
-            PostgreSQL
-            (Supabase)
-                 │
-        ┌────────┴──────────┐
-        ↓                   ↓
-   PNCP API           OpenAI API
-```
-
----
-
-## 7. Technology Stack Rationale
-
-### Backend: FastAPI
-- **Why:** Type hints, automatic OpenAPI docs, excellent async support
-- **Version:** 0.110+ required for latest features
-- **Pydantic:** 2.6+ for strict validation
-- **httpx:** Better than requests for async + resilience
-- **openpyxl:** Industry standard for Excel generation
-
-### Frontend: Next.js 14+
-- **Why:** Full-stack TypeScript, App Router simplifies routing
-- **React 18+:** Latest hooks, concurrent rendering
-- **Tailwind CSS:** Utility-first, minimal bundle impact
-- **TypeScript:** Strict mode for type safety
-
-### External Services
-- **PNCP API:** Only source of procurement data
-- **OpenAI API:** GPT-4.1-nano for summaries (temperature=0.3 for consistency)
-
----
-
-## 8. Code Patterns & Standards
-
-### 8.1 Python (Backend)
-
-```python
-# Type hints required
-def filter_licitacao(
-    licitacao: dict,
-    ufs_selecionadas: set[str]
-) -> tuple[bool, str | None]:
-    """Filter a single bid. Returns (approved, reason_if_rejected)"""
-    ...
-
-# Pydantic for validation
-class BuscaRequest(BaseModel):
-    ufs: list[str]
-    data_inicio: str  # YYYY-MM-DD pattern
-
-    @field_validator('ufs')
-    def validate_ufs(cls, v):
-        valid_ufs = {'SP', 'RJ', ...}
-        if not all(uf in valid_ufs for uf in v):
-            raise ValueError('Invalid UF')
-        return v
-
-# Docstrings for public functions
-def fetch_all_bids(...) -> AsyncGenerator[dict]:
-    """Fetch all bids across paginated results.
-
-    Handles retry logic, rate limiting, pagination automatically.
-    Yields individual bid dictionaries.
-    """
-    ...
-```
-
-### 8.2 TypeScript (Frontend)
-
-```typescript
-// Explicit return types
-interface Licitacao {
-  codigo: string;
-  objeto: string;
-  valor: number;
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "queued"
 }
+```
 
-async function buscarLicitacoes(
-  ufs: string[],
-  dataInicial: string
-): Promise<BuscaResponse> {
-  // ...
+#### GET /buscar/{job_id}/status -- Response
+
+```json
+{
+  "job_id": "...",
+  "status": "running",
+  "progress": {
+    "phase": "fetching",
+    "ufs_completed": 2,
+    "ufs_total": 3,
+    "items_fetched": 1523,
+    "items_filtered": 0,
+    "sources_completed": 1,
+    "sources_total": 2
+  },
+  "created_at": "2026-03-07T10:00:00+00:00",
+  "elapsed_seconds": 45.2
 }
+```
 
-// No any types
-const [ufs, setUfs] = useState<Set<string>>(new Set());
+#### GET /buscar/{job_id}/result -- Response (completed)
+
+```json
+{
+  "job_id": "...",
+  "status": "completed",
+  "resumo": {
+    "resumo_executivo": "Encontradas 42 licitacoes...",
+    "total_oportunidades": 42,
+    "valor_total": 3500000.00,
+    "destaques": ["..."],
+    "alerta_urgencia": null
+  },
+  "excel_base64": "UEsDBBQ...",
+  "total_raw": 2500,
+  "total_filtrado": 42,
+  "total_atas": 5,
+  "total_licitacoes": 37,
+  "filter_stats": {
+    "rejeitadas_uf": 0,
+    "rejeitadas_valor": 150,
+    "rejeitadas_keyword": 2308,
+    "rejeitadas_prazo": 0,
+    "rejeitadas_outros": 0
+  },
+  "sources_used": ["PNCP", "transparencia"],
+  "source_stats": { "...": "..." },
+  "dedup_removed": 12,
+  "truncated_combos": 3
+}
+```
+
+### 7.2 Frontend API Routes (Next.js)
+
+| Method | Path | Proxies To |
+|--------|------|------------|
+| POST | `/api/buscar` | Backend `POST /buscar` |
+| GET | `/api/buscar/status?job_id=X` | Backend `GET /buscar/{X}/status` |
+| GET | `/api/buscar/result?job_id=X` | Backend `GET /buscar/{X}/result` (saves Excel to tmpdir) |
+| GET | `/api/download?id=X` | Reads Excel from tmpdir, serves as attachment |
+| GET | `/api/setores` | Backend `GET /setores` |
+
+The result route performs an additional step: it decodes the base64 Excel from the backend response, writes it to `os.tmpdir()` as `descomplicita_{timestamp}_{uuid}.xlsx`, and returns a `download_id` to the frontend. A cleanup routine deletes expired files (default TTL: 1 hour).
+
+---
+
+## 8. Data Flow
+
+### 8.1 Search Request Lifecycle (End-to-End)
+
+```
+User submits form
+    |
+    v
+[Frontend] POST /api/buscar (validates UFs, dates)
+    |
+    v
+[Next.js API Route] Forwards to Backend POST /buscar
+    |
+    v
+[Backend main.py] Creates job, launches asyncio.create_task(run_search_job)
+    |
+    v
+[run_search_job] Phase: FETCHING
+    |-- Resolves sector config (keywords, exclusions, value range)
+    |-- Gets MultiSourceOrchestrator
+    |-- Calls orchestrator.search_all(query)
+    |     |-- For each enabled source (PNCP, Transparencia):
+    |     |     |-- asyncio.create_task with per-source timeout
+    |     |     |-- PNCP: run_in_executor -> PNCPClient.fetch_all()
+    |     |     |     |-- Builds UF x modalidade task matrix
+    |     |     |     |-- ThreadPoolExecutor(max_workers=3)
+    |     |     |     |-- For each combo: paginate, rate-limit, retry, cache
+    |     |     |     |-- Yields normalized items, deduped by numeroControlePNCP
+    |     |     |-- Transparencia: httpx async with retry
+    |     |-- Deduplicates across sources (composite key)
+    |     |-- Returns OrchestratorResult
+    |
+    v
+[run_search_job] Phase: FILTERING
+    |-- Converts NormalizedRecords to legacy dicts
+    |-- filter_batch(licitacoes, ufs, valor_min/max, keywords, exclusions)
+    |     |-- For each bid: UF check -> value range -> keyword regex -> status
+    |     |-- Tier scoring: A=1.0, B=0.7, C=0.3, threshold=0.6
+    |-- Returns approved list + rejection stats
+    |
+    v
+[run_search_job] Phase: SUMMARIZING + GENERATING_EXCEL (parallel)
+    |-- gerar_resumo() -> GPT-4.1-nano structured output
+    |     |-- On failure: gerar_resumo_fallback() (pure Python)
+    |-- create_excel() -> openpyxl BytesIO -> base64
+    |-- Override LLM counts with actual values
+    |
+    v
+[run_search_job] Phase: DONE
+    |-- job_store.complete(job_id, result)
+    |
+    v
+[Frontend] Polling detects status=completed
+    |-- GET /api/buscar/result -> saves Excel to tmpdir -> returns BuscaResult
+    |-- Renders: summary, stats, source badges, download button
+    |
+    v
+[User] Clicks "Download Excel"
+    |-- GET /api/download?id=... -> serves .xlsx file
 ```
 
 ---
 
-## 9. Security Considerations
+## 9. External Integrations
 
-### 9.1 Input Validation
-- ✓ UF whitelist validation (Pydantic)
-- ✓ Date pattern matching (YYYY-MM-DD)
-- ✓ Value range validation
-- ⚠️ Missing: URL parameter sanitization (low risk - internal API)
+### 9.1 PNCP Portal (Primary Source -- ENABLED)
 
-### 9.2 API Security
-- ✓ PNCP: Public API, no authentication required
-- ⚠️ OpenAI: API key in environment variable (not committed)
-- ⚠️ CORS: Currently allow all (fix before production)
+- **API:** `https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao`
+- **Auth:** None (public API)
+- **Rate limit:** Undocumented; server returns 429 with Retry-After header
+- **Page size:** 50 items (API max, despite docs claiming 500)
+- **Key parameters:** `dataInicial`, `dataFinal`, `codigoModalidadeContratacao`, `uf`, `pagina`
+- **Note:** `palavraChave` parameter is silently ignored by the API (verified 2026-03-07)
+- **Modalities queried:** 7 default (Concorrencia, Pregao, Dispensa, etc.), 3 priority when >10 UFs
 
-### 9.3 Data Protection
-- ✓ No user authentication yet (public data)
-- ✓ PNCP data is public (no privacy concerns)
-- ⚠️ Download cache in memory (no encryption needed for POC)
+### 9.2 Portal da Transparencia (Secondary Source -- ENABLED)
 
----
+- **API:** `https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes`
+- **Auth:** API key via `chave-api-dados` header (free registration)
+- **Rate limit:** 3 req/s (enforced client-side)
+- **Page size:** 15 items per page
+- **Also provides:** Sanctions checks (CEIS/CNEP) via `check_sanctions(cnpj)`
 
-## 10. Performance Targets
+### 9.3 ComprasGov (DISABLED)
 
-### Backend
-- **PNCP queries:** 30s timeout per request
-- **Rate limiting:** 10 req/second (100ms minimum)
-- **Filtering:** <1s for 1000 bids
-- **Excel generation:** <2s for 500 rows
-- **LLM summarization:** <5s for 50 bids
+- **Reason:** `licitacoes/v1` endpoint returns 404 since ~2026-03
+- **Status:** API migrated to `compras.dados.gov.br`; licitacoes consolidated into PNCP
 
-### Frontend
-- **First Contentful Paint:** <1.5s
-- **Time to Interactive:** <3s
-- **Bundle size:** <200KB gzipped
-- **Search to results:** <5s (including API call)
+### 9.4 Querido Diario (DISABLED)
 
----
+- **Reason:** API returns HTML instead of JSON since ~2026-03; endpoint deprecated
 
-## 11. Monitoring & Observability (Future)
+### 9.5 TCE-RJ (DISABLED)
 
-### Metrics to Track
-- PNCP API success rate
-- Rate limit 429 frequency
-- LLM API latency
-- Excel generation time
-- User search frequency by UF/timerange
+- **Reason:** `/api/v1/compras-diretas` returns 404 since ~2026-03
 
-### Error Logging
-- ✓ Structured logging (not print statements)
-- ⚠️ Missing: Centralized log aggregation
-- ⚠️ Missing: Error alerting (future)
+### 9.6 OpenAI API
+
+- **Model:** GPT-4.1-nano
+- **Usage:** Structured output via `beta.chat.completions.parse`
+- **Schema:** `ResumoLicitacoes` (Pydantic model)
+- **Fallback:** Pure Python statistical summary when API unavailable
+- **Cost driver:** ~50 bids per call, 200 chars per description, 500 max output tokens
 
 ---
 
-## 12. Decision Log
+## 10. Deployment Architecture
 
-### ADR-001: Use FastAPI for Backend
-**Status:** ACCEPTED
-**Rationale:** Type safety, async support, minimal boilerplate
-**Alternative Considered:** Django REST Framework (too heavy for POC)
-**Consequences:** Requires Python 3.11+, but enables fast iteration
+### 10.1 Docker Compose (Local Development)
 
-### ADR-002: In-Memory Cache for Downloads
-**Status:** ACCEPTED (POC only)
-**Rationale:** Simple, no external dependencies
-**Alternative Considered:** Redis (overkill for POC)
-**Consequences:** Not scalable beyond single instance
+```yaml
+services:
+  backend:   python:3.11-slim, port 8000, hot-reload via volume mount
+  frontend:  Next.js, port 3000, depends_on backend (service_healthy)
+networks:
+  bidiq-network: bridge
+```
 
-### ADR-003: GPT-4.1-nano for Summaries
-**Status:** ACCEPTED
-**Rationale:** Cost-effective, fast, structured output via Pydantic
-**Alternative Considered:** GPT-3.5-turbo (cheaper but less capable)
-**Consequences:** ~$0.001 per summary, ~500 tokens max
+Both services have health checks (30s interval, 3 retries).
 
----
+### 10.2 Railway Configuration (Backend Production)
 
-## 13. Risk Assessment
+- **Container:** python:3.11-slim, single-stage Dockerfile
+- **Entry:** `uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}`
+- **Health check:** `/health` endpoint
+- **Auto-deploy:** On push to main (backend/ path changes)
+- **Environment variables:** Injected via Railway dashboard
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|-----------|
-| PNCP API instability | HIGH | HIGH | Robust retry logic, circuit breaker |
-| Rate limiting | HIGH | MEDIUM | Exponential backoff, rate limiter |
-| LLM API cost overrun | MEDIUM | LOW | Token limits, fallback without LLM |
-| Frontend not ready | MEDIUM | HIGH | Issue #21 is priority |
-| Test coverage gaps | HIGH | MEDIUM | Issue #27 test framework setup |
-| Cache expiration issues | LOW | LOW | 10min TTL, session-based cleanup |
+### 10.3 Vercel Configuration (Frontend Production)
 
----
+- **Container:** node:20-alpine, 3-stage Dockerfile (deps -> build -> runner)
+- **Output:** Next.js standalone mode
+- **Non-root user:** `nextjs` (UID 1001)
+- **Auto-deploy:** On push to main (frontend/ path changes)
+- **Environment variables:** `BACKEND_URL` pointing to Railway backend
 
-## 14. Next Steps (Roadmap)
+### 10.4 Environment Variables
 
-### Phase 1: MVP Completion (1-2 weeks)
-- [ ] Issue #17: Implement FastAPI endpoints
-- [ ] Issue #21: Set up Next.js frontend
-- [ ] Issue #27: Configure test frameworks
-- [ ] Issue #13: Complete Excel testing
-- [ ] Issue #14: Complete LLM testing
-- **Result:** Fully functional POC
-
-### Phase 2: Production Readiness (2-3 weeks)
-- [ ] Add comprehensive test coverage (70%+ backend, 60%+ frontend)
-- [ ] Setup CI/CD (GitHub Actions)
-- [ ] Environment configuration validation
-- [ ] CORS configuration for production
-- [ ] Deployment to Railway/Vercel
-- **Result:** Production-ready system
-
-### Phase 3: Enhancement (Post-MVP)
-- [ ] Redis caching for scalability
-- [ ] Supabase integration for persistence
-- [ ] User authentication
-- [ ] Real-time notifications
-- [ ] Advanced filtering (semantic search)
-- **Result:** Enterprise-grade platform
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | Yes (for LLM) | -- | OpenAI API key |
+| `BACKEND_URL` | No | `http://localhost:8000` | Backend URL for frontend proxy |
+| `TRANSPARENCIA_API_KEY` | No | -- | Portal da Transparencia API key |
+| `LOG_LEVEL` | No | `INFO` | Python logging level |
+| `NEXT_PUBLIC_MIXPANEL_TOKEN` | No | -- | Mixpanel analytics token |
+| `ENABLED_SOURCES` | No | Config-based | Comma-separated source names override |
+| `DOWNLOAD_TTL_MS` | No | `3600000` | Excel download file TTL in ms |
+| `PORT` | No | `8000` | Server port (Railway injects this) |
 
 ---
 
-## 15. Architecture Strengths
+## 11. Security Considerations
 
-✅ **Resilient API Integration**
-- Exponential backoff with jitter
-- Circuit breaker pattern
-- Rate limit respect (Retry-After)
-- Timeout boundaries
+### 11.1 CORS Configuration
 
-✅ **Fail-Fast Filtering**
-- Sequential filters minimize computation
-- Fastest checks first (UF)
-- Early exit on mismatch
+**CURRENT:** `allow_origins=["*"]` -- allows all origins. This is explicitly marked as a POC setting with a TODO comment in `main.py:76`.
 
-✅ **Type Safety**
-- Pydantic validation (backend)
-- TypeScript strict (frontend)
-- No `any` types
+**RISK:** High. Any website can make authenticated requests to the API.
 
-✅ **Clean Separation of Concerns**
-- HTTP client (pncp_client.py)
-- Filtering logic (filter.py)
-- Report generation (excel.py)
-- LLM integration (llm.py)
-- API schemas (schemas.py)
+**RECOMMENDATION:** Restrict to specific domains (`https://descomplicita.vercel.app`, `http://localhost:3000`).
 
----
+### 11.2 Rate Limiting
 
-## 16. Architecture Weaknesses
+- **Backend -> PNCP:** Adaptive rate limiting (300ms-2s), circuit breaker, max 3 concurrent workers
+- **Client -> Backend:** Only concurrency limit (10 max active jobs). No per-IP rate limiting.
+- **RISK:** No protection against client-side abuse (DDoS, resource exhaustion)
 
-⚠️ **Missing Integration Points**
-- Frontend not fully developed
-- Backend endpoints incomplete
-- No persistent storage (yet)
-- No user management
+### 11.3 Input Validation
 
-⚠️ **Limited Scalability**
-- In-memory cache (single instance only)
-- No queue system for long-running tasks
-- No load balancing considerations
+- Pydantic model validation on `/buscar` (UFs list, date format, date range)
+- Date range no longer has a max-days limit (was 30 days, removed)
+- No sanitization of `termos_busca` beyond whitespace splitting
+- Sector ID validated against `SECTORS` dict (raises KeyError -> job failure)
 
-⚠️ **Incomplete Error Handling**
-- No centralized error tracking
-- Missing HTTP error status code strategy
-- Limited user-facing error messages
+### 11.4 API Key Management
 
-⚠️ **Test Coverage Gaps**
-- Existing tests: 96.69% coverage (but small scope)
-- Missing: E2E tests, integration tests
-- Missing: Load testing
+- `OPENAI_API_KEY` stored as environment variable, not in code
+- `TRANSPARENCIA_API_KEY` stored as environment variable
+- `.env` file excluded from git via `.gitignore`
+- `.env.example` provided with empty values
+
+### 11.5 Container Security
+
+- Frontend Dockerfile uses non-root user (`nextjs`, UID 1001)
+- Backend Dockerfile runs as root (no `USER` directive)
 
 ---
 
-## 17. Architecture Review Checklist
+## 12. Performance and Resilience
 
-- [x] Data flows documented
-- [x] Component separation clear
-- [x] External dependencies identified
-- [x] Error handling strategy defined (partially)
-- [x] Security considerations addressed
-- [ ] Performance targets set (documented but not validated)
-- [ ] Scalability concerns identified
-- [ ] Test strategy defined (partially)
-- [x] Deployment path documented
-- [x] Tech stack rationale provided
+### 12.1 Circuit Breaker Pattern
+
+Located in `pncp_client.py`:
+- **Threshold:** 3 consecutive timeouts
+- **Pause formula:** `15 * (consecutive_timeouts / threshold)`, capped at 60s
+- **Reset:** On first successful response
+- **Scope:** Shared across all threads via `threading.Lock`
+
+### 12.2 Adaptive Rate Limiting
+
+Located in `pncp_client.py`:
+- **Base interval:** 300ms
+- **Increase condition:** Response time > 5s or timeout -> interval doubles (max 2s)
+- **Decrease condition:** Response time < 2s -> interval decays by 20%
+- **Thread-safe:** Uses `threading.Lock`
+
+### 12.3 Caching Strategy
+
+Located in `pncp_client.py`:
+- **Cache key:** `{uf}:{modalidade}:{data_inicial}:{data_final}`
+- **TTL:** 4 hours
+- **Max entries:** 500
+- **Eviction:** LRU (least recently accessed)
+- **Scope:** Per-PNCPClient instance (shared across requests via global singleton)
+- **Thread-safe:** Uses `threading.Lock`
+
+### 12.4 Timeout Handling
+
+| Layer | Timeout | Configurable |
+|-------|---------|-------------|
+| PNCP HTTP request | 40s | `RetryConfig.timeout` |
+| PNCP orchestrator | 300s base + 15s per UF beyond 5 | `SOURCES_CONFIG["pncp"]["timeout"]` |
+| Transparencia HTTP | 90s | `SOURCES_CONFIG["transparencia"]["timeout"]` |
+| Transparencia orchestrator | 90s | Same |
+| Frontend polling | Indefinite (user can cancel) | -- |
+
+### 12.5 Parallelism
+
+- **PNCP fetch:** ThreadPoolExecutor with max 3 workers (shared process)
+- **Source orchestration:** asyncio.gather across enabled sources
+- **LLM + Excel:** Parallel via asyncio.gather(run_in_executor)
+- **No true async for PNCP:** Uses `requests` (blocking) wrapped in `run_in_executor`
 
 ---
 
-## Document Information
+## 13. Testing Strategy
 
-**Created:** January 26, 2026
-**Last Updated:** January 26, 2026
-**Format:** Markdown (GitHub-flavored)
-**Status:** APPROVED FOR TECHNICAL DEBT REVIEW
-**Next Review:** After Issue #17 & #21 completion
+### 13.1 Backend Tests
+
+- **Framework:** pytest + pytest-asyncio
+- **Coverage:** 99.2% (threshold: 70%)
+- **Test count:** 226+ tests
+- **Key test files:**
+  - `test_pncp_client.py` -- 32 tests (retry, rate limiting, pagination, circuit breaker)
+  - `test_filter.py` -- 48 tests (keyword matching, normalization, exclusions)
+  - `test_excel.py` -- 20 tests (formatting, data integrity, edge cases)
+  - `test_llm.py` -- 15 tests (GPT integration, fallback, empty input)
+  - `test_main.py` -- 14 tests (API endpoints, validation)
+  - `test_schemas.py` -- 25 tests (Pydantic validation)
+- **Mocking:** OpenAI API calls mocked; PNCP API calls mocked
+- **CI matrix:** Python 3.11, 3.12
+
+### 13.2 Frontend Tests
+
+- **Framework:** Jest + Testing Library (unit), Playwright (E2E)
+- **Coverage:** 91.5% (threshold: 60%)
+- **Unit tests:** 94 tests across page, error boundary, API routes
+- **E2E tests:** 25 Playwright tests
+- **Accessibility:** axe-core integration in E2E tests
+
+### 13.3 CI/CD Integration
+
+8 GitHub Actions workflows:
+- `tests.yml` -- Backend (Python 3.11/3.12) + Frontend + coverage upload
+- `deploy.yml` -- Auto-deploy to Railway/Vercel on push to main
+- `codeql.yml` -- Security scanning + secret detection
+- `backend-ci.yml` -- Backend-specific CI
+- `pr-validation.yml` -- PR checks
+- `filter-quality-audit.yml` -- Filter false positive/negative auditing
+- `dependabot-auto-merge.yml` -- Auto-merge minor dependency updates
+- `cleanup.yml` -- Resource cleanup
 
 ---
 
-**Questions or clarifications?** Reference section numbers in technical discussions.
+## 14. Technical Debt Inventory (PRELIMINARY)
+
+### CRITICAL
+
+| # | Description | Location | Category |
+|---|-------------|----------|----------|
+| TD-01 | **CORS allows all origins** -- `allow_origins=["*"]` permits any website to call the API. Should be restricted to Vercel domain in production. | `backend/main.py:76` | Security |
+| TD-02 | **Backend Dockerfile runs as root** -- no `USER` directive, container processes run as root user. | `backend/Dockerfile` | Security |
+| TD-03 | **No authentication or authorization** -- all API endpoints are publicly accessible with no auth. Any user can exhaust job capacity. | `backend/main.py` (all endpoints) | Security |
+
+### HIGH
+
+| # | Description | Location | Category |
+|---|-------------|----------|----------|
+| TD-04 | **In-memory job store is not horizontally scalable** -- all state lost on restart. Cannot run multiple backend instances. Needs Redis/PostgreSQL. | `backend/job_store.py` | Scalability |
+| TD-05 | **No per-IP/user rate limiting on API** -- only global concurrency limit (10 jobs). A single client can monopolize all slots. | `backend/main.py:289-293` | Security |
+| TD-06 | **Excel base64 transmitted in job result** -- entire Excel file base64-encoded in JSON response. For large reports, this wastes bandwidth and memory. Should use streaming/file reference. | `backend/main.py:538-539` | Performance |
+| TD-07 | **Global mutable singletons** -- `_pncp_source`, `_orchestrator`, `_job_store` are module-level globals. Makes testing harder and prevents proper DI. | `backend/main.py:151-188` | Maintainability |
+| TD-08 | **Deprecated `@app.on_event("startup")`** -- FastAPI recommends lifespan context manager instead. | `backend/main.py:191` | Maintainability |
+| TD-09 | **`datetime.utcnow()` is deprecated** -- should use `datetime.now(timezone.utc)`. | `backend/main.py:145` | Code Quality |
+| TD-10 | **Dev dependencies in production requirements.txt** -- pytest, ruff, mypy, faker bundled in production image. Should be separated. | `backend/requirements.txt:23-31` | Performance |
+| TD-11 | **PNCP client uses blocking `requests` library** -- wrapped in `run_in_executor` but ties up thread pool. Should migrate to `httpx` async like Transparencia source. | `backend/pncp_client.py` | Performance |
+
+### MEDIUM
+
+| # | Description | Location | Category |
+|---|-------------|----------|----------|
+| TD-12 | **`docker-compose.yml` still references `bidiq-` names** -- container names and network are `bidiq-backend`, `bidiq-frontend`, `bidiq-network`. Should be rebranded to `descomplicita`. | `docker-compose.yml:30,74,94` | Maintainability |
+| TD-13 | **`README.md` title still says "BidIQ Uniformes"** -- inconsistent branding across documentation. | `README.md:1` | Maintainability |
+| TD-14 | **sectors.py module docstring says "BidIQ"** -- needs brand update. | `backend/sectors.py:1` | Maintainability |
+| TD-15 | **No request ID / correlation ID** -- log entries for a single search are correlated only by job_id in string interpolation, not structured logging fields. | `backend/main.py` (throughout) | Maintainability |
+| TD-16 | **Hardcoded PNCP base URL** -- `PNCPClient.BASE_URL` is a class constant, not configurable via env. | `backend/pncp_client.py:81` | Maintainability |
+| TD-17 | **No API versioning** -- endpoints are unversioned (`/buscar` not `/v1/buscar`). Breaking changes will affect all clients simultaneously. | `backend/main.py` | Maintainability |
+| TD-18 | **Filter diagnostic code in production path** -- lines 441-455 in `main.py` import `filter.py` internals and iterate over raw data for debug logging inside the request handler. | `backend/main.py:441-455` | Code Quality |
+| TD-19 | **UFS constant duplicated** -- defined in both `frontend/app/page.tsx:18-21` and `frontend/app/types.ts:6-10`. | `frontend/app/page.tsx:18`, `frontend/app/types.ts:6` | Code Quality |
+| TD-20 | **No OpenAPI schema for job result endpoint** -- `GET /buscar/{job_id}/result` returns raw `JSONResponse`, not a typed Pydantic model. Swagger docs are incomplete. | `backend/main.py:650` | Maintainability |
+| TD-21 | **Excel download uses filesystem tmpdir** -- not suitable for serverless (Vercel edge functions) or multi-instance deployment. Should use signed URLs or streaming. | `frontend/app/api/buscar/result/route.ts:63-64` | Scalability |
+| TD-22 | **`asyncio.get_event_loop()` deprecated usage** -- should use `asyncio.get_running_loop()`. | `backend/main.py:320`, `backend/sources/pncp_source.py:104` | Code Quality |
+| TD-23 | **No graceful shutdown** -- background tasks (`run_search_job`, cleanup) are not properly cancelled on SIGTERM. | `backend/main.py:191-198` | Maintainability |
+| TD-24 | **Cache not shared across restarts** -- in-memory LRU cache in PNCPClient is lost on container restart. Repeated searches after deploy re-fetch everything. | `backend/pncp_client.py:108` | Performance |
+| TD-25 | **Module-level singleton in job_store.py** -- `job_store = JobStore()` at line 158 creates a second instance that is never used (main.py creates its own `_job_store`). | `backend/job_store.py:158` | Code Quality |
+
+### LOW
+
+| # | Description | Location | Category |
+|---|-------------|----------|----------|
+| TD-26 | **No structured error codes** -- error responses use free-text Portuguese messages, not machine-parseable error codes. | Throughout backend | Maintainability |
+| TD-27 | **`f-string` in logger calls** -- should use `logger.info("msg %s", val)` for lazy formatting. | `backend/main.py` (many lines) | Performance |
+| TD-28 | **No pagination for sectors endpoint** -- returns all sectors in a single response. Not a problem now (6 sectors) but could be if expanded. | `backend/main.py:201-204` | Scalability |
+| TD-29 | **Frontend emoji usage in source code** -- LoadingProgress.tsx and other components embed emoji characters directly in JSX. | `frontend/app/components/LoadingProgress.tsx` | Code Quality |
+| TD-30 | **No content-length validation for Excel downloads** -- frontend serves whatever is on disk without size limits. | `frontend/app/api/download/route.ts` | Security |
+| TD-31 | **Date range max removed** -- BuscaRequest no longer enforces a max date range. Users can query arbitrarily large ranges, potentially overloading PNCP. | `backend/schemas.py:59-73` | Performance |
+
+---
+
+## 15. Recommendations
+
+### Priority 1 -- Security (Immediate)
+
+1. **Restrict CORS origins** to production domains (TD-01)
+2. **Run backend container as non-root user** (TD-02)
+3. **Implement per-IP rate limiting** (e.g., SlowAPI middleware) (TD-05)
+4. **Add API authentication** for production use (TD-03) -- even a simple API key would prevent abuse
+
+### Priority 2 -- Scalability (Before Multi-Tenant)
+
+5. **Replace in-memory job store with Redis** -- enables horizontal scaling, survives restarts (TD-04)
+6. **Stream Excel files** instead of base64 in JSON -- use pre-signed URLs or direct streaming (TD-06)
+7. **Migrate PNCP client to httpx async** -- eliminate thread pool bottleneck (TD-11)
+8. **Share cache via Redis** -- enables cache persistence across restarts and instances (TD-24)
+
+### Priority 3 -- Code Quality (Next Sprint)
+
+9. **Separate dev/prod requirements** -- use `requirements-dev.txt` for test/lint tools (TD-10)
+10. **Complete branding migration** -- update docker-compose, README, sectors.py to Descomplicita (TD-12, TD-13, TD-14)
+11. **Adopt FastAPI lifespan** context manager to replace deprecated `on_event` (TD-08)
+12. **Replace deprecated `datetime.utcnow()`** with `datetime.now(timezone.utc)` (TD-09)
+13. **Add API versioning** prefix (`/v1/`) before any breaking changes (TD-17)
+14. **Add structured logging** with correlation IDs per request (TD-15)
+15. **Remove filter diagnostic code** from production path (TD-18)
+16. **Type the job result endpoint** with a proper Pydantic response model (TD-20)
+
+### Priority 4 -- Observability (Medium-Term)
+
+17. **Add Sentry error tracking** (DSN already in `.env.example`)
+18. **Add response time metrics** (Prometheus or DataDog)
+19. **Add health check dependencies** (verify PNCP/OpenAI reachability in `/health`)
+20. **Dashboard for job queue metrics** (active jobs, avg duration, failure rate)
+
+---
+
+*Document generated: 2026-03-07*
+*Based on codebase analysis at commit `9fbd54d0` (main branch)*

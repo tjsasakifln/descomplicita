@@ -1,983 +1,1013 @@
-# BidIQ Uniformes - Frontend Specification & Audit
+# Frontend Specification -- Descomplicita
 
-**Project:** BidIQ Uniformes - POC v0.2
-**Date:** January 2026
-**Version:** 1.0
-**Status:** BROWNFIELD DISCOVERY - PHASE 3
-**Documented by:** @ux-design-expert
-
----
-
-## Executive Summary
-
-The BidIQ frontend is designed as a **single-page application (SPA)** using Next.js 14+ with App Router. Current status: **Partial implementation** - dependencies configured but application structure incomplete. This specification documents the intended architecture, components, and current gaps.
-
-**Key Characteristics:**
-- Minimal, focused UI for B2B procurement search
-- Multi-select UF (state) filter with 27 options
-- Date range picker with smart defaults (last 7 days)
-- Results display with GPT-powered summaries
-- Direct Excel export to browser
-- Mobile-responsive design via Tailwind CSS
-
-**Current Status:** Package dependencies configured, but Next.js app structure not yet created (Issue #21)
+**Project:** Descomplicita (formerly BidIQ) -- Brazilian Procurement Search Platform
+**Date:** March 2026
+**Version:** 2.0
+**Status:** MVP -- Production-ready single-page application
+**Documented by:** @ux-design-expert (Pixel)
+**Audit scope:** Complete frontend codebase analysis
 
 ---
 
-## 1. Frontend Technology Stack
+## 1. Overview
 
-### 1.1 Core Framework
+### Purpose and User-Facing Features
 
-| Technology | Version | Purpose | Status |
-|------------|---------|---------|--------|
-| Next.js | 14+ | Full-stack React framework, App Router | ✅ Configured (Issue #21) |
-| React | 18+ | UI component library | ✅ Configured |
-| TypeScript | 5.3+ | Type-safe development | ✅ Configured |
-| Tailwind CSS | 3.4+ | Utility-first styling | ✅ Configured |
-| Node.js | 18+ | Runtime | ✅ Required |
+Descomplicita (DescompLicita) is a procurement opportunity discovery platform for Brazil. It searches official government procurement portals (PNCP, Compras.gov, Transparencia, Diarios Oficiais, TCE-RJ) and returns AI-summarized results with an Excel download.
 
-### 1.2 Development Dependencies
+**Core user workflow:**
+1. Select search mode (Sector or Custom Terms)
+2. Choose Brazilian states (UFs) from a visual grid
+3. Set date range
+4. Submit search -> background job with real-time progress polling
+5. View AI-generated executive summary with highlights
+6. Download filtered results as Excel spreadsheet
+7. Optionally save search for later re-use
 
-```json
-{
-  "devDependencies": {
-    "@testing-library/react": "^14.0.0",
-    "@testing-library/jest-dom": "^6.1.4",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0",
-    "prettier": "^3.0.3",
-    "eslint": "^8",
-    "eslint-config-next": "^14"
-  }
-}
-```
+**Additional features:**
+- 5-theme system (Light, Paperwhite, Sepia, Dim, Dark)
+- Saved searches (up to 10, persisted in localStorage)
+- Real-time loading progress with 5-stage pipeline visualization
+- Curiosity carousel during loading (52 items across 4 categories)
+- Background browser notifications on search completion
+- Source transparency badges showing per-source statistics
+- Empty state with filter rejection breakdown and actionable suggestions
+- Mixpanel analytics integration
 
-### 1.3 Build & Deployment
+### Target Audience
 
-- **Build Tool:** Next.js built-in
-- **Output:** Standalone server + static assets
-- **Target:** Vercel or self-hosted Node.js
-- **Bundle Optimization:** Next.js automatic code splitting
+Brazilian businesses and procurement professionals who participate in public tenders (licitacoes). Primary use case: companies that supply goods/services to government entities searching for new opportunities across multiple states.
+
+### Current State
+
+**MVP** -- Single-page application with full search-to-download flow. Production-deployed with Docker standalone output. The app is functional but operates as a monolithic single page with all UI in `page.tsx` (1,071 lines).
 
 ---
 
-## 2. Application Structure (Intended)
+## 2. Technology Stack
 
-### 2.1 Directory Layout
+### Framework Versions
+| Technology | Version | Purpose |
+|---|---|---|
+| Next.js | ^16.1.4 | React meta-framework with App Router |
+| React | ^18.3.1 | UI library |
+| TypeScript | ^5.9.3 | Type safety |
+| TailwindCSS | ^3.4.19 | Utility-first CSS |
+| PostCSS | ^8.5.6 | CSS processing |
+| Autoprefixer | ^10.4.23 | CSS vendor prefixing |
+
+### Key Dependencies
+| Package | Version | Purpose |
+|---|---|---|
+| mixpanel-browser | ^2.74.0 | Analytics event tracking |
+| uuid | ^13.0.0 | Unique ID generation for saved searches |
+| @types/uuid | ^10.0.0 | TypeScript types for uuid |
+
+### Dev Dependencies
+| Package | Version | Purpose |
+|---|---|---|
+| jest | ^29.7.0 | Unit test runner |
+| @swc/jest | ^0.2.29 | SWC-based Jest transformer |
+| jest-environment-jsdom | ^29.7.0 | Browser environment simulation |
+| @testing-library/react | ^14.1.2 | React component testing |
+| @testing-library/jest-dom | ^6.1.5 | Custom DOM matchers |
+| @testing-library/user-event | ^14.5.1 | User interaction simulation |
+| @playwright/test | ^1.58.0 | E2E browser testing |
+| @axe-core/playwright | ^4.11.0 | Accessibility testing in E2E |
+
+### Build Configuration
+- **Output:** `standalone` (Docker-optimized)
+- **Strict mode:** Enabled (`reactStrictMode: true`)
+- **Dark mode:** Class-based (`darkMode: "class"`)
+- **Node.js requirement:** >=20.9.0
+
+---
+
+## 3. Application Architecture
+
+### App Router Structure
 
 ```
 frontend/
-├── app/                          # App Router directory
-│   ├── layout.tsx                # Root layout (global styles, providers)
-│   ├── page.tsx                  # Main search page (/)
-│   ├── api/                      # API route handlers
-│   │   ├── buscar/
-│   │   │   └── route.ts          # POST /api/buscar → proxy to backend
-│   │   └── download/
-│   │       └── route.ts          # GET /api/download → serve Excel
-│   └── [components]/             # (To be created)
-│       ├── UFSelector.tsx        # Multi-select UF buttons
-│       ├── DateRangePicker.tsx   # Date range input
-│       ├── ResultsTable.tsx      # Results display
-│       ├── SummaryCard.tsx       # GPT summary display
-│       ├── LoadingSkeletons.tsx  # Loading states
-│       └── ErrorBoundary.tsx     # Error handling
-│
-├── styles/                       # (Optional if needed beyond Tailwind)
-│   └── globals.css               # Global Tailwind imports
-│
-├── hooks/                        # Custom React hooks
-│   ├── useSearch.ts              # Encapsulate search logic
-│   └── usePagination.ts          # Pagination state (future)
-│
-├── lib/                          # Utilities
-│   ├── api-client.ts             # API communication
-│   ├── constants.ts              # UFs, defaults, colors
-│   └── utils.ts                  # Helper functions
-│
-├── types/                        # TypeScript type definitions
-│   ├── api.ts                    # API response types
-│   └── domain.ts                 # Domain models
-│
-├── __tests__/                    # Test files
-│   ├── components/
-│   ├── hooks/
-│   ├── pages/
-│   └── integration/
-│
-├── public/                       # Static assets
-│   └── favicon.ico
-│
-├── next.config.js                # Next.js configuration
-├── tsconfig.json                 # TypeScript configuration
-├── jest.config.js                # Jest testing configuration
-├── tailwind.config.js            # Tailwind configuration
-└── package.json
+  app/
+    layout.tsx          -- Root layout (fonts, metadata, providers)
+    page.tsx            -- Main (and only) page -- entire UI
+    error.tsx           -- Error boundary
+    globals.css         -- Design system tokens + animations
+    types.ts            -- Shared TypeScript interfaces
+    icon.svg            -- Favicon (still shows "B" from BidIQ era)
+    api/
+      buscar/
+        route.ts        -- POST: Submit search job
+        status/
+          route.ts      -- GET: Poll job status
+        result/
+          route.ts      -- GET: Fetch completed result
+      download/
+        route.ts        -- GET: Serve Excel file
+      setores/
+        route.ts        -- GET: Fetch available sectors
+    components/
+      AnalyticsProvider.tsx
+      carouselData.ts
+      EmptyState.tsx
+      LoadingProgress.tsx
+      RegionSelector.tsx
+      SavedSearchesDropdown.tsx
+      SourceBadges.tsx
+      ThemeProvider.tsx
+      ThemeToggle.tsx
+  hooks/
+    useAnalytics.ts
+    useSavedSearches.ts
+  lib/
+    savedSearches.ts
+  public/
+    .gitkeep
+    logo-descomplicita.png
 ```
+
+### Component Tree / Hierarchy
+
+```
+RootLayout (layout.tsx)
+  AnalyticsProvider
+    ThemeProvider
+      HomePage (page.tsx) -- "use client"
+        header
+          img (logo)
+          SavedSearchesDropdown
+          ThemeToggle
+        main
+          [Search Mode Toggle]
+          [Sector Select / Terms Input]
+          RegionSelector
+          [UF Grid]
+          [Date Range Inputs]
+          [Search Button]
+          [Save Search Button]
+          LoadingProgress (conditional)
+          [Error Display] (conditional)
+          EmptyState (conditional)
+          [Result Display] (conditional)
+            SourceBadges
+            [Download Button]
+        footer
+        [Save Search Dialog Modal] (conditional)
+```
+
+### Data Flow Patterns
+
+1. **Search initiation:** `page.tsx` -> POST `/api/buscar` -> backend `/buscar` -> returns `job_id`
+2. **Status polling:** `setInterval` (2s) -> GET `/api/buscar/status?job_id=` -> updates progress state
+3. **Result fetch:** On status=completed -> GET `/api/buscar/result?job_id=` -> sets result state
+4. **Download:** Click -> GET `/api/download?id=` -> blob -> programmatic anchor click
+5. **Sectors:** On mount -> GET `/api/setores` -> fallback hardcoded list on failure
+
+All API routes in `/api/*` are **proxy routes** that forward requests to the Python backend (`BACKEND_URL` env var, default `http://localhost:8000`).
+
+### State Management Approach
+
+**Pure React state** -- no external state management library. All state lives in `HomePage` component via `useState` hooks. The component manages 20+ state variables including:
+- Form state (UFs, dates, search mode, terms)
+- Loading/error state
+- Polling state (phase, UFs completed, items fetched, elapsed time)
+- Result state
+- Download state
+- Save search dialog state
+
+Refs are used for:
+- Polling interval (`pollingRef`)
+- Current job ID (`jobIdRef`)
+- Search start time (`searchStartTimeRef`)
+- Original document title (`originalTitleRef`)
 
 ---
 
-## 3. Component Architecture
+## 4. Component Inventory
 
-### 3.1 Page Structure: Main Search Page (`page.tsx`)
+### HomePage (page.tsx)
+- **Path:** `frontend/app/page.tsx`
+- **Purpose:** Entire application UI -- search form, results display, download, save search
+- **Lines:** 1,071
+- **Props:** None (root page component)
+- **Dependencies:** All other components, both hooks, types
+- **Responsive:** Yes -- grid adjustments at `sm:` breakpoint, responsive typography
+- **Accessibility:** aria-pressed on UF buttons, aria-busy on search button, role="alert" on errors, aria-live="polite" on loading
+- **Issues:** God component -- 1,071 lines with 20+ state variables, all business logic, and UI rendering in one file
 
-```typescript
-// Main SPA with all search functionality on single page
-
-export default function SearchPage() {
-  const [ufs, setUfs] = useState<Set<string>>(new Set());
-  const [dateRange, setDateRange] = useState({
-    start: getLastNDays(7), // Default: last 7 days
-    end: new Date().toISOString().split('T')[0]
-  });
-  const [results, setResults] = useState<Licitacao[]>([]);
-  const [summary, setSummary] = useState<ResumoLicitacoes | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [downloadId, setDownloadId] = useState<string | null>(null);
-
-  const handleSearch = async () => {
-    // POST to /api/buscar
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <h1>BidIQ Uniformes</h1>
-        <p>Descoberta Automática de Oportunidades de Compra Pública</p>
-      </header>
-
-      <main className="max-w-7xl mx-auto p-6">
-        {/* Filters Section */}
-        <section className="bg-white rounded-lg shadow p-6 mb-6">
-          <UFSelector ufs={ufs} onChange={setUfs} />
-          <DateRangePicker dateRange={dateRange} onChange={setDateRange} />
-          <button onClick={handleSearch} disabled={loading}>
-            {loading ? "Buscando..." : "Buscar Oportunidades"}
-          </button>
-        </section>
-
-        {/* Summary Card (if results) */}
-        {summary && <SummaryCard resumo={summary} />}
-
-        {/* Results Section */}
-        {results.length > 0 && (
-          <section className="mt-6">
-            <h2>Resultados ({results.length})</h2>
-            <ResultsTable results={results} downloadId={downloadId} />
-          </section>
-        )}
-
-        {/* Loading State */}
-        {loading && <LoadingSkeletons count={5} />}
-
-        {/* Error State */}
-        {error && <ErrorAlert message={error} />}
-      </main>
-    </div>
-  );
-}
-```
-
-### 3.2 Component: UF Selector
-
-```typescript
-interface UFSelectorProps {
-  ufs: Set<string>;
-  onChange: (ufs: Set<string>) => void;
-}
-
-export function UFSelector({ ufs, onChange }: UFSelectorProps) {
-  const UFS = [
-    // 27 Brazilian states
-    { code: 'AC', name: 'Acre' },
-    { code: 'AL', name: 'Alagoas' },
-    { code: 'AP', name: 'Amapá' },
-    { code: 'AM', name: 'Amazonas' },
-    { code: 'BA', name: 'Bahia' },
-    // ... 22 more states
-    { code: 'TO', name: 'Tocantins' }
-  ];
-
-  const toggleUF = (code: string) => {
-    const newUFs = new Set(ufs);
-    if (newUFs.has(code)) {
-      newUFs.delete(code);
-    } else {
-      newUFs.add(code);
-    }
-    onChange(newUFs);
-  };
-
-  return (
-    <div className="mb-6">
-      <label className="block text-sm font-medium mb-2">
-        Estados (Selecione um ou mais)
-      </label>
-      <div className="grid grid-cols-9 gap-2">
-        {UFS.map(uf => (
-          <button
-            key={uf.code}
-            onClick={() => toggleUF(uf.code)}
-            className={`
-              px-3 py-2 rounded text-sm font-medium transition-colors
-              ${ufs.has(uf.code)
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }
-            `}
-            title={uf.name}
-          >
-            {uf.code}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-```
-
-### 3.3 Component: Date Range Picker
-
-```typescript
-interface DateRangePickerProps {
-  dateRange: { start: string; end: string };
-  onChange: (range: { start: string; end: string }) => void;
-}
-
-export function DateRangePicker({ dateRange, onChange }: DateRangePickerProps) {
-  return (
-    <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">Data Inicial</label>
-        <input
-          type="date"
-          value={dateRange.start}
-          onChange={e => onChange({ ...dateRange, start: e.target.value })}
-          className="w-full px-3 py-2 border rounded"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Data Final</label>
-        <input
-          type="date"
-          value={dateRange.end}
-          onChange={e => onChange({ ...dateRange, end: e.target.value })}
-          className="w-full px-3 py-2 border rounded"
-        />
-      </div>
-    </div>
-  );
-}
-```
-
-### 3.4 Component: Results Table
-
-```typescript
-interface ResultsTableProps {
-  results: Licitacao[];
-  downloadId: string | null;
-}
-
-export function ResultsTable({ results, downloadId }: ResultsTableProps) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-100 border-b">
-          <tr>
-            <th className="px-4 py-2 text-left">Código</th>
-            <th className="px-4 py-2 text-left">Objeto</th>
-            <th className="px-4 py-2 text-left">Órgão</th>
-            <th className="px-4 py-2 text-left">UF</th>
-            <th className="px-4 py-2 text-right">Valor</th>
-            <th className="px-4 py-2 text-left">Status</th>
-            <th className="px-4 py-2 text-left">Link</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map(licitacao => (
-            <tr key={licitacao.codigo} className="border-b hover:bg-gray-50">
-              <td className="px-4 py-2 font-mono text-xs">{licitacao.codigo}</td>
-              <td className="px-4 py-2">{licitacao.objeto}</td>
-              <td className="px-4 py-2">{licitacao.orgao}</td>
-              <td className="px-4 py-2 font-semibold">{licitacao.uf}</td>
-              <td className="px-4 py-2 text-right font-semibold">
-                R$ {(licitacao.valor / 1000).toFixed(1)}k
-              </td>
-              <td className="px-4 py-2">
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                  {licitacao.status}
-                </span>
-              </td>
-              <td className="px-4 py-2">
-                <a
-                  href={licitacao.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  PNCP ↗
-                </a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {downloadId && (
-        <button
-          onClick={() => window.location.href = `/api/download?id=${downloadId}`}
-          className="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-        >
-          📥 Baixar Excel
-        </button>
-      )}
-    </div>
-  );
-}
-```
-
-### 3.5 Component: Summary Card
-
-```typescript
-export function SummaryCard({ resumo }: { resumo: ResumoLicitacoes }) {
-  return (
-    <div className="bg-blue-50 border-l-4 border-blue-600 p-6 rounded mb-6">
-      <h2 className="font-bold text-lg mb-3">📊 Resumo Executivo (IA)</h2>
-
-      <p className="text-gray-700 mb-4">{resumo.resumo_executivo}</p>
-
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-blue-600">
-            {resumo.total_oportunidades}
-          </div>
-          <div className="text-sm text-gray-600">Oportunidades</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">
-            R$ {(resumo.valor_total / 1_000_000).toFixed(1)}M
-          </div>
-          <div className="text-sm text-gray-600">Valor Total</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-orange-600">
-            {(resumo.valor_total / resumo.total_oportunidades / 1000).toFixed(0)}k
-          </div>
-          <div className="text-sm text-gray-600">Valor Médio</div>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <h3 className="font-semibold text-sm mb-2">🎯 Destaques:</h3>
-        <ul className="list-disc list-inside text-sm text-gray-700">
-          {resumo.destaques.map((destaque, i) => (
-            <li key={i}>{destaque}</li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-sm mb-2">💡 Recomendações:</h3>
-        <ul className="list-disc list-inside text-sm text-gray-700">
-          {resumo.recomendacoes.map((rec, i) => (
-            <li key={i}>{rec}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-## 4. API Integration
-
-### 4.1 API Route: `/api/buscar` (POST)
-
-```typescript
-// frontend/app/api/buscar/route.ts
-
-export async function POST(request: Request) {
-  const body = await request.json();
-
-  try {
-    const response = await fetch('http://localhost:8000/api/buscar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Backend unavailable' },
-      { status: 500 }
-    );
+### LoadingProgress
+- **Path:** `frontend/app/components/LoadingProgress.tsx`
+- **Purpose:** Multi-stage loading visualization with progress bar, UF grid, curiosity carousel, skeleton cards
+- **Lines:** 415
+- **Props Interface:**
+  ```typescript
+  interface LoadingProgressProps {
+    phase: SearchPhase;
+    ufsCompleted: number;
+    ufsTotal: number;
+    itemsFetched: number;
+    itemsFiltered: number;
+    elapsedSeconds: number;
+    onCancel: () => void;
+    selectedUfs?: string[];
+    sectorId?: string;
   }
-}
-```
+  ```
+- **Dependencies:** useAnalytics hook, carouselData, types
+- **Responsive:** Stage labels hidden on mobile (`hidden sm:block`), mobile-specific detail card (`sm:hidden`)
+- **Accessibility:** `role="progressbar"` with `aria-valuenow/min/max`, `aria-hidden` on decorative icons
 
-### 4.2 API Route: `/api/download` (GET)
+### carouselData
+- **Path:** `frontend/app/components/carouselData.ts`
+- **Purpose:** Pure data module with 52 curiosity items across 4 categories, category config, and balanced shuffle algorithm
+- **Lines:** 368
+- **No React -- pure TypeScript data**
+- **Exports:** `CURIOSIDADES`, `CATEGORIA_CONFIG`, `shuffleBalanced`, types
 
-```typescript
-// frontend/app/api/download/route.ts
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const downloadId = searchParams.get('id');
-
-  if (!downloadId) {
-    return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+### SavedSearchesDropdown
+- **Path:** `frontend/app/components/SavedSearchesDropdown.tsx`
+- **Purpose:** Dropdown for managing saved searches -- load, delete, clear
+- **Lines:** 250
+- **Props Interface:**
+  ```typescript
+  interface SavedSearchesDropdownProps {
+    onLoadSearch: (search: SavedSearch) => void;
+    onAnalyticsEvent?: (eventName: string, properties?: Record<string, any>) => void;
   }
+  ```
+- **Dependencies:** useSavedSearches hook, SavedSearch type
+- **Responsive:** "Buscas Salvas" label hidden on small screens (`hidden sm:inline`), dropdown width responsive (`w-80 sm:w-96`)
+- **Accessibility:** `aria-label`, `aria-expanded`, `aria-hidden` on backdrop
 
-  try {
-    const response = await fetch(
-      `http://localhost:8000/api/download?id=${downloadId}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.status}`);
-    }
-
-    const buffer = await response.arrayBuffer();
-
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="licitacoes-${downloadId}.xlsx"`
-      }
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Download failed' },
-      { status: 500 }
-    );
+### EmptyState
+- **Path:** `frontend/app/components/EmptyState.tsx`
+- **Purpose:** Informative empty state when search returns 0 results, with filter rejection breakdown and suggestions
+- **Lines:** 140
+- **Props Interface:**
+  ```typescript
+  interface EmptyStateProps {
+    onAdjustSearch?: () => void;
+    rawCount?: number;
+    stateCount?: number;
+    filterStats?: FilterStats | null;
+    sectorName?: string;
   }
-}
-```
+  ```
+- **Dependencies:** FilterStats type
+- **Responsive:** No specific responsive adjustments (relies on parent container)
+- **Accessibility:** No explicit ARIA attributes
 
----
+### ThemeProvider
+- **Path:** `frontend/app/components/ThemeProvider.tsx`
+- **Purpose:** Context provider for 5-theme system. Manages theme persistence in localStorage and applies CSS custom properties
+- **Lines:** 122
+- **Exports:** `ThemeProvider` component, `useTheme` hook, `THEMES` constant, `ThemeId` type
+- **Dependencies:** None (pure React context)
+- **Approach:** Imperatively sets CSS custom properties on `document.documentElement` via `applyTheme()` function
 
-## 5. State Management
-
-### 5.1 Component-Level State (React Hooks)
-
-```typescript
-// No Redux or Context API used (keep simple for POC)
-// All state co-located in page.tsx
-
-const [ufs, setUfs] = useState<Set<string>>(new Set());
-const [dateRange, setDateRange] = useState({ ... });
-const [results, setResults] = useState<Licitacao[]>([]);
-const [summary, setSummary] = useState<ResumoLicitacoes | null>(null);
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState<string | null>(null);
-```
-
-### 5.2 Download Cache Strategy
-
-**Current:** Implicit via API backend (10min TTL)
-**Future:** React SWR or TanStack Query for client-side caching
-
----
-
-## 6. Styling & Design System
-
-### 6.1 Tailwind CSS Configuration
-
-```javascript
-// tailwind.config.js
-module.exports = {
-  content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}'
-  ],
-  theme: {
-    extend: {
-      colors: {
-        // BidIQ color palette
-        'bidiq-green': '#2E7D32',  // Primary (from AIOS standard)
-        'bidiq-blue': '#1976D2',   // Secondary
-      }
-    }
+### SourceBadges
+- **Path:** `frontend/app/components/SourceBadges.tsx`
+- **Purpose:** Displays per-source search statistics with colored badges and expandable detail view
+- **Lines:** 120
+- **Props Interface:**
+  ```typescript
+  interface SourceBadgesProps {
+    sources: string[];
+    stats: Record<string, SourceStats>;
+    dedupRemoved: number;
+    truncatedCombos?: number;
   }
-};
-```
+  ```
+- **Responsive:** Margin adjustments (`mt-4 sm:mt-6`)
+- **Accessibility:** No ARIA attributes on expandable section
 
-### 6.2 Global Styles
+### AnalyticsProvider
+- **Path:** `frontend/app/components/AnalyticsProvider.tsx`
+- **Purpose:** Initializes Mixpanel and tracks page_load/page_exit events
+- **Lines:** 74
+- **Dependencies:** mixpanel-browser, next/navigation
+- **Issues:** Uses deprecated `performance.timing.navigationStart` API
 
-```css
-/* app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+### ThemeToggle
+- **Path:** `frontend/app/components/ThemeToggle.tsx`
+- **Purpose:** Dropdown button to switch between 5 themes
+- **Lines:** 73
+- **Dependencies:** ThemeProvider (useTheme, THEMES)
+- **Responsive:** Theme label hidden on small screens (`hidden sm:inline`)
+- **Accessibility:** `aria-label`, `aria-expanded`
 
-@layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-bidiq-green text-white rounded hover:bg-green-700 transition-colors;
+### RegionSelector
+- **Path:** `frontend/app/components/RegionSelector.tsx`
+- **Purpose:** Quick-select buttons for Brazilian geographic regions (Norte, Nordeste, Centro-Oeste, Sudeste, Sul)
+- **Lines:** 53
+- **Props Interface:**
+  ```typescript
+  interface RegionSelectorProps {
+    selected: Set<string>;
+    onToggleRegion: (ufs: string[]) => void;
   }
+  ```
+- **Accessibility:** `aria-label` on each region button
 
-  .btn-secondary {
-    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors;
-  }
-}
+### useAnalytics (Hook)
+- **Path:** `frontend/hooks/useAnalytics.ts`
+- **Purpose:** Wraps Mixpanel tracking with error handling. Provides trackEvent, identifyUser, trackPageView
+- **Lines:** 66
+- **Dependencies:** mixpanel-browser
+
+### useSavedSearches (Hook)
+- **Path:** `frontend/hooks/useSavedSearches.ts`
+- **Purpose:** React hook wrapping localStorage-based saved searches with CRUD operations
+- **Lines:** 148
+- **Dependencies:** lib/savedSearches
+
+### savedSearches (Library)
+- **Path:** `frontend/lib/savedSearches.ts`
+- **Purpose:** Pure localStorage CRUD operations for saved searches (max 10, sorted by lastUsedAt)
+- **Lines:** 99
+- **Dependencies:** uuid
+
+---
+
+## 5. Design System Analysis
+
+### Documented Design System
+
+The project has a well-documented design system at `frontend/.interface-design/system.md` with clear rationale for decisions.
+
+### Color Palette
+
+**Brand Colors:**
+| Token | Light | Dark | Purpose |
+|---|---|---|---|
+| `--brand-navy` | #0a1e3f | #0a1e3f | Primary action, authority |
+| `--brand-blue` | #116dff | #116dff | Interactive accent |
+| `--brand-blue-hover` | #0d5ad4 | #0d5ad4 | Hover state |
+| `--brand-blue-subtle` | #e8f0ff | rgba(17,109,255,0.12) | Highlight backgrounds |
+
+**Canvas & Ink:**
+| Token | Light | Dark |
+|---|---|---|
+| `--canvas` | #ffffff | #121212 |
+| `--ink` | #1e2d3b | #e8eaed |
+| `--ink-secondary` | #3d5975 | #a8b4c0 |
+| `--ink-muted` | #808f9f | #6b7a8a |
+| `--ink-faint` | #c0d2e5 | #3a4555 |
+
+**Surfaces:**
+| Token | Light | Dark |
+|---|---|---|
+| `--surface-0` | #ffffff | #121212 |
+| `--surface-1` | #f7f8fa | #1a1d22 |
+| `--surface-2` | #f0f2f5 | #242830 |
+| `--surface-elevated` | #ffffff | #1e2128 |
+
+**Semantic:**
+| Token | Light | Dark |
+|---|---|---|
+| `--success` | #16a34a | #22c55e |
+| `--error` | #dc2626 | #f87171 |
+| `--warning` | #ca8a04 | #facc15 |
+
+### Typography
+
+| Role | Font | Variable | Usage |
+|---|---|---|---|
+| Body | DM Sans | `--font-body` | All body text, labels, buttons |
+| Display | Fahkwang | `--font-display` | Headings (matches Descomplicita brand) |
+| Data | DM Mono | `--font-data` | Numbers, statistics, timestamps |
+
+All fonts loaded via `next/font/google` with `display: "swap"` for performance.
+
+**Font size:** `clamp(14px, 1vw + 10px, 16px)` responsive base with `line-height: 1.6`.
+
+### Spacing System
+
+Base: 4px (Tailwind default). Custom comment in config references 4px base but no custom values defined -- relies on Tailwind's default spacing scale.
+
+### Border Radius Scale
+| Token | Value | Usage |
+|---|---|---|
+| `rounded-input` | 4px | Form inputs |
+| `rounded-button` | 6px | Buttons |
+| `rounded-card` | 8px | Cards, panels |
+| `rounded-modal` | 12px | Modals |
+
+### Depth Strategy
+
+**Borders-only** -- no box shadows. All depth conveyed through 1px borders with low-opacity values:
+- `--border`: rgba(0,0,0,0.08) / rgba(255,255,255,0.08)
+- `--border-strong`: rgba(0,0,0,0.15) / rgba(255,255,255,0.15)
+- `--border-accent`: rgba(17,109,255,0.3) / rgba(17,109,255,0.4)
+
+Exception: `shadow-lg` used on save search dialog and `shadow-sm` on theme dropdown.
+
+### Dark/Light Theme Implementation
+
+5 themes managed via `ThemeProvider`:
+
+| Theme | isDark | Canvas | Ink |
+|---|---|---|---|
+| Light | No | #ffffff | #1e2d3b |
+| Paperwhite | No | #F5F0E8 | #1e2d3b |
+| Sepia | No | #EDE0CC | #2c1810 |
+| Dim | Yes | #2A2A2E | #e0e0e0 |
+| Dark | Yes | #121212 | #e0e0e0 |
+
+Implementation uses inline `<script>` in `<head>` to prevent flash of unstyled content (FOUC), reading from localStorage before React hydrates. The `ThemeProvider` then takes over with `applyTheme()` which sets all CSS custom properties imperatively.
+
+### Component Consistency
+
+The design system is **well-defined but inconsistently applied**:
+- `error.tsx` uses hardcoded Tailwind colors (`bg-gray-50`, `bg-green-600`, `text-gray-900`) instead of design tokens
+- The `icon.svg` still shows "B" (from BidIQ) with green background (`#166534`) instead of brand navy
+- Some hardcoded Tailwind color classes in `SourceBadges.tsx` (`bg-green-100`, `bg-red-100`, etc.) instead of semantic tokens
+- `carouselData.ts` uses hardcoded Tailwind colors (`bg-blue-50`, `bg-green-50`, etc.) for category styling
+
+### Responsive Breakpoints
+
+Uses Tailwind's default breakpoints:
+- `sm:` (640px) -- primary responsive breakpoint used throughout
+- `md:` (768px) -- used only for UF grid columns (`md:grid-cols-9`)
+- No `lg:` or `xl:` usage
+
+---
+
+## 6. UX Patterns
+
+### User Flows
+
+**Primary Flow: Search -> Results -> Download**
+1. User lands on page, sees search form with defaults (SC/PR/RS, last 7 days, Vestuario sector)
+2. User can switch to "Termos Especificos" mode for custom keyword search
+3. User selects states via grid or region quick-select buttons
+4. User adjusts date range
+5. User clicks "Buscar [Sector Name]"
+6. Loading screen shows: progress bar, 5-stage indicator, UF grid, curiosity carousel, skeleton cards
+7. On completion: executive summary, highlights, statistics, source badges
+8. User clicks "Baixar Excel" to download
+9. Optionally saves search for later
+
+**Secondary Flow: Saved Searches**
+1. Click "Buscas Salvas" dropdown in header
+2. See list of up to 10 saved searches sorted by last used
+3. Click to load parameters into form, or delete individual searches
+
+### Loading States
+
+**Excellent loading UX** with multi-layered feedback:
+- 5-stage pipeline indicator (Queued -> Fetching -> Filtering -> Summarizing -> Generating Excel)
+- Real progress bar with percentage based on actual backend phase
+- UF visual grid showing completed/in-progress/pending states
+- ETA calculation based on per-UF timing
+- Elapsed time counter
+- Curiosity carousel rotating every 6 seconds (sector-aware content)
+- Skeleton result cards previewing upcoming layout
+- Document title updates during background tab: progress % shown
+- Browser notification on completion (if permission granted)
+- Cancel button available at all times
+
+### Error States
+
+- **API errors:** Red card with error message + "Tentar novamente" button
+- **Download errors:** Red card below download button
+- **Validation errors:** Inline red text below affected fields with `role="alert"`
+- **Error boundary:** Full-page error with "Ops! Algo deu errado" message
+- **Backend unavailable:** Handled with 503 status and user-friendly message
+- **Polling timeout:** 10-minute deadline with specific timeout message
+
+### Empty States
+
+Rich empty state component with:
+- Contextual messaging based on raw count and filter stats
+- Filter rejection breakdown (keyword, value range, state mismatch)
+- Actionable suggestions (expand dates, add states, change sector)
+- "Ajustar criterios de busca" button scrolls to top
+
+### Feedback Mechanisms
+
+- Button states: enabled/disabled/loading with visual changes
+- UF buttons: pressed state via `aria-pressed` and bg-brand-navy
+- Search mode toggle: segmented control with active state
+- Form validation: real-time inline errors
+- Download: loading spinner animation during download
+
+### Notifications
+
+- Browser Notification API (permission requested after first search)
+- Document title change when tab is in background
+- Title restored when user returns to tab
+
+---
+
+## 7. API Integration
+
+### Frontend API Routes
+
+| Route | Method | Purpose | Backend Proxy |
+|---|---|---|---|
+| `/api/buscar` | POST | Submit search job | `POST /buscar` |
+| `/api/buscar/status` | GET | Poll job status | `GET /buscar/{job_id}/status` |
+| `/api/buscar/result` | GET | Fetch completed result | `GET /buscar/{job_id}/result` |
+| `/api/download` | GET | Serve Excel file | N/A (filesystem) |
+| `/api/setores` | GET | List available sectors | `GET /setores` |
+
+### Backend Communication Patterns
+
+- **Proxy pattern:** All API routes proxy to Python backend via `BACKEND_URL` env var
+- **Job-based async:** Search is async -- POST returns `job_id`, frontend polls status every 2s
+- **File handling:** Result route saves base64-encoded Excel to tmp filesystem, download route serves it
+- **TTL cleanup:** Downloaded files auto-expire after 1 hour (`DOWNLOAD_TTL_MS`)
+
+### Error Handling in API Routes
+
+Each route handles:
+- Missing/invalid parameters (400)
+- Backend unavailable (503)
+- Backend errors (forwarded status)
+- Network errors (catch blocks)
+- Job not found (404)
+
+### Polling Mechanism
+
+```
+POST /api/buscar -> { job_id }
+  |
+  v (every 2s via setInterval)
+GET /api/buscar/status?job_id= -> { status, progress }
+  |
+  v (when status === "completed" or "failed")
+GET /api/buscar/result?job_id= -> { resumo, download_id, ... }
 ```
 
-### 6.3 Design Principles
-
-- **Minimalist:** Focus on functionality over decoration
-- **Data-driven:** Tables > visualizations (better for procurement data)
-- **Accessible:** WCAG 2.1 AA compliance
-- **Responsive:** Mobile-first approach
-- **Performance:** No heavy libraries (Tailwind only)
+- Polling interval: 2 seconds
+- Timeout: 10 minutes
+- On network error: silently retry next interval
+- On completion: stop polling, fetch result, update UI
 
 ---
 
-## 7. Type Safety (TypeScript)
+## 8. Performance Analysis
 
-### 7.1 API Types
+### Bundle Size Considerations
 
-```typescript
-// types/api.ts
+**Positive:**
+- Minimal dependencies (only mixpanel-browser and uuid beyond React/Next.js)
+- `output: 'standalone'` for optimized Docker builds
+- Google Fonts via `next/font` (self-hosted, no external requests)
+- `display: "swap"` on all fonts prevents blocking render
 
-export interface BuscaRequest {
-  ufs: string[];
-  data_inicio: string;  // YYYY-MM-DD
-  data_fim: string;     // YYYY-MM-DD
-  valor_minimo?: number;
-  valor_maximo?: number;
-}
+**Concerns:**
+- `mixpanel-browser` (^2.74.0) adds significant bundle weight (~80KB minified)
+- Entire page is `"use client"` -- no server-side rendering benefit for the main content
+- Logo loaded from external Wix CDN (`static.wixstatic.com`) -- not self-hosted
+- No dynamic imports or code splitting for components
+- `carouselData.ts` (52 items, 368 lines) loaded eagerly even when not searching
 
-export interface Licitacao {
-  codigo: string;
-  objeto: string;
-  orgao: string;
-  uf: string;
-  municipio: string;
-  valor: number;
-  status: string;
-  link: string;
-}
+### Image Optimization
 
-export interface ResumoLicitacoes {
-  resumo_executivo: string;
-  total_oportunidades: number;
-  valor_total: number;
-  destaques: string[];
-  recomendacoes: string[];
-}
+- Logo: External URL via `<img>` tag, not using Next.js `<Image>` component (eslint disable comment present)
+- `logo-descomplicita.png` exists in `/public/` but is not used -- logo comes from Wix CDN
+- `icon.svg` is outdated (shows "B" in green, from BidIQ era)
 
-export interface BuscaResponse {
-  id: string;
-  total: int;
-  resultados: Licitacao[];
-  resumo: ResumoLicitacoes | null;
-  gerado_em: string;
-}
-```
+### Code Splitting
 
-### 7.2 No `any` Types Policy
+**None.** All components are imported statically. The entire UI loads as a single client-side bundle. Given it is a single-page app, this is acceptable for now but will become a concern as features grow.
 
-- ✅ Strict TypeScript enabled
-- ✅ All function parameters typed
-- ✅ All return types explicit
-- ✅ No implicit `any`
+### SSR vs CSR Patterns
+
+- `layout.tsx` is a **server component** (renders HTML shell, fonts, metadata)
+- `page.tsx` is `"use client"` -- the entire page is client-rendered
+- All components are `"use client"`
+- API routes are server-side (Next.js Route Handlers)
+- No server-side data fetching for the main page
+
+### Loading Performance
+
+- **Font loading:** Optimized via `next/font/google` with `display: "swap"`
+- **Theme FOUC prevention:** Inline script in `<head>` applies theme before paint
+- **Animations:** CSS-based with `prefers-reduced-motion` support
+- **Body background:** CSS-only radial gradients (no image assets)
 
 ---
 
-## 8. Testing Strategy
+## 9. Accessibility Audit
 
-### 8.1 Test Coverage Requirements
+### ARIA Labels/Roles
 
-| Layer | Threshold | Status |
-|-------|-----------|--------|
-| Components | 60%+ | ⚠️ Not implemented (Issue #21) |
-| Hooks | 60%+ | ⚠️ Not implemented |
-| Pages | 60%+ | ⚠️ Not implemented |
-| Integration | 40%+ | ⚠️ Not implemented |
+**Present (27 occurrences across 6 files):**
+- `aria-pressed` on UF toggle buttons
+- `aria-busy` on search button during loading
+- `aria-live="polite"` on loading progress container
+- `aria-expanded` on dropdown triggers (ThemeToggle, SavedSearches)
+- `aria-label` on buttons (theme toggle, region buttons, saved searches, download, remove term)
+- `aria-hidden="true"` on decorative SVGs and backdrop
+- `role="alert"` on error messages and urgency alerts
+- `role="progressbar"` with `aria-valuenow/min/max` on progress bar
 
-### 8.2 Test Examples (To Be Implemented)
+### Keyboard Navigation
 
-```typescript
-// __tests__/components/UFSelector.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { UFSelector } from '@/components/UFSelector';
+**Partial implementation:**
+- All interactive elements are `<button>` or `<input>` (focusable by default)
+- `:focus-visible` styling defined globally (2px solid ring)
+- Theme dropdown closes on outside click but **no Escape key handler**
+- SavedSearchesDropdown closes on outside click but **no Escape key handler**
+- Tag input supports Backspace (remove last) and Enter (add term)
+- **No focus trap** in save search modal dialog
+- **No keyboard navigation** within dropdown menus (arrow keys)
 
-describe('UFSelector', () => {
-  it('renders all 27 states', () => {
-    const mockOnChange = jest.fn();
-    render(<UFSelector ufs={new Set()} onChange={mockOnChange} />);
-    expect(screen.getAllByRole('button')).toHaveLength(27);
-  });
+### Color Contrast
 
-  it('toggles UF on click', () => {
-    const mockOnChange = jest.fn();
-    render(<UFSelector ufs={new Set()} onChange={mockOnChange} />);
+**Generally good** due to dark ink on light canvas:
+- `--ink` (#1e2d3b) on `--canvas` (#ffffff) = 12.6:1 ratio (AAA)
+- `--ink-secondary` (#3d5975) on `--canvas` = 6.0:1 (AA for normal text)
+- `--ink-muted` (#808f9f) on `--canvas` = 3.4:1 (FAILS AA for normal text)
+- `--ink-faint` (#c0d2e5) on `--canvas` = 1.7:1 (FAILS all levels)
 
-    const spButton = screen.getByText('SP');
-    fireEvent.click(spButton);
+**Dark mode concerns:**
+- `--ink` (#e8eaed) on `--canvas` (#121212) = 14.5:1 (AAA)
+- `--ink-muted` (#6b7a8a) on dark canvas = 3.8:1 (FAILS AA for normal text)
 
-    expect(mockOnChange).toHaveBeenCalledWith(new Set(['SP']));
-  });
+### Screen Reader Support
 
-  it('highlights selected UFs', () => {
-    const mockOnChange = jest.fn();
-    const selected = new Set(['SP']);
-    render(<UFSelector ufs={selected} onChange={mockOnChange} />);
+- Page language set to `pt-BR` in `<html lang="pt-BR">`
+- `<h1>` present ("Busca de Licitacoes")
+- Semantic HTML used (header, main, footer, section)
+- `<label>` elements properly associated with inputs via `htmlFor`
+- Error messages use `role="alert"` for live announcements
+- Decorative SVGs use `aria-hidden="true"`
 
-    const spButton = screen.getByText('SP');
-    expect(spButton).toHaveClass('bg-green-600');
-  });
-});
-```
+**Missing:**
+- No skip-to-content link
+- No `<nav>` element for header navigation
+- UF grid has no group label for screen readers
+- No announcement when search completes (only `aria-live` on loading)
+- Save search dialog missing `role="dialog"` and `aria-modal`
 
----
+### Focus Management
 
-## 9. Performance Targets
+- **No focus management** after search completes (results may be below viewport)
+- **No focus trap** in modal dialog
+- Focus ring visible via `:focus-visible` global style
+- Minimum touch target 44px enforced via global CSS (`button { min-height: 44px }`)
 
-### 9.1 Core Web Vitals
+### Form Accessibility
 
-| Metric | Target | Status |
-|--------|--------|--------|
-| First Contentful Paint (FCP) | <1.5s | ⚠️ TBD |
-| Largest Contentful Paint (LCP) | <2.5s | ⚠️ TBD |
-| Cumulative Layout Shift (CLS) | <0.1 | ⚠️ TBD |
-| First Input Delay (FID) | <100ms | ⚠️ TBD |
-
-### 9.2 Bundle Size
-
-| Chunk | Target | Status |
-|-------|--------|--------|
-| Main | <100KB | ⚠️ TBD |
-| Tailwind CSS | <50KB | ✅ Likely (PurgeCSS active) |
-| Total Initial | <200KB gzipped | ⚠️ TBD |
-
-### 9.3 Optimization Strategies
-
-- ✅ Code splitting (Next.js automatic)
-- ✅ Image optimization (next/image)
-- ✅ Lazy loading (React.lazy for components)
-- ✅ CSS purging (Tailwind production mode)
-- ⚠️ Font optimization (TBD)
-- ⚠️ Prefetching (TBD)
+- Labels associated via `htmlFor` on date inputs and save search name input
+- Sector select has `id="setor"` but label uses wrapper `<label>` without `htmlFor`
+- Terms input has `id="termos-busca"` but no visible `<label>` element (only wrapper label for section)
+- Validation errors displayed with `role="alert"`
 
 ---
 
-## 10. UX/UI Debt & Gaps
+## 10. Responsive Design
 
-### Current Gaps (POC)
+### Mobile Layout (< 640px)
 
-#### CRITICAL
-1. **Frontend Structure Missing**
-   - Issue #21: Create Next.js app structure
-   - Status: Not started
-   - Impact: Cannot develop/test UI
-   - Effort: 4-6 hours
+- Single-column layout
+- UF grid: 5 columns (`grid-cols-5`)
+- Stage labels hidden; mobile-specific detail card shown
+- Smaller text (`text-sm` for most elements, `text-2xl` for headings)
+- "Buscas Salvas" label hidden, only icon + count shown
+- Theme label hidden, only color preview circle shown
+- Smaller padding on result cards (`p-4`)
+- Dropdown width: 320px (`w-80`)
 
-2. **Components Not Implemented**
-   - Missing: UFSelector, DateRangePicker, ResultsTable, SummaryCard
-   - Status: Designed but not coded
-   - Impact: No UI
-   - Effort: 8-10 hours
+### Tablet Layout (640px - 768px)
 
-3. **API Routes Missing**
-   - Missing: /api/buscar, /api/download route handlers
-   - Status: Not started
-   - Impact: Cannot communicate with backend
-   - Effort: 2-3 hours
+- Date inputs side-by-side (`sm:grid-cols-2`)
+- UF grid: 7 columns (`sm:grid-cols-7`)
+- Larger text and padding
+- Stage labels visible
+- Header tagline visible
 
-#### HIGH
+### Desktop Layout (768px+)
 
-4. **Error Handling UI**
-   - Missing: Error boundaries, error messages, retry buttons
-   - Status: Not designed
-   - Impact: Poor user experience on errors
-   - Effort: 3-4 hours
+- UF grid: 9 columns (`md:grid-cols-9`)
+- Max content width: `max-w-4xl` (896px)
+- Centered layout with `mx-auto`
 
-5. **Loading States**
-   - Missing: Skeleton loaders, progress indicators
-   - Status: Not implemented
-   - Impact: Unclear to users what's happening
-   - Effort: 2-3 hours
+### Breakpoint Usage
 
-6. **Form Validation**
-   - Missing: Client-side validation feedback
-   - Status: Not implemented
-   - Impact: Users can submit invalid dates
-   - Effort: 2-3 hours
+| Breakpoint | Occurrences | Primary Use |
+|---|---|---|
+| `sm:` (640px) | ~50+ | Typography, padding, grid, visibility |
+| `md:` (768px) | 1 | UF grid columns only |
+| `lg:` / `xl:` | 0 | Not used |
 
-7. **Mobile Responsiveness**
-   - Missing: Mobile testing, responsive refinements
-   - Status: Tailwind responsive classes planned but untested
-   - Impact: Poor mobile experience
-   - Effort: 4-5 hours
-
-8. **Accessibility**
-   - Missing: ARIA labels, keyboard navigation, screen reader testing
-   - Status: Basic HTML semantics only
-   - Impact: Not WCAG compliant
-   - Effort: 4-5 hours
-
-#### MEDIUM
-
-9. **Help/Documentation UI**
-   - Missing: Tooltips, help text, inline documentation
-   - Status: Not implemented
-   - Impact: Users unclear on how to use
-   - Effort: 2-3 hours
-
-10. **Download Management**
-    - Missing: Download history, multiple simultaneous downloads
-    - Status: Single download supported
-    - Impact: Users can't track multiple searches
-    - Effort: 4-5 hours (future)
-
-11. **Advanced Filters**
-    - Missing: Value range slider, keyword search, status filters
-    - Status: Only UF and date range available
-    - Impact: Limited filtering capability
-    - Effort: 6-8 hours (future)
-
-12. **Pagination/Virtualization**
-    - Missing: Handling large result sets (100+ results)
-    - Status: All results rendered at once
-    - Impact: Performance degradation with many results
-    - Effort: 4-6 hours (future)
+**Gap:** No large-screen optimization. Content is capped at 896px (`max-w-4xl`). On wide displays, there is significant whitespace with no additional density or layout changes.
 
 ---
 
-## 11. Frontend Security Considerations
+## 11. Testing Coverage
 
-### 11.1 Input Validation
+### Test File Inventory
 
-- ✅ Date validation (HTML5 date input)
-- ⚠️ Missing: Client-side validation feedback
-- ✅ UF validation (predefined list)
-- ✅ No user-generated content displayed without sanitization
+**Unit Tests (Jest):** 11 files, 3,726 lines total
 
-### 11.2 API Security
+| Test File | Lines | Tests |
+|---|---|---|
+| `page.test.tsx` | 601 | UF selection, dates, validation, polling, results, edge cases |
+| `analytics.test.ts` | 449 | Mixpanel integration, event tracking |
+| `savedSearches.test.ts` | 333 | CRUD operations, capacity limits |
+| `components/LoadingProgress.test.tsx` | 311 | Phase rendering, progress, cancel |
+| `error.test.tsx` | 237 | Error boundary rendering, reset |
+| `api/buscar.test.ts` | 175 | POST validation, job creation, error handling |
+| `api/download.test.ts` | 149 | File serving, expiration, cleanup |
+| `api/buscar-result.test.ts` | 133 | Result fetching, status handling |
+| `components/ThemeToggle.test.tsx` | 135 | Theme switching UI |
+| `components/EmptyState.test.tsx` | 93 | Empty state rendering, filter stats |
+| `api/buscar-status.test.ts` | 75 | Status polling endpoint |
+| `setup.test.ts` | 37 | Jest setup verification |
 
-- ⚠️ No authentication (public API - acceptable for POC)
-- ⚠️ CORS not configured (must fix for production)
-- ✅ HTTPS required (production deployment)
-- ⚠️ Missing: Rate limiting on frontend (backend handles)
+**E2E Tests (Playwright):** 4 files, 998 lines total
 
-### 11.3 Data Protection
+| Test File | Lines | Scenarios |
+|---|---|---|
+| `01-happy-path.spec.ts` | 307 | Full user journey, UI elements, search, download |
+| `02-llm-fallback.spec.ts` | 245 | LLM fallback behavior |
+| `03-validation-errors.spec.ts` | 198 | Form validation scenarios |
+| `04-error-handling.spec.ts` | 248 | Error states, backend failures |
 
-- ✅ PNCP data is public (no privacy concerns)
-- ✅ No sensitive user data stored
-- ⚠️ Download cache TTL (10min should be fine)
+### Coverage Metrics
 
----
+From `jest.config.js` thresholds (last recorded):
+- **Statements:** 49.45%
+- **Branches:** 39.56%
+- **Functions:** 41.98%
+- **Lines:** 51.01%
 
-## 12. Browser Support
+**Note:** The claimed 91.5% coverage likely refers to a different measurement or was aspirational. Actual thresholds in config are significantly lower.
 
-### Minimum Requirements
+### Coverage Gaps
 
-| Browser | Minimum Version |
-|---------|-----------------|
-| Chrome | 90+ |
-| Firefox | 88+ |
-| Safari | 14+ |
-| Edge | 90+ |
+**Components without dedicated tests:**
+- `RegionSelector` -- no unit test
+- `SavedSearchesDropdown` -- no dedicated unit test (tested indirectly via page)
+- `SourceBadges` -- no unit test
+- `AnalyticsProvider` -- no unit test
+- `ThemeProvider` -- no unit test
+- `carouselData` -- no unit test for `shuffleBalanced` algorithm
 
-**Note:** ES2020+ features used (requires transpilation via Next.js)
+**Hooks without dedicated tests:**
+- `useAnalytics` -- tested via analytics.test.ts but not as hook
+- `useSavedSearches` -- no dedicated hook test
 
----
+### E2E Test Patterns
 
-## 13. Accessibility Audit
-
-### WCAG 2.1 AA Compliance Checklist
-
-- [ ] Color contrast ≥4.5:1 for text
-- [ ] Keyboard navigation fully functional
-- [ ] ARIA labels on form inputs
-- [ ] Alt text on images
-- [ ] Focus indicators visible
-- [ ] Semantic HTML (headings, lists, etc.)
-- [ ] Page language declared
-- [ ] Screen reader tested
-
-**Status:** ⚠️ Not audited (Issue needed for a11y review)
-
----
-
-## 14. Monitoring & Analytics (Future)
-
-### Metrics to Track
-
-- Page load time (CLS, FCP, LCP)
-- Search frequency by UF
-- Average results per search
-- Excel download rate
-- Error rates by endpoint
-- User session duration
-
-### Tools (Future)
-
-- Google Analytics 4
-- Sentry for error tracking
-- Web Vitals Core measurement
+- Playwright configured for Chromium only
+- API mocking via `page.route()` for deterministic tests
+- Some E2E tests reference outdated class names (e.g., `bg-green-600` instead of `bg-brand-navy`)
+- axe-core dependency installed but not visibly used in current test files
+- Sequential execution (`fullyParallel: false`) for stability
 
 ---
 
-## 15. UX/UI Debt Priority Matrix
+## 12. Frontend Technical Debt
 
-| Item | Effort | Impact | Priority |
-|------|--------|--------|----------|
-| Frontend structure (Issue #21) | 4-6h | CRITICAL | 1 |
-| Components implementation | 8-10h | CRITICAL | 2 |
-| API routes | 2-3h | CRITICAL | 3 |
-| Error handling UI | 3-4h | HIGH | 4 |
-| Loading states | 2-3h | HIGH | 5 |
-| Form validation | 2-3h | HIGH | 6 |
-| Mobile responsiveness | 4-5h | HIGH | 7 |
-| Accessibility | 4-5h | HIGH | 8 |
+### TD-FE-001: God Component (page.tsx)
+- **Description:** The main page component is 1,071 lines with 20+ state variables, all business logic, form handling, polling logic, download logic, save search logic, and complete UI rendering. This violates single responsibility and makes testing, maintenance, and modification extremely difficult.
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Critical
+- **Category:** Code Quality
+- **Impact:** Any change to the UI or business logic requires touching a massive file. Testing individual features in isolation is impossible. New developers face a steep learning curve.
 
-**Total MVP Effort:** ~30-40 hours
+### TD-FE-002: Missing Escape Key Handling on Dropdowns
+- **Description:** ThemeToggle and SavedSearchesDropdown close on outside click but do not respond to Escape key. This is a WCAG 2.1 requirement for dismissible content.
+- **Files:** `ThemeToggle.tsx`, `SavedSearchesDropdown.tsx`
+- **Severity:** High
+- **Category:** Accessibility
+- **Impact:** Keyboard-only users cannot dismiss dropdowns without clicking elsewhere.
 
----
+### TD-FE-003: Modal Missing Focus Trap and Dialog Role
+- **Description:** The save search modal dialog does not trap focus, does not have `role="dialog"` or `aria-modal="true"`, and does not return focus to the trigger element on close.
+- **File:** `frontend/app/page.tsx` (lines 1002-1061)
+- **Severity:** High
+- **Category:** Accessibility
+- **Impact:** Screen reader users may not know they are in a modal. Keyboard users can tab behind the modal overlay.
 
-## 16. Frontend Architecture Strengths
+### TD-FE-004: Insufficient Color Contrast for Muted Text
+- **Description:** `--ink-muted` (#808f9f) on white canvas has only 3.4:1 contrast ratio, failing WCAG AA for normal text (requires 4.5:1). `--ink-faint` (#c0d2e5) at 1.7:1 is decorative-only but used for text content in some places.
+- **Files:** globals.css, multiple components using `text-ink-muted` and `text-ink-faint`
+- **Severity:** High
+- **Category:** Accessibility
+- **Impact:** Low-vision users may struggle to read muted text labels, timestamps, and helper text.
 
-✅ **Type-Safe**
-- TypeScript strict mode
-- No `any` types
-- Interfaces for all API contracts
+### TD-FE-005: No Skip-to-Content Link
+- **Description:** There is no skip navigation link for keyboard users to bypass the header and jump to main content.
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Medium
+- **Category:** Accessibility
+- **Impact:** Keyboard users must tab through header elements on every page load.
 
-✅ **Minimal Dependencies**
-- Tailwind only for styling
-- No heavy UI libraries
-- React hooks for state (no Redux)
+### TD-FE-006: External Logo Dependency
+- **Description:** The logo is loaded from `static.wixstatic.com` instead of being self-hosted. This creates a runtime dependency on an external CDN, potential CORS issues, and privacy concerns (third-party tracking).
+- **File:** `frontend/app/page.tsx` (LOGO_URL constant)
+- **Severity:** Medium
+- **Category:** Performance / Reliability
+- **Impact:** Logo may fail to load if Wix CDN is down. Not using Next.js `<Image>` means no optimization.
 
-✅ **Performance-Conscious**
-- Code splitting automatic (Next.js)
-- CSS purging (Tailwind)
-- No render-blocking CSS
+### TD-FE-007: Outdated Favicon
+- **Description:** `icon.svg` displays a green "B" (from BidIQ era). Should show Descomplicita branding.
+- **File:** `frontend/app/icon.svg`
+- **Severity:** Medium
+- **Category:** Design
+- **Impact:** Brand inconsistency. Users see outdated branding in browser tabs.
 
-✅ **SEO-Friendly**
-- Next.js server-side rendering capable
-- Semantic HTML
-- Meta tags configurable
+### TD-FE-008: Error Boundary Uses Hardcoded Colors
+- **Description:** `error.tsx` uses hardcoded Tailwind colors (`bg-gray-50`, `bg-green-600`, `text-gray-900`) instead of the design system tokens, breaking theme consistency.
+- **File:** `frontend/app/error.tsx`
+- **Severity:** Medium
+- **Category:** Design
+- **Impact:** Error page does not respect dark mode or custom themes.
 
----
+### TD-FE-009: Duplicate UFS Array Definition
+- **Description:** The `UFS` array is defined in both `app/types.ts` (with `as const` for type inference) and `app/page.tsx` (as plain array). `UF_NAMES` mapping only exists in `page.tsx`.
+- **Files:** `frontend/app/types.ts`, `frontend/app/page.tsx`
+- **Severity:** Medium
+- **Category:** Code Quality
+- **Impact:** Maintaining two copies risks divergence. UF-related constants should be centralized.
 
-## 17. Frontend Architecture Weaknesses
+### TD-FE-010: No Internationalization (i18n) Infrastructure
+- **Description:** All user-facing strings are hardcoded in Portuguese throughout the codebase. There is no i18n framework or string extraction.
+- **Files:** All component files
+- **Severity:** Medium
+- **Category:** Code Quality
+- **Impact:** If the app needs to support other languages (English, Spanish), every component would need manual refactoring. Even for Portuguese-only, centralized strings would improve consistency.
 
-⚠️ **Incomplete Implementation**
-- No components built yet
-- No API routes implemented
-- No tests written
-- No error boundaries
+### TD-FE-011: Deprecated API Usage in AnalyticsProvider
+- **Description:** Uses `performance.timing.navigationStart` which is deprecated in favor of `performance.timeOrigin`.
+- **File:** `frontend/app/components/AnalyticsProvider.tsx` (line 52)
+- **Severity:** Low
+- **Category:** Code Quality
+- **Impact:** Will eventually break in future browsers. Easy fix.
 
-⚠️ **Limited State Management**
-- No global state (future: Context API or Zustand)
-- No caching strategy (future: SWR or React Query)
-- No persistence layer
+### TD-FE-012: No Loading State for Sector List
+- **Description:** The sectors dropdown has no loading indicator while fetching from `/api/setores`. If the backend is slow, the dropdown appears empty or shows fallback data without indication.
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Low
+- **Category:** UX
+- **Impact:** Minor confusion if sectors take time to load.
 
-⚠️ **Missing Error Handling**
-- No error boundaries
-- No retry logic UI
-- No offline support
+### TD-FE-013: E2E Tests Reference Outdated Class Names
+- **Description:** E2E tests check for `bg-green-600` CSS class (old BidIQ theme) but the actual UI uses `bg-brand-navy`. These tests likely fail or are not being run.
+- **File:** `frontend/__tests__/e2e/01-happy-path.spec.ts` (line 64)
+- **Severity:** Low
+- **Category:** Code Quality
+- **Impact:** False test failures or skipped E2E tests.
 
-⚠️ **Accessibility Gaps**
-- Not WCAG audited
-- Missing ARIA labels
-- Keyboard navigation untested
+### TD-FE-014: Missing Focus Management After Search
+- **Description:** When search completes, results appear below the form but focus remains on the search button. Users on large forms may not notice results have loaded.
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Medium
+- **Category:** UX / Accessibility
+- **Impact:** Screen reader users may not know results are available. Visual users on mobile must scroll to see results.
 
----
+### TD-FE-015: No Code Splitting for Components
+- **Description:** All components are statically imported. The LoadingProgress component (415 lines), carouselData (368 lines with 52 items), and SavedSearchesDropdown could be dynamically imported.
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Low
+- **Category:** Performance
+- **Impact:** Larger initial bundle. These components are conditionally rendered and could benefit from `React.lazy()` or Next.js `dynamic()`.
 
-## 18. Roadmap: Frontend Development
+### TD-FE-016: No `<nav>` Semantic Element
+- **Description:** The header uses a `<header>` element but lacks `<nav>` for the navigation area (saved searches, theme toggle).
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Low
+- **Category:** Accessibility
+- **Impact:** Screen readers cannot announce navigation landmark.
 
-### Phase 1: MVP (Weeks 1-2)
-- [ ] Issue #21: Create Next.js app structure
-- [ ] Build all core components
-- [ ] Implement API routes (/api/buscar, /api/download)
-- [ ] Basic error handling
-- [ ] Mobile responsive layout
-- **Result:** Functional SPA
+### TD-FE-017: SourceBadges and carouselData Use Hardcoded Colors
+- **Description:** These components use raw Tailwind color classes (`bg-green-100`, `bg-red-100`, `bg-blue-50`, etc.) instead of design system tokens. These colors do not respond to theme changes beyond basic dark: variants.
+- **Files:** `SourceBadges.tsx`, `carouselData.ts`
+- **Severity:** Low
+- **Category:** Design
+- **Impact:** Visual inconsistency in non-standard themes (Paperwhite, Sepia).
 
-### Phase 2: Polish (Week 3)
-- [ ] Comprehensive error UI
-- [ ] Loading states + skeletons
-- [ ] Form validation feedback
-- [ ] Help text + tooltips
-- [ ] Issue #27: Write component tests
-- **Result:** Production-ready UI
+### TD-FE-018: Unused Public Asset
+- **Description:** `public/logo-descomplicita.png` exists but is not referenced anywhere in the codebase. The logo comes from an external Wix URL.
+- **File:** `frontend/public/logo-descomplicita.png`
+- **Severity:** Low
+- **Category:** Code Quality
+- **Impact:** Unused asset increases repository size. Should either be used (replacing Wix URL) or removed.
 
-### Phase 3: Enhancement (Post-MVP)
-- [ ] Advanced filters (value range, keywords)
-- [ ] Pagination/virtualization for large result sets
-- [ ] Download history
-- [ ] User accounts + saved searches
-- [ ] WCAG 2.1 AA compliance
-- **Result:** Enterprise-grade frontend
+### TD-FE-019: Missing `aria-describedby` for Terms Input
+- **Description:** The custom terms tag input has helper text below it ("Digite cada termo...") but no `aria-describedby` linking the input to the description.
+- **File:** `frontend/app/page.tsx`
+- **Severity:** Low
+- **Category:** Accessibility
+- **Impact:** Screen reader users do not hear the input instructions.
 
----
-
-## 19. Component Checklist
-
-### Core Components (Must Have)
-
-- [ ] UFSelector
-- [ ] DateRangePicker
-- [ ] ResultsTable
-- [ ] SummaryCard
-- [ ] LoadingSkeletons
-- [ ] ErrorBoundary
-- [ ] ErrorAlert
-- [ ] Main page.tsx
-
-### Future Components
-
-- [ ] AdvancedFilters
-- [ ] DownloadHistory
-- [ ] Pagination
-- [ ] UserProfile
-- [ ] SavedSearches
-- [ ] Analytics Dashboard
-
----
-
-## 20. Frontend QA Checklist
-
-### Functional Testing
-
-- [ ] UF selection works
-- [ ] Date picker validation
-- [ ] Search submission
-- [ ] Results display
-- [ ] Excel download
-- [ ] Error handling
-
-### Non-Functional
-
-- [ ] Responsive on mobile (320px, 768px, 1024px)
-- [ ] Core Web Vitals: FCP <1.5s, LCP <2.5s
-- [ ] Bundle size <200KB gzipped
-- [ ] WCAG 2.1 AA compliance
-- [ ] Keyboard navigation
-- [ ] Screen reader compatible
-
----
-
-## Document Information
-
-**Created:** January 26, 2026
-**Last Updated:** January 26, 2026
-**Status:** APPROVED FOR TECHNICAL DEBT REVIEW
-**Related Issue:** #21 (Frontend Setup)
+### TD-FE-020: Test Coverage Below Target
+- **Description:** Jest coverage thresholds show statements at 49.45% and branches at 39.56%, well below the stated 91.5% target. Multiple components lack dedicated unit tests.
+- **Files:** `jest.config.js`, test files
+- **Severity:** Medium
+- **Category:** Code Quality
+- **Impact:** Low confidence in refactoring. Changes to untested components may introduce regressions.
 
 ---
 
-**Next Step:** Implement Issue #21 - Create Next.js app structure and begin component development.
+## 13. Recommendations
+
+### Priority 1: Critical (Sprint 1)
+
+1. **Decompose page.tsx into feature modules** (TD-FE-001)
+   - Extract `SearchForm` component (mode toggle, sector select, terms input)
+   - Extract `UfSelector` component (grid, region selector, select/clear)
+   - Extract `DateRangeSelector` component
+   - Extract `SearchResults` component (summary, highlights, download)
+   - Extract `SaveSearchDialog` component
+   - Extract polling logic into a `useSearchJob` custom hook
+   - Target: No component exceeds 200 lines
+
+2. **Fix modal accessibility** (TD-FE-003)
+   - Add `role="dialog"` and `aria-modal="true"`
+   - Implement focus trap (lock focus inside modal)
+   - Return focus to trigger button on close
+   - Close on Escape key
+
+3. **Add Escape key handling to all dropdowns** (TD-FE-002)
+   - ThemeToggle: close on Escape
+   - SavedSearchesDropdown: close on Escape
+
+### Priority 2: High (Sprint 2)
+
+4. **Fix color contrast issues** (TD-FE-004)
+   - Darken `--ink-muted` to meet 4.5:1 ratio (e.g., #5a6a7a)
+   - Audit all uses of `text-ink-faint` for non-decorative text
+   - Review dark mode muted contrast
+
+5. **Self-host logo and update favicon** (TD-FE-006, TD-FE-007)
+   - Use the existing `public/logo-descomplicita.png` via Next.js `<Image>`
+   - Update `icon.svg` with Descomplicita branding (navy "D" or brand mark)
+   - Remove Wix CDN dependency
+
+6. **Add skip-to-content link** (TD-FE-005)
+   - Add visually-hidden link before header: "Ir para conteudo principal"
+   - Target the `<main>` element with `id="main-content"`
+
+7. **Fix focus management after search** (TD-FE-014)
+   - After results load, scroll to and focus the results section
+   - Use `ref` and `scrollIntoView({ behavior: "smooth" })`
+
+### Priority 3: Medium (Sprint 3)
+
+8. **Migrate error.tsx to design tokens** (TD-FE-008)
+   - Replace hardcoded gray/green Tailwind classes with design system tokens
+   - Ensure error page works correctly in all 5 themes
+
+9. **Centralize UFS/UF_NAMES constants** (TD-FE-009)
+   - Move to `lib/constants.ts` or expand `types.ts`
+   - Single source of truth for all UF-related data
+
+10. **Increase test coverage** (TD-FE-020)
+    - Add unit tests for RegionSelector, SourceBadges, SavedSearchesDropdown
+    - Add hook tests for useAnalytics and useSavedSearches
+    - Target: 70% statements, 55% branches
+    - Enable axe-core accessibility checks in E2E tests
+
+11. **Fix E2E test assertions** (TD-FE-013)
+    - Update class name assertions from `bg-green-600` to `bg-brand-navy`
+    - Verify all E2E tests pass against current UI
+
+### Priority 4: Low (Backlog)
+
+12. **Add code splitting** (TD-FE-015) -- Dynamic import for LoadingProgress and carouselData
+13. **Replace deprecated performance API** (TD-FE-011)
+14. **Migrate hardcoded colors in SourceBadges/carouselData** (TD-FE-017)
+15. **Add `<nav>` landmark** (TD-FE-016)
+16. **Add `aria-describedby`** for terms input (TD-FE-019)
+17. **Clean up unused assets** (TD-FE-018)
+18. **Evaluate i18n framework** (TD-FE-010) -- Consider next-intl if multi-language becomes a requirement
+19. **Add sector loading indicator** (TD-FE-012)
+
+---
+
+## Appendix: Source File Line Counts
+
+| File | Lines |
+|---|---|
+| `app/page.tsx` | 1,071 |
+| `app/components/LoadingProgress.tsx` | 415 |
+| `app/components/carouselData.ts` | 368 |
+| `app/components/SavedSearchesDropdown.tsx` | 250 |
+| `hooks/useSavedSearches.ts` | 148 |
+| `app/components/EmptyState.tsx` | 140 |
+| `app/components/ThemeProvider.tsx` | 122 |
+| `app/components/SourceBadges.tsx` | 120 |
+| `app/types.ts` | 114 |
+| `lib/savedSearches.ts` | 99 |
+| `app/api/buscar/result/route.ts` | 98 |
+| `app/api/download/route.ts` | 76 |
+| `app/components/AnalyticsProvider.tsx` | 74 |
+| `app/components/ThemeToggle.tsx` | 73 |
+| `app/layout.tsx` | 72 |
+| `app/error.tsx` | 70 |
+| `hooks/useAnalytics.ts` | 66 |
+| `app/api/buscar/route.ts` | 60 |
+| `app/components/RegionSelector.tsx` | 53 |
+| `app/api/buscar/status/route.ts` | 41 |
+| `app/api/setores/route.ts` | 25 |
+| **Total source lines** | **3,505** |
+| **Total test lines** | **4,724** |

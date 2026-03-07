@@ -1,469 +1,187 @@
-# EPIC: Resolução de Débitos Técnicos - BidIQ Uniformes
+# Epic: Resolucao de Debitos Tecnicos -- Descomplicita
 
-**Epic ID:** TDE-001
-**Título:** Resolução de Débitos Técnicos - MVP + Production Ready
-**Versão:** 1.0
-**Status:** READY TO START ✅
-**Data Criada:** January 26, 2026
+## Objetivo
 
----
+Systematically resolve all 57 identified technical debts across security, accessibility, architecture, code quality, and infrastructure to bring the Descomplicita platform to production-grade standards. The platform currently has critical security vulnerabilities (unauthenticated endpoints, wildcard CORS, root containers), broken tests, a monolithic frontend component blocking all feature work, and systemic WCAG accessibility gaps that violate Brazilian accessibility law (LBI -- Law 13.146/2015).
 
-## 1. Objetivo do Epic
+## Escopo
 
-Transformar BidIQ Uniformes de um **POC com múltiplos débitos técnicos** em um **produto pronto para produção** com todas as dependências mapeadas, priorizadas e soluções validadas.
+- Total de debitos: 57 (5 Critical, 13 High, 22 Medium, 17 Low)
+- Sprints planejados: 6 (Sprint 0 through Sprint 5) + Backlog
+- Timeline: ~10 semanas
+- Esforco estimado: 173-287 horas (scheduled) / 206-388 horas (including backlog)
+- Codebase baseline: commit 9fbd54d0 (main branch)
 
-**Resultado Final:** Sistema funcional, testado, acessível e pronto para escalar.
+## Criterios de Sucesso
 
----
+- [ ] All 5 critical debts resolved (TD-001, TD-002, TD-003 Phase 1, TD-004, TD-054)
+- [ ] Frontend test coverage >= 65% statements after Sprint 2, >= 80% long-term
+- [ ] Backend test coverage maintained >= 70% (CI enforcement without `continue-on-error`)
+- [ ] Zero WCAG AA critical/serious violations (axe-core gated in E2E)
+- [ ] CORS restricted to whitelisted origins
+- [ ] API key authentication on all endpoints
+- [ ] No containers running as root
+- [ ] Debug endpoints disabled in production
+- [ ] All test assertions reference "Descomplicita" (not "BidIQ")
+- [ ] E2E happy-path test passes on current codebase
+- [ ] Sentry capturing production errors (backend + frontend)
+- [ ] Job state survives container restart (Redis-backed)
 
-## 2. Descrição Completa
+## Stories
 
-### Situação Atual
+| Story | Sprint | Points | Priority |
+|-------|--------|--------|----------|
+| Story 0.0: Emergency Fixes -- Unblock CI | Sprint 0 | 3 | Critical |
+| Story 1.0: Security Hardening + Quick Wins | Sprint 1 | 13 | Critical |
+| Story 2.0: Frontend Architecture -- God Component Decomposition | Sprint 2 | 13 | Critical |
+| Story 3.0: Frontend Quality + Accessibility Compliance | Sprint 3 | 13 | High |
+| Story 4.0: Backend Architecture -- Persistent Storage + Async | Sprint 4 | 21 | High |
+| Story 5.0: Polish + Infrastructure + Observability | Sprint 5 | 13 | Medium |
 
-BidIQ é um POC v0.2 com:
-- ✅ Arquitetura bem definida (documentada)
-- ✅ Design de componentes pronto
-- ❌ Implementação incompleta (28 débitos técnicos)
-- ❌ Sem testes automatizados
-- ❌ Sem UI frontend
-- ❌ Sem validação de resilience
+**Total Story Points: 76**
 
-### Situação Desejada
+## Sprint-by-Sprint Debt Allocation
 
-BidIQ será um produto v1.0 com:
-- ✅ Backend completamente implementado
-- ✅ Frontend intuitivo e responsivo
-- ✅ 70%+ test coverage
-- ✅ WCAG A accessibility
-- ✅ PNCP API resilience validada
-- ✅ Pronto para deploy em produção
+### Sprint 0: Emergency Fixes (Week 1, Days 1-2) -- 3-5 hours
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-054 | Broken backend test assertions (BidIQ title) | 1-2 | Backend |
+| TD-041 | E2E tests reference outdated class names | 2-3 | Frontend |
 
-### Transformação
+### Sprint 1: Security Hardening + Quick Wins (Weeks 1-2) -- 22-41 hours
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-001 | CORS allows all origins | 1-2 | Backend |
+| TD-002 | Backend Dockerfile runs as root | 1-2 | Backend |
+| TD-003 | No authentication (Phase 1: API key) | 4-8 | Backend |
+| TD-006 | No per-IP/user rate limiting | 4-8 | Backend |
+| TD-012 | Dev dependencies in production image | 2-4 | Backend |
+| TD-055 | Debug endpoints exposed in production | 2-4 | Backend |
+| TD-056 | Unbounded termos_busca input length | 1-2 | Backend |
+| TD-009 | Missing Escape key on dropdowns | 2-3 | Frontend |
+| TD-010 | Insufficient color contrast (ink-muted) | 4-6 | Frontend |
+| TD-027 | No skip-to-content link | 1-2 | Frontend |
 
-| Aspecto | Antes | Depois |
-|---------|-------|--------|
-| **Funcionalidade** | 0% (não funciona) | 100% (MVP) |
-| **Qualidade** | Não testado | 70% coverage |
-| **UX** | Sem interface | Clean, intuitive |
-| **Performance** | Desconhecido | <1.5s FCP |
-| **Acessibilidade** | 0% | WCAG A |
-| **Documentação** | Arquitetura apenas | Código + arquitetura + API |
+### Sprint 2: Frontend Architecture (Weeks 3-4) -- 31-45 hours
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-004 | God component (page.tsx, 1071 lines) | 28-40 | Frontend |
+| TD-021 | Duplicate UFS constant definition | 1-2 | Frontend |
+| TD-028 | External logo dependency (Wix CDN) | 2-3 | Frontend |
+| TD-045 | Unused public asset (resolved by TD-028) | 0 | Frontend |
 
----
+### Sprint 3: Frontend Quality + Accessibility (Weeks 5-6) -- 29-47 hours
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-008 | Modal missing focus trap and dialog role | 4-6 | Frontend |
+| TD-031 | Missing focus management after search | 3-5 | Frontend |
+| TD-029 | Outdated favicon (BidIQ "B") | 1-2 | Frontend |
+| TD-030 | Error boundary uses hardcoded colors | 2-4 | Frontend |
+| TD-042 | No code splitting for components | 4-6 | Frontend |
+| TD-043 | No nav semantic element | 1 | Frontend |
+| TD-044 | SourceBadges/carouselData hardcoded colors | 3-5 | Frontend |
+| TD-046 | Missing aria-describedby for terms input | 1 | Frontend |
+| TD-047 | Dropdown menus lack ARIA menu pattern | 2-3 | Frontend |
+| TD-048 | window.confirm() for destructive action | 2-3 | Frontend |
+| TD-049 | EmptyState lacks ARIA live region | 1 | Frontend |
+| TD-050 | SourceBadges lacks aria-expanded | 1-2 | Frontend |
+| TD-051 | UF grid buttons lack group label | 1-2 | Frontend |
+| TD-052 | No heading hierarchy in main sections | 1-2 | Frontend |
+| TD-053 | Hardcoded borderColor in ThemeToggle | 0.5 | Frontend |
 
-## 3. Escopo
+### Sprint 4: Backend Architecture (Weeks 7-8) -- 58-96 hours
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-005 | In-memory job store not scalable | 16-24 | Backend |
+| TD-013 | Global mutable singletons | 8-12 | Backend |
+| TD-014 | Deprecated startup event pattern | 2-4 | Backend |
+| TD-026 | Cache not shared across restarts | 8-16 | Backend |
+| TD-007 | Excel base64 in JSON response | 8-16 | Backend |
+| TD-023 | Excel download uses filesystem tmpdir | 0 | Backend |
+| TD-011 | PNCP client uses blocking requests lib | 16-24 | Backend |
 
-### Incluso (MVP + Production)
+### Sprint 5: Polish + Infrastructure (Weeks 9-10) -- 30-53 hours
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-015 | datetime.utcnow() deprecated | 1-2 | Backend |
+| TD-016 | Branding inconsistency (BidIQ remnants) | 4-8 | Both |
+| TD-017 | No request/correlation ID logging | 4-8 | Backend |
+| TD-018 | Hardcoded PNCP base URL | 1-2 | Backend |
+| TD-020 | Filter diagnostic code in production | 1-2 | Backend |
+| TD-022 | No OpenAPI schema for result endpoint | 2-4 | Backend |
+| TD-024 | asyncio.get_event_loop() deprecated | 1-2 | Backend |
+| TD-025 | No graceful shutdown | 4-8 | Backend |
+| TD-033 | f-string in logger calls | 2-4 | Backend |
+| TD-035 | Frontend emoji in source code | 1 | Frontend |
+| TD-036 | No content-length validation for downloads | 1-2 | Backend |
+| TD-037 | Date range max removed | 1-2 | Backend |
+| TD-038 | Module-level singleton in job_store.py | 1 | Backend |
+| TD-039 | Deprecated performance API in AnalyticsProvider | 1 | Frontend |
+| TD-057 | No Sentry/APM integration | 4-8 | Both |
 
-**Backend:**
-- Implementar todos os endpoints FastAPI
-- Completo pncp_client com retry logic
-- Filter engine com keyword matching
-- Excel report generator com styling
-- LLM integration com fallback
-- 70%+ test coverage
-- CI/CD setup
+### Backlog (Unscheduled)
+| ID | Debt | Hours | Owner |
+|----|------|-------|-------|
+| TD-003 Ph2 | JWT user accounts | 12-32 | Backend |
+| TD-019 | API versioning | 4-8 | Backend |
+| TD-032 | No structured error codes | 4-8 | Backend |
+| TD-034 | No pagination for sectors endpoint | 1-2 | Backend |
+| TD-040 | No loading state for sector list | 1-2 | Frontend |
 
-**Frontend:**
-- Next.js 14+ app structure
-- Core components (UF selector, date picker, results, summary)
-- API routes (/api/buscar, /api/download)
-- Error handling + loading states
-- Form validation + feedback
-- Mobile responsiveness
-- WCAG A accessibility
-- 60%+ test coverage
+## Riscos
 
-**Testing:**
-- Backend unit + integration tests
-- Frontend component + E2E tests
-- PNCP API resilience validation
-- Excel output validation
-- LLM behavior testing
-- CI/CD quality gates
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| CORS exploitation before Sprint 1 | High | High | Prioritize TD-001 as first fix in Sprint 1 |
+| Resource exhaustion (no auth) | High | High | API key auth in Sprint 1 |
+| Root container escape | Low | Critical | Sprint 1 Dockerfile fix |
+| Debug endpoint abuse (cache clear) | Medium | Medium | Feature flag or auth gate in Sprint 1 |
+| TD-004 decomposition regression | High | High | Sprint 0 E2E baseline; incremental extraction |
+| Redis migration data loss | Medium | Medium | Dual-write (in-memory + Redis) during transition |
+| httpx migration response parity | Medium | Medium | Compare result counts old vs new on same query |
+| Coverage drop during decomposition | High | Low | Enforce per-component coverage, not global threshold |
+| Unbounded date range query abuse | Low | Medium | Re-introduce configurable max (90 days) |
+| Production errors go unnoticed | High | Medium | Sentry integration in Sprint 5 |
 
-### NÃO Incluso (Phase 2 ou Later)
-
-- Database (Supabase) integration
-- User authentication
-- Advanced filters (value range, semantic search)
-- Download history
-- Real-time notifications
-- Multi-language support
-- WCAG AA (can be upgraded later)
-
----
-
-## 4. Critérios de Sucesso
-
-### Deve-Ter (Non-negotiable)
-
-- [x] Todos 28 débitos técnicos resolvidos
-- [x] Backend endpoints funcionando
-- [x] Frontend UI completa
-- [x] 70%+ backend test coverage
-- [x] 60%+ frontend test coverage
-- [x] PNCP API resilience validated
-- [x] No blocking errors in logs
-- [x] End-to-end user flow works
-- [x] Documentation complete
-
-### Deve-Ter (Quality)
-
-- [x] Linting passes (eslint + ruff)
-- [x] Type checking passes (TypeScript + mypy)
-- [x] Bundle size <200KB
-- [x] FCP <1.5s
-- [x] LCP <2.5s
-- [x] WCAG A compliance
-- [x] No console errors
-
-### Nice-to-Have (If Time)
-
-- [ ] WCAG AA (upgraded from A)
-- [ ] Sentry error tracking setup
-- [ ] Google Analytics 4
-- [ ] Cypress E2E tests
-- [ ] Load testing (1000+ concurrent)
-
----
-
-## 5. Fases de Entrega
-
-### Fase 1: MVP (Semanas 1-2)
-
-**Deliverables:**
-- Backend endpoints + core modules (SYS-001, SYS-002)
-- Frontend structure + components (FE-001, FE-002, FE-003)
-- Basic tests setup (TEST-001, TEST-002)
-
-**Stories:** TDE-001-1 a TDE-001-6
-**Horas:** 55-70
-**Status:** Ready to Start
-
----
-
-### Fase 2: Production Ready (Semana 3)
-
-**Deliverables:**
-- Complete test coverage (SYS-003 a SYS-006, TEST-003 a TEST-006)
-- Error/loading/validation UX (FE-004 a FE-006)
-
-**Stories:** TDE-001-7 a TDE-001-13
-**Horas:** 31-40
-**Status:** Dependent on Phase 1
-
----
-
-### Fase 3: Polish (Semana 4)
-
-**Deliverables:**
-- Mobile responsiveness (FE-007)
-- Accessibility upgrade (FE-008)
-- Help documentation (FE-009)
-
-**Stories:** TDE-001-14 a TDE-001-16
-**Horas:** 23-30
-**Status:** Dependent on Phases 1-2
-
----
-
-### Fase 4: Enhancement (Semanas 5-6, Optional)
-
-**Deliverables:**
-- Infrastructure (caching, CORS, env validation)
-- Advanced features (download history, filters, pagination)
-
-**Stories:** TDE-001-17 a TDE-001-23
-**Horas:** 28-35
-**Status:** Post-MVP, nice-to-have
-
----
-
-## 6. Timeline
+## Dependencias
 
 ```
-Week 1-2: MVP
-├─ Mon-Tue: Backend endpoints (SYS-001, SYS-002)
-├─ Wed-Thu: Frontend structure + components (FE-001, FE-002)
-└─ Fri: API routes + tests setup (FE-003, TEST-001/002)
+Sprint 0 is a PREREQUISITE for ALL subsequent sprints.
 
-Week 3: Testing & QA
-├─ Mon-Tue: Complete resilience testing (SYS-003-006)
-├─ Wed-Thu: Error handling + loading UI (FE-004-006)
-└─ Fri: Bug fixes + validation
+Sprint 1 has no dependencies beyond Sprint 0.
 
-Week 4: Polish & Production
-├─ Mon-Tue: Mobile responsiveness (FE-007)
-├─ Wed-Thu: Accessibility + help (FE-008-009)
-└─ Fri: Final QA + deploy staging
+Sprint 2 depends on Sprint 0 (E2E baseline required).
+  TD-004 decomposition UNBLOCKS Sprint 3 items: TD-008, TD-031, TD-042.
 
-Total: 3-4 weeks for production-ready
-Optional: Week 5-6 for Phase 4 (scalability)
+Sprint 3 depends on Sprint 2 (TD-004 extraction must be complete).
+  TD-008 (modal a11y) requires SaveSearchDialog extracted in TD-004.
+  TD-031 (focus management) is easier after TD-004 extraction.
+  TD-042 (code splitting) requires separate components from TD-004.
+
+Sprint 4 has no hard dependency on Sprints 2-3 (backend-only).
+  TD-005 and TD-026 share Redis infrastructure (do together).
+  TD-007 and TD-023 are paired (Excel delivery refactor).
+  TD-013 and TD-014 are tightly coupled (DI + lifespan).
+
+Sprint 5 has no hard dependency on Sprint 4.
+  TD-015 and TD-024 must include test file updates.
+  TD-016 branding cleanup includes TD-029 favicon if not done in Sprint 3.
+
+Sprints 2-3 (Frontend) and Sprints 4-5 (Backend) can be parallelized
+with separate developers.
 ```
 
----
+## Notas
 
-## 7. Recursos Necessários
-
-### Equipe
-
-| Papel | FTE | Semanas | Custo |
-|-------|-----|---------|-------|
-| Backend Developer | 1 | 4 | R$ 24,000 |
-| Frontend Developer | 1 | 4 | R$ 19,200 |
-| QA Engineer | 1 | 3 | R$ 15,600 |
-| **Subtotal** | - | - | **R$ 58,800** |
-| Contingency (10%) | - | - | R$ 5,880 |
-| **Total** | - | - | **R$ 64,680** |
-
-*Baseado em R$ 150/h backend, R$ 120/h frontend, R$ 130/h QA*
-
-### Ambiente
-
-- GitHub (code hosting)
-- GitHub Actions (CI/CD)
-- Staging environment (para QA)
-- Production environment (railway.app ou similar)
-
-### Dependências Externas
-
-- PNCP API (public, no API key needed)
-- OpenAI API (need valid API key + credit)
-- GitHub (already have)
+- Hours assume a single developer per task
+- Backend and frontend sprints can be parallelized with separate developers
+- Sprint 4 is the largest block (58-96 hours) and benefits most from parallel execution of Redis and httpx workstreams
+- Story points use a rough 1 point = 4 hours mapping at the midpoint of each sprint's estimate range
+- The 91.5% frontend coverage claim in the architecture document is incorrect; actual coverage is ~49.45% statements
+- Brazilian accessibility law (LBI -- Law 13.146/2015) applies to this government-facing tool
 
 ---
 
-## 8. Riscos & Mitigações
-
-| Risco | Probability | Impact | Mitigation |
-|-------|-------------|--------|-----------|
-| PNCP API instability | High | Critical | Robust retry logic (designed) + mocking |
-| Scope creep | Medium | High | Strict MVP focus, defer Phase 2 features |
-| Test coverage gaps | Medium | High | QA strategy document + CI gates |
-| Performance issues | Medium | Medium | Load testing with realistic data |
-| LLM API costs | Low | Medium | Token limits + cost monitoring |
-| Team availability | Medium | Medium | Cross-training + documentation |
-
----
-
-## 9. Dependências de Story
-
-```
-START (Day 1)
-  ├─ TDE-001-1: Backend endpoints (SYS-001)
-  │  ├─ BLOCKS: TDE-001-7 (API testing)
-  │  └─ Duration: 2-3 days
-  │
-  ├─ TDE-001-2: Frontend structure (FE-001)
-  │  ├─ BLOCKS: TDE-001-3, TDE-001-4, TDE-001-5
-  │  └─ Duration: 1 day
-  │
-  └─ TDE-001-6: Tests setup (TEST-001/002)
-     └─ Duration: 2-3 days
-
-(Continues...)
-```
-
----
-
-## 10. Success Metrics (Final)
-
-### Functional
-
-- ✅ User can select UF → pick date range → click search
-- ✅ System calls PNCP API → filters results → returns data
-- ✅ Results display in table + GPT summary card
-- ✅ User can download Excel report
-- ✅ All error cases handled gracefully
-
-### Quality
-
-- ✅ Backend test coverage: 70%+
-- ✅ Frontend test coverage: 60%+
-- ✅ Linting: 0 errors
-- ✅ Type checking: 0 errors
-- ✅ No console errors on happy path
-
-### Performance
-
-- ✅ FCP <1.5s
-- ✅ LCP <2.5s
-- ✅ Bundle <200KB gzipped
-- ✅ Search response <5s (including API)
-
-### Accessibility
-
-- ✅ WCAG A compliance
-- ✅ Keyboard navigation works
-- ✅ Color contrast >4.5:1
-- ✅ Semantic HTML
-
-### Operations
-
-- ✅ CI/CD pipeline green
-- ✅ Can deploy one-click
-- ✅ Monitoring setup (logs)
-- ✅ Documentation complete
-
----
-
-## 11. Story Breakdown
-
-### Phase 1: MVP (TDE-001-1 to TDE-001-6)
-
-| Story | Title | Owner | Points | Phase |
-|-------|-------|-------|--------|-------|
-| TDE-001-1 | Implement FastAPI endpoints | @dev-backend | 13 | 1 |
-| TDE-001-2 | Create Next.js app structure | @dev-frontend | 8 | 1 |
-| TDE-001-3 | Implement core components | @dev-frontend | 13 | 1 |
-| TDE-001-4 | Create API routes (/api/buscar, /api/download) | @dev-frontend | 5 | 1 |
-| TDE-001-5 | Complete core modules (pncp, filter, excel, llm) | @dev-backend | 13 | 1 |
-| TDE-001-6 | Setup test infrastructure | @qa | 8 | 1 |
-
----
-
-### Phase 2: Production (TDE-001-7 to TDE-001-13)
-
-| Story | Title | Owner | Points | Phase |
-|-------|-------|-------|--------|-------|
-| TDE-001-7 | Validate PNCP API resilience | @qa | 8 | 2 |
-| TDE-001-8 | Test Excel output thoroughly | @qa | 8 | 2 |
-| TDE-001-9 | Test LLM integration | @qa | 5 | 2 |
-| TDE-001-10 | Write integration tests | @qa | 10 | 2 |
-| TDE-001-11 | Implement error handling UI | @dev-frontend | 8 | 2 |
-| TDE-001-12 | Implement loading states | @dev-frontend | 5 | 2 |
-| TDE-001-13 | Implement form validation feedback | @dev-frontend | 5 | 2 |
-
----
-
-### Phase 3: Polish (TDE-001-14 to TDE-001-16)
-
-| Story | Title | Owner | Points | Phase |
-|-------|-------|-------|--------|-------|
-| TDE-001-14 | Mobile responsiveness testing | @dev-frontend | 10 | 3 |
-| TDE-001-15 | WCAG A accessibility implementation | @dev-frontend | 10 | 3 |
-| TDE-001-16 | Help/documentation UI | @dev-frontend | 5 | 3 |
-
----
-
-### Phase 4: Enhancement (Optional, TDE-001-17+)
-
-| Story | Title | Owner | Points | Phase |
-|-------|-------|-------|--------|-------|
-| TDE-001-17 | Redis caching implementation | @dev-backend | 13 | 4 |
-| TDE-001-18 | CORS configuration | @dev-backend | 3 | 4 |
-| TDE-001-19 | Environment validation | @dev-backend | 3 | 4 |
-| TDE-001-20 | Download history feature | @dev-frontend | 10 | 4 |
-| TDE-001-21 | Advanced filters (value range) | @dev-frontend | 13 | 4 |
-| TDE-001-22 | Pagination/virtualization | @dev-frontend | 13 | 4 |
-
----
-
-## 12. Definition of Done (For Each Story)
-
-- [x] Code written and committed
-- [x] Code reviewed by peer
-- [x] Tests written (unit + integration)
-- [x] Tests passing (100% of story tests)
-- [x] Linting passes (eslint, ruff)
-- [x] Type checking passes (TS, mypy)
-- [x] Documentation updated
-- [x] Verified against acceptance criteria
-- [x] No new console errors
-- [x] QA approved
-
----
-
-## 13. Acceptance Criteria (Epic Level)
-
-### Phase 1 Complete When:
-
-- [x] Backend endpoints respond to requests
-- [x] Frontend UI renders without errors
-- [x] User can perform full search flow
-- [x] Basic tests run and pass
-- [x] No blocking issues in QA
-
-### Phase 2 Complete When:
-
-- [x] All unit tests pass (70%+ backend)
-- [x] All integration tests pass
-- [x] Error handling shows user-friendly messages
-- [x] PNCP API failures handled correctly
-- [x] Ready for public beta
-
-### Phase 3 Complete When:
-
-- [x] Mobile works (tested on devices)
-- [x] Accessibility WCAG A compliant
-- [x] All help text in place
-- [x] Performance targets met
-- [x] Ready for production deployment
-
----
-
-## 14. Communication Plan
-
-### Stakeholders
-
-- **CTO/VP Tech:** Weekly status (every Fri)
-- **Product Owner:** Daily standup (quick)
-- **Finance:** Weekly budget check
-- **Customers:** Beta kickoff (end Phase 1)
-
-### Updates
-
-| Frequency | Audience | Format |
-|-----------|----------|--------|
-| Daily | Team | Standup (15min) |
-| Weekly | Leadership | Email summary |
-| Bi-weekly | Stakeholders | Demo + metrics |
-| Monthly | Board | Financial summary |
-
----
-
-## 15. Glossary & References
-
-**MVP:** Minimum Viable Product (Phase 1, functional)
-**Production Ready:** Phases 1-3 combined
-**Enterprise Grade:** All phases complete (including Phase 4)
-
-**Related Documents:**
-- `docs/architecture/system-architecture.md` (Technical overview)
-- `docs/frontend/frontend-spec.md` (Component design)
-- `docs/prd/technical-debt-assessment.md` (Debt prioritization)
-- `docs/reports/TECHNICAL-DEBT-REPORT.md` (Executive summary)
-
----
-
-## 16. Approval & Sign-Off
-
-| Role | Name | Date | Status |
-|------|------|------|--------|
-| Architect | @architect | 2026-01-26 | ✅ |
-| Product Manager | TBD | TBD | ⏳ |
-| Engineering Manager | TBD | TBD | ⏳ |
-| CTO | TBD | TBD | ⏳ |
-
----
-
-## Next Steps
-
-1. **Engineering Manager:** Review & assign stories
-2. **Team:** Kick-off meeting (Day 1)
-3. **Dev Team:** Begin Phase 1 (Backend + Frontend)
-4. **QA:** Begin test infrastructure
-5. **Project Manager:** Track progress weekly
-
----
-
-**Epic Created:** January 26, 2026
-**Version:** 1.0
-**Status:** ✅ READY FOR KICK-OFF
-**Expected Duration:** 3-4 weeks
-**Estimated Budget:** R$ 65k
-
----
-
-*Epic approved by @architect. Awaiting executive approval to proceed.*
+*Created: 2026-03-07*
+*Source: docs/prd/technical-debt-assessment.md (v1.0 Validated)*
+*Codebase at commit: 9fbd54d0 (main branch)*
