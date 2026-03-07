@@ -9,4 +9,4 @@ faker==37.1.0
 
 # Code quality
 ruff==0.9.6
-mypy==1.15.0
+mypy==1.19.1
