@@ -26,6 +26,18 @@ logger = logging.getLogger(__name__)
 # Portal da Transparencia page size (API default)
 TRANSPARENCIA_PAGE_SIZE = 15
 
+# Mapping of UF abbreviations to IBGE numeric codes.
+# The Portal da Transparencia API expects numeric IBGE codes for the codigoUF
+# parameter, not state abbreviations (siglas).
+UF_TO_IBGE: Dict[str, int] = {
+    "AC": 12, "AL": 27, "AM": 13, "AP": 16, "BA": 29,
+    "CE": 23, "DF": 53, "ES": 32, "GO": 52, "MA": 21,
+    "MG": 31, "MS": 50, "MT": 51, "PA": 15, "PB": 25,
+    "PE": 26, "PI": 22, "PR": 41, "RJ": 33, "RN": 24,
+    "RO": 11, "RR": 14, "RS": 43, "SC": 42, "SE": 28,
+    "SP": 35, "TO": 17,
+}
+
 
 @dataclass
 class SanctionResult:
@@ -264,7 +276,20 @@ class TransparenciaSource(DataSourceClient):
         for uf in target_ufs:
             uf_params = dict(params)
             if uf:
-                uf_params["codigoUF"] = uf
+                ibge_code = UF_TO_IBGE.get(uf.upper())
+                if ibge_code is not None:
+                    uf_params["codigoUF"] = ibge_code
+                    logger.debug(
+                        "Transparencia: UF '%s' mapped to IBGE code %d",
+                        uf, ibge_code,
+                        extra={"source": "transparencia"},
+                    )
+                else:
+                    logger.warning(
+                        "Transparencia: unknown UF '%s', skipping codigoUF parameter",
+                        uf,
+                        extra={"source": "transparencia"},
+                    )
 
             if query.modalidades:
                 for mod in query.modalidades:

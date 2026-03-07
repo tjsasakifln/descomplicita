@@ -13,6 +13,7 @@ from sources.transparencia_source import (
     _parse_transparencia_date,
     _generate_id,
     TRANSPARENCIA_PAGE_SIZE,
+    UF_TO_IBGE,
 )
 from sources.base import SearchQuery, NormalizedRecord
 from config import RetryConfig
@@ -136,7 +137,7 @@ class TestTransparenciaSourceInit:
         assert s._api_key == "env-key-456"
 
     def test_default_config(self, source):
-        assert source._config.timeout == 30
+        assert source._config.timeout == 90
         assert source._config.max_retries == 3
 
     def test_custom_config(self):
@@ -483,7 +484,8 @@ class TestTransparenciaSourceFetchRecords:
         assert params["dataFinal"] == "31/03/2026"
 
     @pytest.mark.asyncio
-    async def test_fetch_passes_uf_param(self, source, mock_response_empty):
+    async def test_fetch_passes_uf_as_ibge_code(self, source, mock_response_empty):
+        """codigoUF must be sent as IBGE numeric code, not state abbreviation."""
         source._get_client = Mock()
         client_mock = AsyncMock()
         client_mock.get.return_value = mock_response_empty
@@ -494,7 +496,7 @@ class TestTransparenciaSourceFetchRecords:
 
         call_args = client_mock.get.call_args
         params = call_args.kwargs.get("params") or call_args[1].get("params", {})
-        assert params["codigoUF"] == "RJ"
+        assert params["codigoUF"] == 33  # IBGE code for RJ
 
     @pytest.mark.asyncio
     async def test_fetch_multiple_ufs(self, source, mock_response_empty):
@@ -677,7 +679,7 @@ class TestTransparenciaConfig:
 
     def test_transparencia_timeout(self):
         from config import SOURCES_CONFIG
-        assert SOURCES_CONFIG["transparencia"]["timeout"] == 30
+        assert SOURCES_CONFIG["transparencia"]["timeout"] == 90
 
     def test_transparencia_auth_configured(self):
         from config import SOURCES_CONFIG
@@ -686,3 +688,114 @@ class TestTransparenciaConfig:
         assert auth["type"] == "api_key"
         assert auth["header"] == "chave-api-dados"
         assert auth["env_var"] == "TRANSPARENCIA_API_KEY"
+
+
+# ---------------------------------------------------------------------------
+# UF to IBGE code mapping tests (SE-001.2)
+# ---------------------------------------------------------------------------
+
+class TestUFToIBGEMapping:
+    """Tests for UF abbreviation to IBGE numeric code mapping."""
+
+    ALL_UFS = {
+        "AC": 12, "AL": 27, "AM": 13, "AP": 16, "BA": 29,
+        "CE": 23, "DF": 53, "ES": 32, "GO": 52, "MA": 21,
+        "MG": 31, "MS": 50, "MT": 51, "PA": 15, "PB": 25,
+        "PE": 26, "PI": 22, "PR": 41, "RJ": 33, "RN": 24,
+        "RO": 11, "RR": 14, "RS": 43, "SC": 42, "SE": 28,
+        "SP": 35, "TO": 17,
+    }
+
+    def test_mapping_has_all_27_ufs(self):
+        assert len(UF_TO_IBGE) == 27
+
+    @pytest.mark.parametrize("uf,expected_code", list(ALL_UFS.items()))
+    def test_uf_to_ibge_code(self, uf, expected_code):
+        assert UF_TO_IBGE[uf] == expected_code
+
+    def test_all_codes_are_integers(self):
+        for uf, code in UF_TO_IBGE.items():
+            assert isinstance(code, int), f"Code for {uf} is not int: {type(code)}"
+
+    def test_all_codes_are_unique(self):
+        codes = list(UF_TO_IBGE.values())
+        assert len(codes) == len(set(codes)), "Duplicate IBGE codes found"
+
+
+class TestUFConversionInFetchRecords:
+    """Tests for UF-to-IBGE conversion within fetch_records (SE-001.2)."""
+
+    @pytest.fixture
+    def source(self):
+        return TransparenciaSource(api_key="test-key")
+
+    @pytest.fixture
+    def mock_empty_response(self):
+        response = AsyncMock(spec=httpx.Response)
+        response.status_code = 200
+        response.raise_for_status = Mock()
+        response.json.return_value = []
+        return response
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("uf,expected_code", [
+        ("SP", 35), ("RJ", 33), ("MG", 31), ("BA", 29), ("DF", 53),
+    ])
+    async def test_uf_converted_to_ibge_code(self, source, mock_empty_response, uf, expected_code):
+        """Verify that each UF sigla is converted to the correct IBGE code in API params."""
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = mock_empty_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-01-01", data_final="2026-01-31", ufs=[uf])
+        await source.fetch_records(query)
+
+        call_args = client_mock.get.call_args
+        params = call_args.kwargs.get("params") or call_args[1].get("params", {})
+        assert params["codigoUF"] == expected_code
+
+    @pytest.mark.asyncio
+    async def test_invalid_uf_omits_codigo_param(self, source, mock_empty_response):
+        """An unknown UF abbreviation should not send codigoUF to the API."""
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = mock_empty_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-01-01", data_final="2026-01-31", ufs=["XX"])
+        await source.fetch_records(query)
+
+        call_args = client_mock.get.call_args
+        params = call_args.kwargs.get("params") or call_args[1].get("params", {})
+        assert "codigoUF" not in params
+
+    @pytest.mark.asyncio
+    async def test_lowercase_uf_still_maps(self, source, mock_empty_response):
+        """UF conversion should be case-insensitive."""
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = mock_empty_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-01-01", data_final="2026-01-31", ufs=["sp"])
+        await source.fetch_records(query)
+
+        call_args = client_mock.get.call_args
+        params = call_args.kwargs.get("params") or call_args[1].get("params", {})
+        assert params["codigoUF"] == 35
+
+    @pytest.mark.asyncio
+    async def test_no_uf_no_codigo_param(self, source, mock_empty_response):
+        """When no UFs specified, codigoUF should not appear in params."""
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = mock_empty_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-01-01", data_final="2026-01-31")
+        await source.fetch_records(query)
+
+        call_args = client_mock.get.call_args
+        params = call_args.kwargs.get("params") or call_args[1].get("params", {})
+        assert "codigoUF" not in params
