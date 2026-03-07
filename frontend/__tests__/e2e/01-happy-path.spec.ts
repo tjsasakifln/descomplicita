@@ -61,10 +61,10 @@ test.describe('Happy Path User Journey', () => {
 
     // Verify selected states are highlighted
     const spButton = page.getByRole('button', { name: 'SP', exact: true });
-    await expect(spButton).toHaveClass(/bg-green-600/);
+    await expect(spButton).toHaveClass(/bg-brand-navy/);
 
     const rjButton = page.getByRole('button', { name: 'RJ', exact: true });
-    await expect(rjButton).toHaveClass(/bg-green-600/);
+    await expect(rjButton).toHaveClass(/bg-brand-navy/);
   });
 
   test('AC1.3: should have default 7-day date range', async ({ page }) => {
