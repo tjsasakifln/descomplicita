@@ -370,10 +370,17 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             f"[job={job_id}] Fetching bids from {sources_total} sources: {source_names}"
         )
 
+        # Use custom terms as search_terms if provided, otherwise sector's search_keywords
+        if custom_terms:
+            api_search_terms = custom_terms[:5]
+        else:
+            api_search_terms = sector.search_keywords if sector.search_keywords else None
+
         query = SearchQuery(
             data_inicial=request.data_inicial,
             data_final=request.data_final,
             ufs=request.ufs,
+            search_terms=api_search_terms or None,
         )
 
         async def _on_progress(completed: int, total: int):

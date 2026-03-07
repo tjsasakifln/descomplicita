@@ -210,6 +210,7 @@ class PNCPClient:
         uf: str | None = None,
         pagina: int = 1,
         tamanho: int = PNCP_PAGE_SIZE,
+        palavra_chave: str | None = None,
     ) -> Dict[str, Any]:
         """
         Fetch a single page of procurement data from PNCP API.
@@ -250,6 +251,9 @@ class PNCPClient:
 
         if uf:
             params["uf"] = uf
+
+        if palavra_chave:
+            params["palavraChave"] = palavra_chave
 
         url = f"{self.BASE_URL}/contratacoes/publicacao"
 
@@ -394,6 +398,7 @@ class PNCPClient:
         modalidade: int,
         uf: str | None,
         on_progress: Callable[[int, int, int], None] | None = None,
+        palavra_chave: str | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch all pages for a single UF+modalidade combination.
@@ -401,8 +406,9 @@ class PNCPClient:
         Thread-safe wrapper around _fetch_by_uf that collects results into a list.
         Used by ThreadPoolExecutor in fetch_all for parallel fetching.
         """
-        label = f"modalidade={modalidade}, UF={uf or 'ALL'}"
-        cache_key = self._cache_key(uf, modalidade, data_inicial, data_final)
+        kw_label = f", palavraChave={palavra_chave}" if palavra_chave else ""
+        label = f"modalidade={modalidade}, UF={uf or 'ALL'}{kw_label}"
+        cache_key = self._cache_key(uf, modalidade, data_inicial, data_final) + (f":{palavra_chave}" if palavra_chave else "")
 
         # Check cache first
         cached = self._cache_get(cache_key)
@@ -412,7 +418,7 @@ class PNCPClient:
 
         logger.info(f"Fetching {label}")
         try:
-            items = list(self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress))
+            items = list(self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress, palavra_chave=palavra_chave))
             logger.info(f"Completed {label}: {len(items)} items")
             # Store raw results in cache
             self._cache_put(cache_key, items)
@@ -428,6 +434,7 @@ class PNCPClient:
         ufs: list[str] | None = None,
         modalidades: list[int] | None = None,
         on_progress: Callable[[int, int, int], None] | None = None,
+        search_terms: list[str] | None = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Fetch all procurement records with parallel UF×modalidade fetching.
@@ -465,30 +472,35 @@ class PNCPClient:
                     f"{chunk_start} to {chunk_end}"
                 )
 
-            # Build list of (modalidade, uf) tasks to run in parallel
-            tasks: list[tuple[int, str | None]] = []
+            # Build list of (modalidade, uf, palavra_chave) tasks to run in parallel
+            # When search_terms are provided, run one query per term for each UF×modalidade
+            terms_to_use = search_terms if search_terms else [None]
+            tasks: list[tuple[int, str | None, str | None]] = []
             for modalidade in modalidades_to_fetch:
                 if ufs:
                     for uf in ufs:
-                        tasks.append((modalidade, uf))
+                        for term in terms_to_use:
+                            tasks.append((modalidade, uf, term))
                 else:
-                    tasks.append((modalidade, None))
+                    for term in terms_to_use:
+                        tasks.append((modalidade, None, term))
 
+            terms_info = f" × {len(search_terms)} terms" if search_terms else ""
             logger.info(
                 f"Launching {len(tasks)} parallel fetches "
-                f"({len(modalidades_to_fetch)} modalities × {len(ufs or ['ALL'])} UFs)"
+                f"({len(modalidades_to_fetch)} modalities × {len(ufs or ['ALL'])} UFs{terms_info})"
             )
 
-            # Parallel fetch: each UF×modalidade runs in its own thread
+            # Parallel fetch: each UF×modalidade×term runs in its own thread
             # Max 12 workers for better throughput on multi-UF searches
             max_workers = min(len(tasks), 12)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_task = {
                     executor.submit(
                         self._fetch_uf_modalidade,
-                        chunk_start, chunk_end, modalidade, uf, on_progress,
+                        chunk_start, chunk_end, modalidade, uf, on_progress, term,
                     ): (modalidade, uf)
-                    for modalidade, uf in tasks
+                    for modalidade, uf, term in tasks
                 }
 
                 for future in as_completed(future_to_task):
@@ -542,6 +554,7 @@ class PNCPClient:
         modalidade: int,
         uf: str | None,
         on_progress: Callable[[int, int, int], None] | None,
+        palavra_chave: str | None = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Fetch all pages for a specific modality and UF combination.
@@ -576,6 +589,7 @@ class PNCPClient:
                 modalidade=modalidade,
                 uf=uf,
                 pagina=pagina,
+                palavra_chave=palavra_chave,
             )
 
             # Extract pagination metadata

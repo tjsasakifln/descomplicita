@@ -14,6 +14,7 @@ class SearchQuery:
     data_final: str
     ufs: Optional[List[str]] = None
     modalidades: Optional[List[int]] = None
+    search_terms: Optional[List[str]] = None
 
 
 @dataclass

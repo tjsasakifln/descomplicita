@@ -103,6 +103,7 @@ class PNCPSource(DataSourceClient):
                     ufs=query.ufs,
                     modalidades=query.modalidades,
                     on_progress=on_progress,
+                    search_terms=query.search_terms,
                 )
             ),
         )

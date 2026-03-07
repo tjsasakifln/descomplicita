@@ -25,6 +25,8 @@ class SectorConfig:
     keywords_b: Set[str] = field(default_factory=set)  # Strong (weight 0.7)
     keywords_c: Set[str] = field(default_factory=set)  # Ambiguous (weight 0.3)
     threshold: float = 0.6  # Minimum score to approve
+    # High-precision terms for PNCP server-side palavraChave filtering (SE-001.1)
+    search_keywords: List[str] = field(default_factory=list)
 
 
 SECTORS: Dict[str, SectorConfig] = {
@@ -79,6 +81,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "avental", "aventais",
             "colete", "coletes",
         },
+        search_keywords=["uniforme", "fardamento", "vestuario", "jaleco", "camiseta"],
     ),
     "alimentos": SectorConfig(
         id="alimentos",
@@ -176,6 +179,7 @@ SECTORS: Dict[str, SectorConfig] = {
             # "bebida" — exclude non-procurement
             "bebida alcoólica", "bebida alcoolica",
         },
+        search_keywords=["alimento", "merenda", "genero alimenticio", "cesta basica", "hortifruti"],
     ),
     "informatica": SectorConfig(
         id="informatica",
@@ -294,6 +298,7 @@ SECTORS: Dict[str, SectorConfig] = {
             # "switch" in non-IT context (unlikely but guard)
             "switch grass",
         },
+        search_keywords=["informatica", "computador", "notebook", "impressora", "software"],
     ),
     "limpeza": SectorConfig(
         id="limpeza",
@@ -407,6 +412,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "avental descartavel", "avental descartável",
             "lencol descartavel", "lençol descartável",
         },
+        search_keywords=["material de limpeza", "detergente", "desinfetante", "saneante", "papel higienico"],
     ),
     "mobiliario": SectorConfig(
         id="mobiliario",
@@ -480,6 +486,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "arrecadacao bancaria", "arrecadação bancária",
             "taxa bancaria", "taxa bancária",
         },
+        search_keywords=["mobiliario", "cadeira", "armario", "mesa de escritorio", "estante"],
     ),
     "papelaria": SectorConfig(
         id="papelaria",
@@ -543,6 +550,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "horário de expediente", "horario de expediente",
             "fora de expediente",
         },
+        search_keywords=["material de escritorio", "papelaria", "papel sulfite", "material escolar", "caneta"],
     ),
     "saude": SectorConfig(
         id="saude",
@@ -615,6 +623,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "sonda de perfuracao", "sonda de perfuração",
             "sonda espacial",
         },
+        search_keywords=["medicamento", "hospitalar", "farmaceutico", "insumo hospitalar", "material hospitalar"],
     ),
     "veiculos": SectorConfig(
         id="veiculos",
@@ -683,6 +692,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "abastecimento publico", "abastecimento público",
             "sistema de abastecimento de agua", "sistema de abastecimento de água",
         },
+        search_keywords=["veiculo", "combustivel", "pneu", "peca automotiva", "manutencao veicular"],
     ),
     "engenharia": SectorConfig(
         id="engenharia",
@@ -834,6 +844,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "cobertura hospitalar",
             "cobertura obstetra", "cobertura obstétrica",
         },
+        search_keywords=["obra", "construcao civil", "pavimentacao", "reforma predial", "engenharia"],
     ),
     "hospitalar": SectorConfig(
         id="hospitalar",
@@ -905,6 +916,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "centrifuga industrial", "centrífuga industrial",
             "centrifuga de acucar", "centrífuga de açúcar",
         },
+        search_keywords=["equipamento hospitalar", "equipamento medico", "cama hospitalar", "autoclave", "raio-x"],
     ),
     "servicos_gerais": SectorConfig(
         id="servicos_gerais",
@@ -984,6 +996,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "lei de terceirizacao", "lei de terceirização",
             "reforma trabalhista",
         },
+        search_keywords=["servicos gerais", "manutencao predial", "jardinagem", "portaria", "dedetizacao"],
     ),
     "seguranca": SectorConfig(
         id="seguranca",
@@ -1067,6 +1080,7 @@ SECTORS: Dict[str, SectorConfig] = {
             "vigilancia de zoonoses", "vigilância de zoonoses",
             "vigilancia ambiental", "vigilância ambiental",
         },
+        search_keywords=["vigilancia patrimonial", "CFTV", "controle de acesso", "camera de seguranca", "vigilante"],
     ),
 }
 
