@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useSearchForm } from "./hooks/useSearchForm";
@@ -12,10 +13,29 @@ import { UfSelector } from "./components/UfSelector";
 import { DateRangeSelector } from "./components/DateRangeSelector";
 import { SearchSummary } from "./components/SearchSummary";
 import { SearchActions } from "./components/SearchActions";
-import { SaveSearchDialog } from "./components/SaveSearchDialog";
-import { LoadingProgress } from "./components/LoadingProgress";
-import { EmptyState } from "./components/EmptyState";
 import type { SavedSearch } from "../lib/savedSearches";
+
+// Task 15 (TD-042): Dynamic imports for heavy components
+const SaveSearchDialog = dynamic(
+  () => import("./components/SaveSearchDialog").then(mod => ({ default: mod.SaveSearchDialog })),
+  { ssr: false }
+);
+
+const LoadingProgress = dynamic(
+  () => import("./components/LoadingProgress").then(mod => ({ default: mod.LoadingProgress })),
+  { loading: () => (
+    <div className="mt-8 p-6 bg-surface-1 rounded-card border animate-fade-in-up">
+      <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+        <div className="h-full w-1/4 bg-gradient-to-r from-brand-blue to-brand-navy rounded-full animate-pulse" />
+      </div>
+      <p className="text-sm text-ink-muted mt-3">Carregando...</p>
+    </div>
+  )}
+);
+
+const EmptyState = dynamic(
+  () => import("./components/EmptyState").then(mod => ({ default: mod.EmptyState })),
+);
 
 export default function HomePage() {
   const { trackEvent } = useAnalytics();
@@ -23,6 +43,22 @@ export default function HomePage() {
   const job = useSearchJob(trackEvent);
   const form = useSearchForm(job.clearResult);
   const save = useSaveDialog({ form, saveNewSearch, trackEvent, hasResult: !!job.result });
+
+  // Task 2 (TD-031): Focus management after search
+  const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const prevResultRef = useRef<typeof job.result>(null);
+
+  useEffect(() => {
+    // When results arrive (transition from null to having a result), focus the results heading
+    if (job.result && !prevResultRef.current) {
+      // Small delay to allow DOM to render
+      requestAnimationFrame(() => {
+        resultsHeadingRef.current?.focus();
+        resultsHeadingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    prevResultRef.current = job.result;
+  }, [job.result]);
 
   const handleBuscar = useCallback(async () => {
     await job.buscar({
@@ -52,6 +88,13 @@ export default function HomePage() {
   const hasResults = job.result && job.result.resumo.total_oportunidades > 0;
   const isEmpty = job.result && job.result.resumo.total_oportunidades === 0;
 
+  // Task 2: Announce result count for screen readers
+  const resultAnnouncement = hasResults
+    ? `${job.result!.resumo.total_oportunidades} resultados encontrados`
+    : isEmpty
+      ? "Nenhum resultado encontrado"
+      : "";
+
   return (
     <div className="min-h-screen">
       <SearchHeader onLoadSearch={handleLoadSearch} onAnalyticsEvent={trackEvent} />
@@ -62,6 +105,7 @@ export default function HomePage() {
           <p className="text-ink-secondary mt-1 text-sm sm:text-base">Encontre oportunidades de contratação pública em fontes oficiais</p>
         </div>
 
+        <h2 className="sr-only">Formulário de Busca</h2>
         <SearchForm searchMode={form.searchMode} onSearchModeChange={form.setSearchMode} setores={form.setores}
           setorId={form.setorId} onSetorIdChange={form.setSetorId} termosArray={form.termosArray}
           onTermosArrayChange={form.setTermosArray} termoInput={form.termoInput}
@@ -98,6 +142,19 @@ export default function HomePage() {
             </button>
           </div>
         )}
+
+        {/* Task 2 (TD-031): aria-live region for result announcements */}
+        <div aria-live="polite" className="sr-only" role="status">
+          {resultAnnouncement}
+        </div>
+
+        <h2
+          ref={resultsHeadingRef}
+          tabIndex={-1}
+          className="sr-only outline-none"
+        >
+          Resultados
+        </h2>
 
         {isEmpty && (
           <EmptyState onAdjustSearch={() => window.scrollTo({ top: 0, behavior: "smooth" })}

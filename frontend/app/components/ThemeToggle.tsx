@@ -8,6 +8,7 @@ export function ThemeToggle() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const closeDropdown = useCallback(() => {
     setOpen(false);
@@ -33,6 +34,48 @@ export function ThemeToggle() {
     };
   }, [open, closeDropdown]);
 
+  // Focus first menu item when menu opens
+  useEffect(() => {
+    if (open && menuRef.current) {
+      const items = menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]');
+      // Focus the currently selected theme item
+      const activeIndex = THEMES.findIndex(t => t.id === theme);
+      (items[activeIndex] || items[0])?.focus();
+    }
+  }, [open, theme]);
+
+  const handleMenuKeyDown = (e: React.KeyboardEvent) => {
+    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    if (!items || items.length === 0) return;
+
+    const currentIndex = Array.from(items).findIndex(item => item === document.activeElement);
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault();
+        const next = (currentIndex + 1) % items.length;
+        items[next]?.focus();
+        break;
+      }
+      case "ArrowUp": {
+        e.preventDefault();
+        const prev = (currentIndex - 1 + items.length) % items.length;
+        items[prev]?.focus();
+        break;
+      }
+      case "Home": {
+        e.preventDefault();
+        items[0]?.focus();
+        break;
+      }
+      case "End": {
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+        break;
+      }
+    }
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -41,13 +84,14 @@ export function ThemeToggle() {
         type="button"
         aria-label="Alternar tema"
         aria-expanded={open}
+        aria-haspopup="true"
         className="flex items-center gap-2 px-3 py-2 rounded-button border border-strong
                    bg-surface-0 text-ink-secondary
                    hover:border-accent transition-colors text-sm"
       >
         <span
-          className="w-4 h-4 rounded-full border border-strong"
-          style={{ backgroundColor: THEMES.find(t => t.id === theme)?.preview }}
+          className="w-4 h-4 rounded-full border"
+          style={{ backgroundColor: THEMES.find(t => t.id === theme)?.preview, borderColor: "var(--border-strong)" }}
         />
         <span className="hidden sm:inline">{THEMES.find(t => t.id === theme)?.label}</span>
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,13 +100,21 @@ export function ThemeToggle() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-48 rounded-card border border-strong
-                        bg-surface-elevated shadow-sm z-50 overflow-hidden animate-fade-in">
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Selecionar tema"
+          onKeyDown={handleMenuKeyDown}
+          className="absolute right-0 mt-2 w-48 rounded-card border border-strong
+                          bg-surface-elevated shadow-sm z-50 overflow-hidden animate-fade-in"
+        >
           {THEMES.map(t => (
             <button
               key={t.id}
-              onClick={() => { setTheme(t.id); setOpen(false); }}
+              onClick={() => { setTheme(t.id); closeDropdown(); }}
               type="button"
+              role="menuitem"
+              tabIndex={-1}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left
                          hover:bg-surface-1 transition-colors
                          ${theme === t.id ? "bg-brand-blue-subtle font-semibold" : ""}`}
@@ -71,7 +123,7 @@ export function ThemeToggle() {
                 className="w-5 h-5 rounded-full border flex-shrink-0"
                 style={{
                   backgroundColor: t.preview,
-                  borderColor: theme === t.id ? "#116dff" : "var(--border-strong)",
+                  borderColor: theme === t.id ? "var(--brand-blue)" : "var(--border-strong)",
                 }}
               />
               <span className="text-ink">{t.label}</span>

@@ -34,6 +34,7 @@ export function SavedSearchesDropdown({
 
   const [isOpen, setIsOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [clearConfirm, setClearConfirm] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const closeDropdown = useCallback(() => {
@@ -134,6 +135,7 @@ export function SavedSearchesDropdown({
                    border border-strong"
         aria-label="Buscas salvas"
         aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -188,15 +190,23 @@ export function SavedSearchesDropdown({
                   {searches.length > 0 && (
                     <button
                       onClick={() => {
-                        if (window.confirm('Deseja excluir todas as buscas salvas?')) {
+                        if (clearConfirm) {
                           clearAll();
+                          setClearConfirm(false);
                           setIsOpen(false);
+                        } else {
+                          setClearConfirm(true);
+                          setTimeout(() => setClearConfirm(false), 3000);
                         }
                       }}
-                      className="text-xs text-ink-muted hover:text-error transition-colors"
+                      className={`text-xs transition-colors ${
+                        clearConfirm
+                          ? 'text-error font-semibold'
+                          : 'text-ink-muted hover:text-error'
+                      }`}
                       type="button"
                     >
-                      Limpar todas
+                      {clearConfirm ? 'Confirmar exclusão?' : 'Limpar todas'}
                     </button>
                   )}
                 </div>

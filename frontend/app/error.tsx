@@ -10,20 +10,22 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log error to console in development
     console.error("Application error:", error);
-
-    // In production, you would send this to an error tracking service
-    // Example: Sentry, LogRocket, Datadog, etc.
-    // errorTracker.captureException(error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8 text-center">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--canvas, #f7f8fa)", color: "var(--ink, #1e2d3b)" }}
+    >
+      <div
+        className="max-w-md w-full shadow-lg rounded-lg p-8 text-center"
+        style={{ background: "var(--surface-0, #ffffff)", borderRadius: "var(--radius-card, 8px)" }}
+      >
         <div className="mb-6">
           <svg
-            className="mx-auto h-16 w-16 text-red-500"
+            className="mx-auto h-16 w-16"
+            style={{ color: "var(--error, #dc2626)" }}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -38,17 +40,29 @@ export default function Error({
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1
+          className="text-2xl font-bold mb-2"
+          style={{ color: "var(--ink, #1e2d3b)" }}
+        >
           Ops! Algo deu errado
         </h1>
 
-        <p className="text-gray-600 mb-6">
+        <p
+          className="mb-6"
+          style={{ color: "var(--ink-secondary, #3d5975)" }}
+        >
           Ocorreu um erro inesperado. Por favor, tente novamente.
         </p>
 
         {error.message && (
-          <div className="mb-6 p-4 bg-gray-100 rounded-md text-left">
-            <p className="text-sm text-gray-700 font-mono break-words">
+          <div
+            className="mb-6 p-4 rounded-md text-left"
+            style={{ background: "var(--surface-1, #f7f8fa)" }}
+          >
+            <p
+              className="text-sm font-mono break-words"
+              style={{ color: "var(--ink-secondary, #3d5975)" }}
+            >
               {error.message}
             </p>
           </div>
@@ -56,12 +70,20 @@ export default function Error({
 
         <button
           onClick={reset}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          className="w-full font-medium py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+          style={{
+            background: "var(--brand-navy, #0a1e3f)",
+            color: "#ffffff",
+            borderRadius: "var(--radius-button, 6px)",
+          }}
         >
           Tentar novamente
         </button>
 
-        <p className="mt-4 text-sm text-gray-500">
+        <p
+          className="mt-4 text-sm"
+          style={{ color: "var(--ink-muted, #5a6a7a)" }}
+        >
           Se o problema persistir, entre em contato com o suporte.
         </p>
       </div>

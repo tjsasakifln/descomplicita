@@ -30,6 +30,7 @@ export function SourceBadges({ sources, stats, dedupRemoved, truncatedCombos = 0
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="flex items-center gap-2 text-sm font-medium text-ink-secondary hover:text-ink transition-colors"
       >
         <svg className="w-4 h-4 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -48,10 +49,10 @@ export function SourceBadges({ sources, stats, dedupRemoved, truncatedCombos = 0
           const label = SOURCE_LABELS[name] || name;
           const statusColor =
             stat.status === "success" && stat.total_fetched > 0
-              ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
+              ? "bg-status-success-bg text-status-success-text border-status-success"
               : stat.status === "success" && stat.total_fetched === 0
-                ? "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800"
-                : "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800";
+                ? "bg-status-warning-bg text-status-warning-text border-status-warning"
+                : "bg-status-error-bg text-status-error-text border-status-error";
 
           return (
             <span
@@ -60,10 +61,10 @@ export function SourceBadges({ sources, stats, dedupRemoved, truncatedCombos = 0
             >
               <span className={`w-1.5 h-1.5 rounded-full ${
                 stat.status === "success" && stat.total_fetched > 0
-                  ? "bg-green-500"
+                  ? "bg-status-success-dot"
                   : stat.status === "success" && stat.total_fetched === 0
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
+                    ? "bg-status-warning-dot"
+                    : "bg-status-error-dot"
               }`} />
               {label}: {stat.total_fetched}
             </span>
@@ -83,10 +84,10 @@ export function SourceBadges({ sources, stats, dedupRemoved, truncatedCombos = 0
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${
                       stat.status === "success" && stat.total_fetched > 0
-                        ? "bg-green-500"
+                        ? "bg-status-success-dot"
                         : stat.status === "success" && stat.total_fetched === 0
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
+                          ? "bg-status-warning-dot"
+                          : "bg-status-error-dot"
                     }`} />
                     <span className="font-medium text-ink">{label}</span>
                   </div>

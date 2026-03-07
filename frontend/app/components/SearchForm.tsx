@@ -106,6 +106,7 @@ export function SearchForm({
             <input
               id="termos-busca"
               type="text"
+              aria-describedby="termos-busca-hint"
               value={termoInput}
               onChange={e => {
                 const val = e.target.value;
@@ -140,7 +141,7 @@ export function SearchForm({
                          placeholder:text-ink-faint py-1"
             />
           </div>
-          <p className="text-sm text-ink-muted mt-1.5">
+          <p id="termos-busca-hint" className="text-sm text-ink-muted mt-1.5">
             Digite cada termo e pressione <kbd className="px-1.5 py-0.5 bg-surface-2 rounded text-xs font-mono border">espaço</kbd> para confirmar.
             {termosArray.length > 0 && (
               <span className="text-brand-blue font-medium">

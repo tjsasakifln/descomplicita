@@ -54,7 +54,7 @@ export function SearchSummary({ result }: SearchSummaryProps) {
 
       {result.resumo.destaques.length > 0 && (
         <div className="mt-4 sm:mt-6">
-          <h4 className="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3">Destaques:</h4>
+          <h3 className="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3">Destaques:</h3>
           <ul className="list-disc list-inside text-sm sm:text-base space-y-2 text-ink-secondary">
             {result.resumo.destaques.map((d, i) => (
               <li key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 60}ms` }}>{d}</li>

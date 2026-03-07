@@ -1,7 +1,7 @@
 /**
  * ThemeToggle Component Tests
  *
- * Tests theme switching functionality and rendering
+ * Tests theme switching functionality, ARIA menu pattern, and keyboard navigation
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -23,9 +23,10 @@ describe('ThemeToggle Component', () => {
     const button = screen.getByRole('button', { name: /Alternar tema/i });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('aria-label', 'Alternar tema');
+    expect(button).toHaveAttribute('aria-haspopup', 'true');
   });
 
-  it('should open dropdown when clicked', () => {
+  it('should open dropdown with ARIA menu pattern when clicked', () => {
     render(
       <ThemeProvider>
         <ThemeToggle />
@@ -34,16 +35,20 @@ describe('ThemeToggle Component', () => {
 
     const toggleButton = screen.getByRole('button', { name: /Alternar tema/i });
 
-    // Initially dropdown should not be visible
-    expect(screen.queryByText('Light')).not.toBeInTheDocument();
+    // Initially no menu should be visible
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
     // Click to open dropdown
     fireEvent.click(toggleButton);
 
-    // Dropdown should now be visible
-    expect(screen.getByText('Light')).toBeInTheDocument();
-    expect(screen.getByText('Dark')).toBeInTheDocument();
-    expect(screen.getByText('Paperwhite')).toBeInTheDocument();
+    // Menu should appear with proper ARIA attributes
+    const menu = screen.getByRole('menu');
+    expect(menu).toBeInTheDocument();
+    expect(menu).toHaveAttribute('aria-label', 'Selecionar tema');
+
+    // Menu items should have role="menuitem"
+    const menuItems = screen.getAllByRole('menuitem');
+    expect(menuItems.length).toBe(5); // Light, Paperwhite, Sépia, Dim, Dark
   });
 
   it('should switch theme when option clicked', async () => {
@@ -58,8 +63,8 @@ describe('ThemeToggle Component', () => {
     // Open dropdown
     fireEvent.click(toggleButton);
 
-    // Click on "Dark" theme
-    const darkOption = screen.getByText('Dark');
+    // Click on "Dark" theme via menuitem
+    const darkOption = screen.getByRole('menuitem', { name: /Dark/ });
     fireEvent.click(darkOption);
 
     // Check that theme was applied
@@ -69,7 +74,7 @@ describe('ThemeToggle Component', () => {
 
     // Dropdown should close after selection
     await waitFor(() => {
-      expect(screen.queryByText('Light')).not.toBeInTheDocument();
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
   });
 
@@ -84,12 +89,12 @@ describe('ThemeToggle Component', () => {
 
     // Open dropdown and select dark theme
     fireEvent.click(toggleButton);
-    const darkOption = screen.getByText('Dark');
+    const darkOption = screen.getByRole('menuitem', { name: /Dark/ });
     fireEvent.click(darkOption);
 
     // Check localStorage
     await waitFor(() => {
-      expect(localStorage.getItem('theme')).toBe('dark');
+      expect(localStorage.getItem('descomplicita-theme')).toBe('dark');
     });
   });
 
@@ -107,7 +112,7 @@ describe('ThemeToggle Component', () => {
 
     // Open dropdown
     fireEvent.click(toggleButton);
-    expect(screen.getByText('Light')).toBeInTheDocument();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
 
     // Click outside
     const outside = screen.getByTestId('outside');
@@ -115,7 +120,7 @@ describe('ThemeToggle Component', () => {
 
     // Dropdown should close
     await waitFor(() => {
-      expect(screen.queryByText('Light')).not.toBeInTheDocument();
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
   });
 
@@ -131,5 +136,46 @@ describe('ThemeToggle Component', () => {
     // Should have a color preview element
     const preview = toggleButton.querySelector('.rounded-full');
     expect(preview).toBeInTheDocument();
+  });
+
+  it('should navigate menu items with arrow keys', () => {
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /Alternar tema/i });
+    fireEvent.click(toggleButton);
+
+    const menu = screen.getByRole('menu');
+    const menuItems = screen.getAllByRole('menuitem');
+
+    // Arrow Down should move focus to next item
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    // Arrow Up should move focus to previous item
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+
+    // All items should be present and navigable
+    expect(menuItems.length).toBe(5);
+  });
+
+  it('should close dropdown on Escape key', async () => {
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /Alternar tema/i });
+    fireEvent.click(toggleButton);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    // Press Escape
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
   });
 });

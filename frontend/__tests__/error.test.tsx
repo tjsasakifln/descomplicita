@@ -43,11 +43,12 @@ describe("Error Boundary Component", () => {
       ).toBeInTheDocument();
     });
 
-    it("should show error icon", () => {
+    it("should show error icon with theme-aware color", () => {
       const { container } = render(<ErrorBoundary error={mockError} reset={mockReset} />);
       const svg = container.querySelector("svg");
       expect(svg).toBeInTheDocument();
-      expect(svg).toHaveClass("text-red-500");
+      // Uses CSS custom property var(--error) via inline style instead of hardcoded class
+      expect(svg).toHaveStyle({ color: "var(--error, #dc2626)" });
     });
 
     it("should display technical error message when available", () => {
@@ -98,10 +99,12 @@ describe("Error Boundary Component", () => {
       expect(mockReset).toHaveBeenCalledTimes(3);
     });
 
-    it("should have proper styling for accessibility", () => {
+    it("should use theme-aware styling with CSS custom properties", () => {
       render(<ErrorBoundary error={mockError} reset={mockReset} />);
       const button = screen.getByRole("button", { name: /tentar novamente/i });
-      expect(button).toHaveClass("bg-green-600", "hover:bg-green-700", "focus:ring-2");
+      // Uses var(--brand-navy) via inline style instead of hardcoded green classes
+      expect(button).toHaveStyle({ background: "var(--brand-navy, #0a1e3f)" });
+      expect(button).toHaveClass("focus:ring-2");
     });
   });
 
@@ -136,9 +139,10 @@ describe("Error Boundary Component", () => {
       errorWithoutMessage.message = "";
       const { container } = render(<ErrorBoundary error={errorWithoutMessage} reset={mockReset} />);
       expect(screen.getByRole("heading")).toBeInTheDocument();
-      // When error.message is empty string (falsy), the div should not render
-      const errorMessageDiv = container.querySelector(".bg-gray-100");
-      expect(errorMessageDiv).not.toBeInTheDocument();
+      // When error.message is empty string (falsy), the error detail div should not render
+      const errorDetailDivs = container.querySelectorAll(".rounded-md");
+      // Empty message means the conditional block is skipped
+      expect(errorDetailDivs.length).toBe(0);
     });
 
     it("should handle error with digest property", () => {
@@ -181,12 +185,13 @@ describe("Error Boundary Component", () => {
       expect(button).toHaveClass("focus:outline-none", "focus:ring-2");
     });
 
-    it("should have sufficient color contrast", () => {
+    it("should use CSS custom properties for theme-aware colors", () => {
       render(<ErrorBoundary error={mockError} reset={mockReset} />);
       const heading = screen.getByRole("heading");
-      expect(heading).toHaveClass("text-gray-900");
+      // Uses var(--ink) inline style instead of hardcoded text-gray-900
+      expect(heading).toHaveStyle({ color: "var(--ink, #1e2d3b)" });
       const description = screen.getByText(/Ocorreu um erro inesperado/);
-      expect(description).toHaveClass("text-gray-600");
+      expect(description).toHaveStyle({ color: "var(--ink-secondary, #3d5975)" });
     });
   });
 
@@ -214,7 +219,7 @@ describe("Error Boundary Component", () => {
     });
   });
 
-  // Visual Regression Guards
+  // Visual Consistency — now using CSS custom properties (TD-030)
   describe("Visual Consistency", () => {
     it("should have consistent spacing classes", () => {
       const { container } = render(<ErrorBoundary error={mockError} reset={mockReset} />);
@@ -222,16 +227,19 @@ describe("Error Boundary Component", () => {
       expect(card).toHaveClass("p-8", "rounded-lg");
     });
 
-    it("should use theme colors consistently", () => {
+    it("should use design tokens via CSS custom properties", () => {
       render(<ErrorBoundary error={mockError} reset={mockReset} />);
       const button = screen.getByRole("button", { name: /tentar novamente/i });
-      expect(button).toHaveClass("bg-green-600", "hover:bg-green-700");
+      // Now uses var(--brand-navy) instead of hardcoded bg-green-600
+      expect(button).toHaveStyle({ background: "var(--brand-navy, #0a1e3f)" });
     });
 
     it("should render with proper layout structure", () => {
       const { container } = render(<ErrorBoundary error={mockError} reset={mockReset} />);
       expect(container.querySelector(".max-w-md")).toBeInTheDocument();
-      expect(container.querySelector(".bg-white")).toBeInTheDocument();
+      // Uses inline style background instead of .bg-white class
+      const card = container.querySelector(".shadow-lg");
+      expect(card).toHaveStyle({ background: "var(--surface-0, #ffffff)" });
     });
   });
 });

@@ -47,7 +47,7 @@ export function UfSelector({
 
       <RegionSelector selected={ufsSelecionadas} onToggleRegion={onToggleRegion} />
 
-      <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-2">
+      <div role="group" aria-label="Selecionar Unidades Federativas" className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-2">
         {UFS.map(uf => (
           <button
             key={uf}

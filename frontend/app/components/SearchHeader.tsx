@@ -24,7 +24,7 @@ export function SearchHeader({ onLoadSearch, onAnalyticsEvent }: SearchHeaderPro
             priority
           />
         </div>
-        <div className="flex items-center gap-4">
+        <nav aria-label="Navegação principal" className="flex items-center gap-4">
           <span className="hidden sm:block text-xs text-ink-muted font-medium">
             Busca Inteligente de Licitações
           </span>
@@ -33,7 +33,7 @@ export function SearchHeader({ onLoadSearch, onAnalyticsEvent }: SearchHeaderPro
             onAnalyticsEvent={onAnalyticsEvent}
           />
           <ThemeToggle />
-        </div>
+        </nav>
       </div>
     </header>
   );

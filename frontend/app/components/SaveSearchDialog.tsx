@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useEffect } from "react";
+
 interface SaveSearchDialogProps {
   saveSearchName: string;
   onNameChange: (name: string) => void;
@@ -15,15 +17,57 @@ export function SaveSearchDialog({
   onCancel,
   saveError,
 }: SaveSearchDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusableSelector = 'input, button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusables = dialog.querySelectorAll<HTMLElement>(focusableSelector);
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    first?.focus();
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCancel();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      // Re-query in case disabled state changed
+      const currentFocusables = dialog!.querySelectorAll<HTMLElement>(focusableSelector);
+      const currentFirst = currentFocusables[0];
+      const currentLast = currentFocusables[currentFocusables.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === currentFirst) {
+          e.preventDefault();
+          currentLast?.focus();
+        }
+      } else {
+        if (document.activeElement === currentLast) {
+          e.preventDefault();
+          currentFirst?.focus();
+        }
+      }
+    }
+
+    dialog.addEventListener("keydown", handleKeyDown);
+    return () => dialog.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in"
       role="dialog"
       aria-modal="true"
-      aria-label="Salvar Busca"
+      aria-labelledby="save-search-dialog-title"
     >
-      <div className="bg-surface-0 rounded-card shadow-xl max-w-md w-full p-6 animate-fade-in-up">
-        <h3 className="text-lg font-semibold text-ink mb-4">Salvar Busca</h3>
+      <div ref={dialogRef} className="bg-surface-0 rounded-card shadow-xl max-w-md w-full p-6 animate-fade-in-up">
+        <h3 id="save-search-dialog-title" className="text-lg font-semibold text-ink mb-4">Salvar Busca</h3>
 
         <div className="mb-4">
           <label htmlFor="save-search-name" className="block text-sm font-medium text-ink-secondary mb-2">
@@ -40,7 +84,6 @@ export function SaveSearchDialog({
                        focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue
                        transition-colors"
             maxLength={50}
-            autoFocus
           />
           <p className="text-xs text-ink-muted mt-1">
             {saveSearchName.length}/50 caracteres

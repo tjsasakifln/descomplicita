@@ -51,7 +51,7 @@ export function EmptyState({
   }
 
   return (
-    <div className="mt-8 p-8 bg-surface-1 rounded-card border text-center animate-fade-in-up">
+    <div className="mt-8 p-8 bg-surface-1 rounded-card border text-center animate-fade-in-up" aria-live="polite" role="status">
       {/* Icon */}
       <div className="w-20 h-20 mx-auto mb-6 bg-surface-2 rounded-full flex items-center justify-center">
         <svg className="w-10 h-10 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
