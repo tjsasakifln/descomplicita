@@ -46,7 +46,7 @@ class RetryConfig:
     max_delay: float = 15.0  # seconds
     exponential_base: int = 2
     jitter: bool = True
-    timeout: int = 15  # seconds (reduced from 30s for faster retries)
+    timeout: int = 15  # HTTP timeout per individual request (seconds)
 
     # HTTP status codes that should trigger retry
     retryable_status_codes: Tuple[int, ...] = field(
@@ -67,12 +67,14 @@ class RetryConfig:
 # ---------------------------------------------------------------------------
 
 SOURCES_CONFIG = {
+    # timeout = orchestrator timeout for the full source operation (seconds),
+    # NOT the HTTP timeout per individual request (see RetryConfig.timeout).
     "pncp": {
         "enabled": True,
         "base_url": "https://pncp.gov.br/api/consulta/v1",
         "auth": None,
         "rate_limit_rps": 10,
-        "timeout": 15,
+        "timeout": 120,  # 7 UFs x 5 modalidades = 35 combos, needs 2-5min
         "priority": 1,
     },
     "comprasgov": {
@@ -80,7 +82,7 @@ SOURCES_CONFIG = {
         "base_url": "https://dadosabertos.compras.gov.br",
         "auth": None,
         "rate_limit_rps": 5,
-        "timeout": 20,
+        "timeout": 60,
         "priority": 2,
     },
     "transparencia": {
@@ -88,7 +90,7 @@ SOURCES_CONFIG = {
         "base_url": "https://api.portaldatransparencia.gov.br",
         "auth": {"type": "api_key", "header": "chave-api-dados", "env_var": "TRANSPARENCIA_API_KEY"},
         "rate_limit_rps": 3,
-        "timeout": 30,
+        "timeout": 90,
         "priority": 3,
     },
     "querido_diario": {
@@ -96,7 +98,7 @@ SOURCES_CONFIG = {
         "base_url": "https://queridodiario.ok.org.br/api/",
         "auth": None,
         "rate_limit_rps": 5,
-        "timeout": 20,
+        "timeout": 60,
         "priority": 4,
     },
     "tce_rj": {
@@ -104,7 +106,7 @@ SOURCES_CONFIG = {
         "base_url": "https://dados.tcerj.tc.br",
         "auth": None,
         "rate_limit_rps": 3,
-        "timeout": 30,
+        "timeout": 90,
         "priority": 5,
     },
 }
