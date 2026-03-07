@@ -316,6 +316,11 @@ class TestLatencyScenarios:
             "pncp_client.PNCPClient.fetch_page",
             _fake_fetch_page,
         )
+        # Restrict orchestrator to PNCP only (avoid hitting other real APIs)
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
+        )
         monkeypatch.setattr("main.filter_batch", _fake_filter_batch)
         monkeypatch.setattr("main.gerar_resumo", _fake_gerar_resumo)
         monkeypatch.setattr("main.create_excel", _fake_create_excel)
@@ -508,6 +513,10 @@ class TestProgressTracking:
             "pncp_client.PNCPClient.fetch_page",
             _fake_fetch_page,
         )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
+        )
         monkeypatch.setattr("main.filter_batch", _fake_filter_batch)
         monkeypatch.setattr("main.gerar_resumo", _fake_gerar_resumo)
         monkeypatch.setattr("main.create_excel", _fake_create_excel)
@@ -603,6 +612,10 @@ class TestProgressTracking:
             "pncp_client.PNCPClient.fetch_page",
             _fake_fetch_page,
         )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
+        )
         monkeypatch.setattr("main.filter_batch", _fake_filter_batch)
         monkeypatch.setattr("main.gerar_resumo", _fake_gerar_resumo)
         monkeypatch.setattr("main.create_excel", _fake_create_excel)
@@ -628,6 +641,10 @@ class TestProgressTracking:
         monkeypatch.setattr(
             "pncp_client.PNCPClient.fetch_page",
             _fake_fetch_page,
+        )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
         )
         monkeypatch.setattr("main.filter_batch", _fake_filter_batch)
         monkeypatch.setattr("main.gerar_resumo", _fake_gerar_resumo)
@@ -658,6 +675,11 @@ class TestProgressTracking:
         monkeypatch.setattr(
             "pncp_client.PNCPClient.fetch_page",
             _fake_fetch_page,
+        )
+        # Restrict orchestrator to PNCP only (avoid hitting other real APIs)
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
         )
         # Filter rejects everything
         monkeypatch.setattr(

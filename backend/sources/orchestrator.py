@@ -209,7 +209,7 @@ class MultiSourceOrchestrator:
         tasks = []
         for source in sources:
             timeout = SOURCES_CONFIG.get(
-                source.source_name, {}
+                source.source_name.lower(), {}
             ).get("timeout", self.default_timeout)
             task = asyncio.create_task(
                 self._fetch_with_timeout(source, query, timeout)

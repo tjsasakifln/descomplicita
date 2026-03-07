@@ -39,6 +39,8 @@ class TestSearchJob:
             "ufs_total": 0,
             "items_fetched": 0,
             "items_filtered": 0,
+            "sources_completed": 0,
+            "sources_total": 0,
         }
 
     def test_default_result_is_none(self):

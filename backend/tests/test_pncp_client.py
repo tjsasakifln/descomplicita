@@ -55,8 +55,8 @@ class TestPNCPClient:
         """Test client initializes with default config."""
         client = PNCPClient()
 
-        assert client.config.max_retries == 3
-        assert client.config.base_delay == 2.0
+        assert client.config.max_retries == 2
+        assert client.config.base_delay == 1.0
         assert client.session is not None
         assert client._request_count == 0
 

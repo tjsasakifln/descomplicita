@@ -38,17 +38,25 @@ DEFAULT_MODALIDADES: List[int] = [
     15,  # Chamada pública (SE-001.3: agricultura familiar, medicamentos)
 ]
 
+# Maximum pages to fetch per UF×modalidade combination.
+# PNCP page size is 50 items, so 10 pages = 500 items per combo.
+# With 3 UFs × 7 modalidades = 21 combos, this yields up to 10,500 raw items
+# before filtering — more than enough for keyword-based sector filtering.
+# Without this cap, large combos (e.g., SP×Pregão = 228 pages) overwhelm the
+# PNCP server with concurrent requests, causing cascading timeouts.
+MAX_PAGES_PER_COMBO: int = 10
+
 
 @dataclass
 class RetryConfig:
     """Configuration for HTTP retry logic."""
 
-    max_retries: int = 3
-    base_delay: float = 2.0  # seconds
-    max_delay: float = 15.0  # seconds
+    max_retries: int = 2
+    base_delay: float = 1.0  # seconds
+    max_delay: float = 10.0  # seconds
     exponential_base: int = 2
     jitter: bool = True
-    timeout: int = 15  # HTTP timeout per individual request (seconds)
+    timeout: int = 25  # HTTP timeout per individual request (seconds)
 
     # HTTP status codes that should trigger retry
     retryable_status_codes: Tuple[int, ...] = field(
@@ -76,7 +84,7 @@ SOURCES_CONFIG = {
         "base_url": "https://pncp.gov.br/api/consulta/v1",
         "auth": None,
         "rate_limit_rps": 10,
-        "timeout": 120,  # 7 UFs x 7 modalidades = 49 combos (SE-001.3), needs 2-5min
+        "timeout": 300,  # 7 UFs x 7 modalidades = 49 combos; with max_pages cap, ~120-180s typical
         "priority": 1,
     },
     # Disabled 2026-03-07: licitacoes/v1 endpoint returns 404.

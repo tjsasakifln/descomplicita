@@ -240,12 +240,12 @@ class TestRetryConfig:
         """Test that RetryConfig has correct default values."""
         config = RetryConfig()
 
-        assert config.max_retries == 3
-        assert config.base_delay == 2.0
-        assert config.max_delay == 15.0
+        assert config.max_retries == 2
+        assert config.base_delay == 1.0
+        assert config.max_delay == 10.0
         assert config.exponential_base == 2
         assert config.jitter is True
-        assert config.timeout == 15
+        assert config.timeout == 25
 
     def test_retryable_status_codes_default(self):
         """Test default retryable HTTP status codes."""

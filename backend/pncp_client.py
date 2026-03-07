@@ -163,13 +163,17 @@ class PNCPClient:
         """
         session = requests.Session()
 
-        # Configure retry strategy using urllib3
+        # Configure retry strategy using urllib3.
+        # Use only 1 urllib3-level retry (for transient connection errors).
+        # Application-level retry in fetch_page() handles status-code retries
+        # separately. Using both at full count causes compounding delays
+        # (e.g., 3 urllib3 × 3 app retries = 9 attempts per page).
         retry_strategy = Retry(
-            total=self.config.max_retries,
-            backoff_factor=self.config.base_delay,
-            status_forcelist=self.config.retryable_status_codes,
+            total=1,
+            backoff_factor=1.0,
+            status_forcelist=(),  # Let fetch_page() handle status codes
             allowed_methods=["GET"],
-            raise_on_status=False,  # We'll handle status codes manually
+            raise_on_status=False,
         )
 
         adapter = HTTPAdapter(max_retries=retry_strategy)
@@ -190,7 +194,7 @@ class PNCPClient:
 
         Sleeps if necessary to maintain minimum interval between requests.
         """
-        MIN_INTERVAL = 0.1  # 100ms = 10 requests/second
+        MIN_INTERVAL = 0.3  # 300ms = ~3 requests/second (gentler on PNCP server)
 
         with self._lock:
             elapsed = time.time() - self._last_request_time
@@ -394,6 +398,7 @@ class PNCPClient:
         modalidade: int,
         uf: str | None,
         on_progress: Callable[[int, int, int], None] | None = None,
+        max_pages: int = 0,
     ) -> List[Dict[str, Any]]:
         """
         Fetch all pages for a single UF+modalidade combination.
@@ -412,7 +417,7 @@ class PNCPClient:
 
         logger.info(f"Fetching {label}")
         try:
-            items = list(self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress))
+            items = list(self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress, max_pages))
             logger.info(f"Completed {label}: {len(items)} items")
             # Store raw results in cache
             self._cache_put(cache_key, items)
@@ -428,6 +433,7 @@ class PNCPClient:
         ufs: list[str] | None = None,
         modalidades: list[int] | None = None,
         on_progress: Callable[[int, int, int], None] | None = None,
+        max_pages: int = 0,
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Fetch all procurement records with parallel UF×modalidade fetching.
@@ -486,14 +492,17 @@ class PNCPClient:
                 f"({len(modalidades_to_fetch)} modalities × {len(ufs or ['ALL'])} UFs)"
             )
 
-            # Parallel fetch: each UF×modalidade runs in its own thread
-            # Max 12 workers for better throughput on multi-UF searches
-            max_workers = min(len(tasks), 12)
+            # Parallel fetch: each UF×modalidade runs in its own thread.
+            # Limit to 3 workers to avoid overwhelming the PNCP API server.
+            # The government server can't handle many concurrent connections
+            # from the same IP — higher concurrency causes ReadTimeoutError
+            # cascades that compound with retries and waste the entire budget.
+            max_workers = min(len(tasks), 3)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_task = {
                     executor.submit(
                         self._fetch_uf_modalidade,
-                        chunk_start, chunk_end, modalidade, uf, on_progress,
+                        chunk_start, chunk_end, modalidade, uf, on_progress, max_pages,
                     ): (modalidade, uf)
                     for modalidade, uf in tasks
                 }
@@ -549,6 +558,7 @@ class PNCPClient:
         modalidade: int,
         uf: str | None,
         on_progress: Callable[[int, int, int], None] | None,
+        max_pages: int = 0,
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Fetch all pages for a specific modality and UF combination.
@@ -613,6 +623,15 @@ class PNCPClient:
                 logger.info(
                     f"Finished fetching modalidade={modalidade}, UF={uf or 'ALL'}: "
                     f"{items_fetched} total items across {pagina} pages"
+                )
+                break
+
+            # Stop if we've reached the max pages limit
+            if max_pages > 0 and pagina >= max_pages:
+                logger.info(
+                    f"Reached max_pages={max_pages} for modalidade={modalidade}, "
+                    f"UF={uf or 'ALL'}: {items_fetched} items fetched "
+                    f"(total available: {total_registros})"
                 )
                 break
 

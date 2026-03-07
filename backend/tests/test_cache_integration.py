@@ -126,16 +126,25 @@ def _post_search(http_client: TestClient, ufs: list[str]) -> str:
 
 
 @pytest.fixture(autouse=True)
-def reset_app_state():
+def reset_app_state(monkeypatch):
     """
     Reset shared app state before (and after) every test so cache counters
     and job store are clean. A brand-new PNCPClient is created on the first
     _get_pncp_client() call after the reset.
     """
     main_module._pncp_client = None
+    main_module._pncp_source = None
+    main_module._orchestrator = None
     _job_store._jobs.clear()
+    # Restrict orchestrator to PNCP only (avoid hitting real external APIs)
+    monkeypatch.setattr(
+        "sources.orchestrator.get_enabled_source_names",
+        lambda: ["pncp"],
+    )
     yield
     main_module._pncp_client = None
+    main_module._pncp_source = None
+    main_module._orchestrator = None
     _job_store._jobs.clear()
 
 

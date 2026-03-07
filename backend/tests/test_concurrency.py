@@ -149,16 +149,15 @@ def reset_job_store():
 @pytest.fixture
 def mock_pncp_client(monkeypatch):
     """
-    Replace _get_pncp_client() with a mock whose fetch_all returns canned data.
+    Replace _get_orchestrator() with a mock that returns canned data.
 
-    The mock returns the items from make_pncp_response() for any requested UF.
+    The mock returns items from make_pncp_response() wrapped in an OrchestratorResult.
     """
-    mock_instance = Mock()
-    mock_instance.fetch_all.side_effect = lambda data_inicial, data_final, ufs: iter(
-        make_pncp_response(ufs[0] if ufs else "SP")["data"]
-    )
-    monkeypatch.setattr("main._get_pncp_client", lambda: mock_instance)
-    return mock_instance
+    from tests.mock_helpers import make_mock_orchestrator
+    records = make_pncp_response("SP")["data"]
+    mock_orch = make_mock_orchestrator(records)
+    monkeypatch.setattr("main._get_orchestrator", lambda: mock_orch)
+    return mock_orch
 
 
 @pytest.fixture

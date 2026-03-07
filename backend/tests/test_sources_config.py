@@ -46,7 +46,7 @@ class TestSourcesConfig:
 
     def test_orchestrator_timeouts(self):
         """SR-001.1: Timeouts must allow full source operations to complete."""
-        assert SOURCES_CONFIG["pncp"]["timeout"] == 120
+        assert SOURCES_CONFIG["pncp"]["timeout"] == 300
         assert SOURCES_CONFIG["comprasgov"]["timeout"] == 60
         assert SOURCES_CONFIG["transparencia"]["timeout"] == 90
         assert SOURCES_CONFIG["querido_diario"]["timeout"] == 60

@@ -229,7 +229,7 @@ class TestPNCPErrorResilience:
         original_fetch = None  # will be set below
 
         def mock_fetch_uf_modalidade(self_client, data_inicial, data_final,
-                                     modalidade, uf, on_progress=None):
+                                     modalidade, uf, on_progress=None, max_pages=0):
             nonlocal call_count
             call_count += 1
             # Every 3rd call simulates a 429 / empty result (as _fetch_uf_modalidade
@@ -241,6 +241,10 @@ class TestPNCPErrorResilience:
         monkeypatch.setattr(
             "pncp_client.PNCPClient._fetch_uf_modalidade",
             mock_fetch_uf_modalidade,
+        )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
         )
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids, {}))
         monkeypatch.setattr("main.gerar_resumo", _mock_gerar_resumo)
@@ -267,7 +271,7 @@ class TestPNCPErrorResilience:
         good_items = [_make_licitacao("2025NCP000002", "SP")]
 
         def mock_fetch_uf_modalidade(self_client, data_inicial, data_final,
-                                     modalidade, uf, on_progress=None):
+                                     modalidade, uf, on_progress=None, max_pages=0):
             nonlocal call_count
             call_count += 1
             if call_count % 10 == 0:
@@ -278,6 +282,10 @@ class TestPNCPErrorResilience:
         monkeypatch.setattr(
             "pncp_client.PNCPClient._fetch_uf_modalidade",
             mock_fetch_uf_modalidade,
+        )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
         )
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids, {}))
         monkeypatch.setattr("main.gerar_resumo", _mock_gerar_resumo)
@@ -292,22 +300,18 @@ class TestPNCPErrorResilience:
 
     def test_fails_gracefully_when_pncp_100pct_offline(self, client, monkeypatch, run_sync):
         """
-        When fetch_all raises PNCPAPIError on every call, the job fails cleanly.
-
-        Mocking fetch_all to raise PNCPAPIError causes run_search_job's
-        `except PNCPAPIError` branch to execute, which calls job_store.fail()
-        with a human-readable message about the portal being unavailable.
+        When orchestrator raises PNCPAPIError, the job fails cleanly.
 
         Expected:
         - job.status == "failed"
         - error message references "PNCP" (not a raw Python traceback)
         - HTTP result endpoint returns 500
         """
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.side_effect = PNCPAPIError(
-            "Simulated full outage — all requests failed"
+        from tests.mock_helpers import make_mock_orchestrator
+        monkeypatch.setattr(
+            "main._get_orchestrator",
+            lambda: make_mock_orchestrator(error=PNCPAPIError("Simulated full outage")),
         )
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
 
         result = _post_sync(client, VALID_REQUEST)
 
@@ -326,22 +330,20 @@ class TestPNCPErrorResilience:
 
     def test_fails_gracefully_on_rate_limit(self, client, monkeypatch, run_sync):
         """
-        When fetch_all raises PNCPRateLimitError, the job fails with a rate-limit message.
-
-        PNCPRateLimitError is a subclass of PNCPAPIError, but run_search_job
-        catches it first in its own except branch, which produces a message about
-        request limiting and the retry-after interval.
+        When orchestrator raises PNCPRateLimitError, the job fails with a rate-limit message.
 
         Expected:
         - job.status == "failed"
         - error message references "limitando" or "aguarde" (wait instruction)
         - HTTP result endpoint returns 500
         """
-        mock_client_instance = Mock()
+        from tests.mock_helpers import make_mock_orchestrator
         error = PNCPRateLimitError("Too many requests — rate limit exceeded")
         error.retry_after = 60
-        mock_client_instance.fetch_all.side_effect = error
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr(
+            "main._get_orchestrator",
+            lambda: make_mock_orchestrator(error=error),
+        )
 
         result = _post_sync(client, VALID_REQUEST)
 
@@ -390,7 +392,7 @@ class TestPartialFailure:
         sp_items = [_make_licitacao("2025NCP000010", "SP")]
 
         def mock_fetch_uf_modalidade(self_client, data_inicial, data_final,
-                                     modalidade, uf, on_progress=None):
+                                     modalidade, uf, on_progress=None, max_pages=0):
             if uf == "RJ":
                 # Simulate _fetch_uf_modalidade catching PNCPAPIError and returning []
                 return []
@@ -400,6 +402,10 @@ class TestPartialFailure:
         monkeypatch.setattr(
             "pncp_client.PNCPClient._fetch_uf_modalidade",
             mock_fetch_uf_modalidade,
+        )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
         )
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids, {}))
         monkeypatch.setattr("main.gerar_resumo", _mock_gerar_resumo)
@@ -429,7 +435,7 @@ class TestPartialFailure:
         ]
 
         def mock_fetch_uf_modalidade(self_client, data_inicial, data_final,
-                                     modalidade, uf, on_progress=None):
+                                     modalidade, uf, on_progress=None, max_pages=0):
             if uf == "RJ":
                 return []
             return list(sp_items)
@@ -447,6 +453,10 @@ class TestPartialFailure:
         monkeypatch.setattr(
             "pncp_client.PNCPClient._fetch_uf_modalidade",
             mock_fetch_uf_modalidade,
+        )
+        monkeypatch.setattr(
+            "sources.orchestrator.get_enabled_source_names",
+            lambda: ["pncp"],
         )
         monkeypatch.setattr("main.filter_batch", mock_filter_batch)
         monkeypatch.setattr("main.gerar_resumo", _mock_gerar_resumo)
@@ -496,9 +506,8 @@ class TestTimeoutBehavior:
             _make_licitacao("2025NCP000022", "SP"),
         ]
 
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter(fast_licitacoes)
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        from tests.mock_helpers import make_mock_orchestrator
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator(fast_licitacoes))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids, {}))
         monkeypatch.setattr("main.gerar_resumo", _mock_gerar_resumo)
         monkeypatch.setattr("main.create_excel", _mock_create_excel)
@@ -529,9 +538,8 @@ class TestTimeoutBehavior:
         - job.status == "completed"
         - total_raw == 0 and total_filtrado == 0
         """
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([])
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        from tests.mock_helpers import make_mock_orchestrator
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
 
         result = _post_sync(client, VALID_REQUEST)
@@ -560,9 +568,8 @@ class TestTimeoutBehavior:
             for i in range(100)
         ]
 
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter(large_set)
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        from tests.mock_helpers import make_mock_orchestrator
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator(large_set))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids, {}))
         monkeypatch.setattr("main.gerar_resumo", _mock_gerar_resumo)
         monkeypatch.setattr("main.create_excel", _mock_create_excel)

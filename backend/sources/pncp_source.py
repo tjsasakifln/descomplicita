@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-from config import RetryConfig
+from config import RetryConfig, MAX_PAGES_PER_COMBO
 from pncp_client import PNCPClient
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 
@@ -88,32 +88,43 @@ class PNCPSource(DataSourceClient):
         query: SearchQuery,
         on_progress: Callable[[int, int, int], None] | None = None,
     ) -> List[NormalizedRecord]:
-        """Fetch all PNCP records matching the query.
+        """Fetch PNCP records matching the query.
 
         Delegates to PNCPClient.fetch_all() (sync, threaded) via
         run_in_executor to avoid blocking the async event loop.
 
-        NOTE: The PNCP /atas endpoint is disabled — it returns HTTP 500
-        ("Failed to obtain JDBC Connection") as of 2026-03-07. Server-side
-        keyword filtering (palavraChave) is also not supported by the
-        consulta API. Sector filtering is done client-side by filter_batch().
+        Uses MAX_PAGES_PER_COMBO to cap pagination per UF×modalidade combo,
+        preventing timeouts on high-volume combinations (e.g., SP×Pregão
+        with 228+ pages). Partial results are collected incrementally so
+        that if an unexpected timeout occurs, whatever was fetched is
+        returned rather than discarded.
         """
         loop = asyncio.get_event_loop()
 
-        raw_items = await loop.run_in_executor(
-            None,
-            lambda: list(
-                self._client.fetch_all(
-                    data_inicial=query.data_inicial,
-                    data_final=query.data_final,
-                    ufs=query.ufs,
-                    modalidades=query.modalidades,
-                    on_progress=on_progress,
-                )
-            ),
-        )
+        # Collect results incrementally so partial data survives any timeout
+        collected: List[dict] = []
 
-        return [self.normalize(item) for item in raw_items]
+        def _fetch() -> List[dict]:
+            for item in self._client.fetch_all(
+                data_inicial=query.data_inicial,
+                data_final=query.data_final,
+                ufs=query.ufs,
+                modalidades=query.modalidades,
+                on_progress=on_progress,
+                max_pages=MAX_PAGES_PER_COMBO,
+            ):
+                collected.append(item)
+            return collected
+
+        try:
+            await loop.run_in_executor(None, _fetch)
+        except Exception as e:
+            logger.warning(
+                "PNCP fetch interrupted (%s), returning %d partial results",
+                type(e).__name__, len(collected),
+            )
+
+        return [self.normalize(item) for item in collected]
 
     def is_healthy(self) -> bool:
         """Quick health check — verifies the HTTP session is open."""

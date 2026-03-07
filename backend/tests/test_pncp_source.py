@@ -233,6 +233,7 @@ class TestPNCPSourceFetchRecords:
             ufs=["SP", "RJ"],
             modalidades=[6, 8],
             on_progress=None,
+            max_pages=10,
         )
 
     @pytest.mark.asyncio

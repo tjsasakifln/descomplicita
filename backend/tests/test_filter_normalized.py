@@ -34,15 +34,15 @@ class TestFilterWithNormalizedFields:
         assert aprovada is True
         assert motivo is None
 
-    def test_rejects_valor_none_normalized(self):
-        """Should reject when valor_estimado is None."""
+    def test_accepts_valor_none_normalized(self):
+        """Items with valor=None should pass (e.g., Atas de Registro de Preço)."""
         licitacao = {
             "uf": "SP",
             "objeto": "Uniformes",
         }
         aprovada, motivo = filter_licitacao(licitacao, {"SP"})
-        assert aprovada is False
-        assert "Valor não informado" in motivo
+        assert aprovada is True
+        assert motivo is None
 
     def test_rejects_valor_below_min_normalized(self):
         """Should reject when valor_estimado is below minimum."""
