@@ -2,5 +2,12 @@
 
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 from sources.comprasgov_source import ComprasGovSource
+from sources.transparencia_source import TransparenciaSource
 
-__all__ = ["DataSourceClient", "NormalizedRecord", "SearchQuery", "ComprasGovSource"]
+__all__ = [
+    "DataSourceClient",
+    "NormalizedRecord",
+    "SearchQuery",
+    "ComprasGovSource",
+    "TransparenciaSource",
+]

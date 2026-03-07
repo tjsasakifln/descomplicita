@@ -83,12 +83,12 @@ SOURCES_CONFIG = {
         "timeout": 20,
         "priority": 2,
     },
-    "portal_transparencia": {
-        "enabled": False,
-        "base_url": "https://api.portaldatransparencia.gov.br/",
-        "auth": None,
-        "rate_limit_rps": 5,
-        "timeout": 20,
+    "transparencia": {
+        "enabled": True,
+        "base_url": "https://api.portaldatransparencia.gov.br",
+        "auth": {"type": "api_key", "header": "chave-api-dados", "env_var": "TRANSPARENCIA_API_KEY"},
+        "rate_limit_rps": 3,
+        "timeout": 30,
         "priority": 3,
     },
     "querido_diario": {

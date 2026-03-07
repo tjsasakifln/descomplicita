@@ -11,7 +11,7 @@ class TestSourcesConfig:
 
     def test_non_implemented_sources_disabled(self):
         """Sources not yet implemented should remain disabled."""
-        implemented = {"pncp", "comprasgov"}
+        implemented = {"pncp", "comprasgov", "transparencia"}
         for name, cfg in SOURCES_CONFIG.items():
             if name not in implemented:
                 assert cfg["enabled"] is False, f"{name} should be disabled"
@@ -29,5 +29,5 @@ class TestSourcesConfig:
         assert len(priorities) == len(set(priorities))
 
     def test_expected_sources_present(self):
-        expected = {"pncp", "comprasgov", "portal_transparencia", "querido_diario", "tce_rj"}
+        expected = {"pncp", "comprasgov", "transparencia", "querido_diario", "tce_rj"}
         assert expected == set(SOURCES_CONFIG.keys())
