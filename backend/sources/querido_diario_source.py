@@ -342,6 +342,17 @@ class QueridoDiarioSource(DataSourceClient):
             params["offset"] = offset
             try:
                 response = await self._request_with_retry(url, params)
+                content_type = response.headers.get("content-type", "")
+                if "application/json" not in content_type:
+                    body_preview = response.text[:200]
+                    logger.error(
+                        "Querido Diario returned unexpected content-type %s at offset %d, body: %s",
+                        content_type,
+                        offset,
+                        body_preview,
+                        extra={"source": "querido_diario"},
+                    )
+                    break
                 data = response.json()
             except Exception as exc:
                 logger.error(
@@ -386,7 +397,7 @@ class QueridoDiarioSource(DataSourceClient):
         return all_records
 
     def is_healthy(self) -> bool:
-        """Check if the Querido Diario API is reachable."""
+        """Check if the Querido Diario API is reachable and returns JSON."""
         try:
             response = httpx.get(
                 f"{self._base_url}/gazettes",
@@ -394,6 +405,14 @@ class QueridoDiarioSource(DataSourceClient):
                 timeout=10,
                 headers={"Accept": "application/json"},
             )
+            content_type = response.headers.get("content-type", "")
+            if "application/json" not in content_type:
+                logger.warning(
+                    "Querido Diario health check: unexpected content-type %s",
+                    content_type,
+                    extra={"source": "querido_diario"},
+                )
+                return False
             return response.status_code == 200
         except Exception:
             return False

@@ -349,6 +349,7 @@ class TestQueridoDiarioSourceFetchRecords:
         """Mock response with 2 gazettes (less than page size = end of data)."""
         response = AsyncMock(spec=httpx.Response)
         response.status_code = 200
+        response.headers = {"content-type": "application/json"}
         response.raise_for_status = Mock()
         response.json.return_value = {
             "total_gazettes": 2,
@@ -381,6 +382,7 @@ class TestQueridoDiarioSourceFetchRecords:
         """Mock response with empty results."""
         response = AsyncMock(spec=httpx.Response)
         response.status_code = 200
+        response.headers = {"content-type": "application/json"}
         response.raise_for_status = Mock()
         response.json.return_value = {"total_gazettes": 0, "gazettes": []}
         return response
@@ -429,6 +431,7 @@ class TestQueridoDiarioSourceFetchRecords:
         """Query with ufs=["SP"] should only return records with territory_id starting with "35"."""
         response = AsyncMock(spec=httpx.Response)
         response.status_code = 200
+        response.headers = {"content-type": "application/json"}
         response.raise_for_status = Mock()
         response.json.return_value = {
             "total_gazettes": 2,
@@ -488,10 +491,12 @@ class TestQueridoDiarioSourceRetry:
 
         resp_500 = AsyncMock(spec=httpx.Response)
         resp_500.status_code = 500
+        resp_500.headers = {"content-type": "application/json"}
         resp_500.raise_for_status = Mock()
 
         resp_ok = AsyncMock(spec=httpx.Response)
         resp_ok.status_code = 200
+        resp_ok.headers = {"content-type": "application/json"}
         resp_ok.raise_for_status = Mock()
         resp_ok.json.return_value = {
             "total_gazettes": 1,
@@ -523,6 +528,7 @@ class TestQueridoDiarioSourceRetry:
 
         resp_ok = AsyncMock(spec=httpx.Response)
         resp_ok.status_code = 200
+        resp_ok.headers = {"content-type": "application/json"}
         resp_ok.raise_for_status = Mock()
         resp_ok.json.return_value = {"total_gazettes": 0, "gazettes": []}
 
@@ -546,13 +552,27 @@ class TestQueridoDiarioSourceHealthCheck:
     """Tests for QueridoDiarioSource.is_healthy()."""
 
     @patch("sources.querido_diario_source.httpx.get")
-    def test_healthy_when_api_returns_200(self, mock_get, source):
-        mock_get.return_value = Mock(status_code=200)
+    def test_healthy_when_api_returns_200_json(self, mock_get, source):
+        mock_get.return_value = Mock(
+            status_code=200,
+            headers={"content-type": "application/json"},
+        )
         assert source.is_healthy() is True
 
     @patch("sources.querido_diario_source.httpx.get")
+    def test_unhealthy_when_api_returns_html(self, mock_get, source):
+        mock_get.return_value = Mock(
+            status_code=200,
+            headers={"content-type": "text/html; charset=UTF-8"},
+        )
+        assert source.is_healthy() is False
+
+    @patch("sources.querido_diario_source.httpx.get")
     def test_unhealthy_when_api_returns_500(self, mock_get, source):
-        mock_get.return_value = Mock(status_code=500)
+        mock_get.return_value = Mock(
+            status_code=500,
+            headers={"content-type": "application/json"},
+        )
         assert source.is_healthy() is False
 
     @patch("sources.querido_diario_source.httpx.get")
@@ -572,6 +592,10 @@ class TestQueridoDiarioConfig:
         from config import SOURCES_CONFIG
         assert "querido_diario" in SOURCES_CONFIG
 
+    def test_querido_diario_disabled(self):
+        from config import SOURCES_CONFIG
+        assert SOURCES_CONFIG["querido_diario"]["enabled"] is False
+
     def test_querido_diario_base_url(self):
         from config import SOURCES_CONFIG
         assert "queridodiario" in SOURCES_CONFIG["querido_diario"]["base_url"]
@@ -582,7 +606,7 @@ class TestQueridoDiarioConfig:
 
     def test_querido_diario_timeout(self):
         from config import SOURCES_CONFIG
-        assert SOURCES_CONFIG["querido_diario"]["timeout"] == 20
+        assert SOURCES_CONFIG["querido_diario"]["timeout"] == 60
 
     def test_querido_diario_no_auth(self):
         from config import SOURCES_CONFIG
@@ -660,3 +684,123 @@ class TestParsingRealExamples:
         assert len(record.objeto) <= 200
         # No valor extracted
         assert record.valor_estimado is None
+
+
+# ---------------------------------------------------------------------------
+# TestDefensiveContentTypeParsing (SR-001.4)
+# ---------------------------------------------------------------------------
+
+class TestDefensiveContentTypeParsing:
+    """Tests for content-type validation before JSON parsing (SR-001.4)."""
+
+    @pytest.mark.asyncio
+    async def test_html_response_returns_empty_list(self, source):
+        """When API returns HTML instead of JSON, fetch_records returns [] gracefully."""
+        html_response = AsyncMock(spec=httpx.Response)
+        html_response.status_code = 200
+        html_response.headers = {"content-type": "text/html; charset=UTF-8"}
+        html_response.text = "<!DOCTYPE html><html><head><title>Querido Diario</title></head></html>"
+        html_response.raise_for_status = Mock()
+
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = html_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-02-01", data_final="2026-02-28")
+        records = await source.fetch_records(query)
+
+        assert records == []
+
+    @pytest.mark.asyncio
+    async def test_html_response_logs_body_preview(self, source, caplog):
+        """When API returns HTML, log includes first 200 chars of body for debug."""
+        html_body = "<html>" + "x" * 300 + "</html>"
+        html_response = AsyncMock(spec=httpx.Response)
+        html_response.status_code = 200
+        html_response.headers = {"content-type": "text/html; charset=UTF-8"}
+        html_response.text = html_body
+        html_response.raise_for_status = Mock()
+
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = html_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-02-01", data_final="2026-02-28")
+
+        import logging
+        with caplog.at_level(logging.ERROR):
+            records = await source.fetch_records(query)
+
+        assert records == []
+        assert any("unexpected content-type" in msg.lower() for msg in caplog.messages)
+
+    @pytest.mark.asyncio
+    async def test_empty_body_returns_empty_list(self, source):
+        """When API returns empty body, fetch_records returns [] gracefully."""
+        empty_response = AsyncMock(spec=httpx.Response)
+        empty_response.status_code = 200
+        empty_response.headers = {"content-type": "text/plain"}
+        empty_response.text = ""
+        empty_response.raise_for_status = Mock()
+
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = empty_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-02-01", data_final="2026-02-28")
+        records = await source.fetch_records(query)
+
+        assert records == []
+
+    @pytest.mark.asyncio
+    async def test_json_content_type_proceeds_normally(self, source):
+        """When API returns proper JSON content-type, parsing proceeds normally."""
+        json_response = AsyncMock(spec=httpx.Response)
+        json_response.status_code = 200
+        json_response.headers = {"content-type": "application/json; charset=utf-8"}
+        json_response.raise_for_status = Mock()
+        json_response.json.return_value = {
+            "total_gazettes": 1,
+            "gazettes": [
+                {
+                    "territory_id": "3550308",
+                    "territory_name": "São Paulo",
+                    "date": "2026-02-15",
+                    "url": "https://example.com/g1",
+                    "excerpts": ["Pregão Nº 001/2026 teste"],
+                }
+            ],
+        }
+
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = json_response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-02-01", data_final="2026-02-28")
+        records = await source.fetch_records(query)
+
+        assert len(records) >= 1
+        assert records[0].source == "querido_diario"
+
+    @pytest.mark.asyncio
+    async def test_missing_content_type_header_returns_empty(self, source):
+        """When response has no content-type header, treat as invalid."""
+        response = AsyncMock(spec=httpx.Response)
+        response.status_code = 200
+        response.headers = {}
+        response.text = "some random text"
+        response.raise_for_status = Mock()
+
+        source._get_client = Mock()
+        client_mock = AsyncMock()
+        client_mock.get.return_value = response
+        source._get_client.return_value = client_mock
+
+        query = SearchQuery(data_inicial="2026-02-01", data_final="2026-02-28")
+        records = await source.fetch_records(query)
+
+        assert records == []

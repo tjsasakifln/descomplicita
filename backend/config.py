@@ -97,7 +97,7 @@ SOURCES_CONFIG = {
         "priority": 3,
     },
     "querido_diario": {
-        "enabled": True,
+        "enabled": False,  # SR-001.4: API returns HTML instead of JSON since ~2026-03; endpoint deprecated
         "base_url": "https://queridodiario.ok.org.br/api/",
         "auth": None,
         "rate_limit_rps": 5,
