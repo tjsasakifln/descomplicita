@@ -76,8 +76,8 @@ SOURCES_CONFIG = {
         "priority": 1,
     },
     "comprasgov": {
-        "enabled": False,
-        "base_url": "https://compras.dados.gov.br/",
+        "enabled": True,
+        "base_url": "https://dadosabertos.compras.gov.br",
         "auth": None,
         "rate_limit_rps": 5,
         "timeout": 20,
