@@ -4,6 +4,11 @@ Implements the DataSourceClient interface for the Compras.gov.br open data API,
 providing access to federal procurement records with CATMAT/CATSER categorization.
 
 API docs: https://dadosabertos.compras.gov.br/swagger-ui/index.html
+
+NOTE (2026-03-07): The licitacoes/v1 endpoint has been deprecated and returns 404.
+The API migrated to compras.dados.gov.br which only exposes contract data
+(comprasContratos), not standalone licitacoes. Licitacoes data has been
+consolidated into PNCP. This source is disabled in config.py. See SR-001.3.
 """
 
 import asyncio

@@ -77,8 +77,11 @@ SOURCES_CONFIG = {
         "timeout": 120,  # 7 UFs x 5 modalidades = 35 combos, needs 2-5min
         "priority": 1,
     },
+    # Disabled 2026-03-07: licitacoes/v1 endpoint returns 404.
+    # API migrated to compras.dados.gov.br (contracts only, no licitacoes).
+    # Licitacoes data consolidated into PNCP. See story SR-001.3.
     "comprasgov": {
-        "enabled": True,
+        "enabled": False,
         "base_url": "https://dadosabertos.compras.gov.br",
         "auth": None,
         "rate_limit_rps": 5,

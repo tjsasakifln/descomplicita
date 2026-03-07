@@ -133,7 +133,7 @@ class TestComprasGovSourceInit:
         assert source.source_name == "comprasgov"
 
     def test_default_config(self, source):
-        assert source._config.timeout == 20
+        assert source._config.timeout == 60
         assert source._config.max_retries == 3
 
     def test_custom_config(self):
@@ -527,9 +527,10 @@ class TestComprasGovConfig:
         from config import SOURCES_CONFIG
         assert "comprasgov" in SOURCES_CONFIG
 
-    def test_comprasgov_enabled(self):
+    def test_comprasgov_disabled(self):
+        """Compras.gov.br is disabled since 2026-03-07 (licitacoes/v1 endpoint deprecated, see SR-001.3)."""
         from config import SOURCES_CONFIG
-        assert SOURCES_CONFIG["comprasgov"]["enabled"] is True
+        assert SOURCES_CONFIG["comprasgov"]["enabled"] is False
 
     def test_comprasgov_base_url(self):
         from config import SOURCES_CONFIG
@@ -541,7 +542,7 @@ class TestComprasGovConfig:
 
     def test_comprasgov_timeout(self):
         from config import SOURCES_CONFIG
-        assert SOURCES_CONFIG["comprasgov"]["timeout"] == 20
+        assert SOURCES_CONFIG["comprasgov"]["timeout"] == 60
 
     def test_comprasgov_no_auth(self):
         from config import SOURCES_CONFIG
