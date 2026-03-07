@@ -100,8 +100,8 @@ SOURCES_CONFIG = {
         "priority": 4,
     },
     "tce_rj": {
-        "enabled": False,
-        "base_url": "https://www.tce.rj.gov.br/",
+        "enabled": True,
+        "base_url": "https://dados.tcerj.tc.br",
         "auth": None,
         "rate_limit_rps": 3,
         "timeout": 30,

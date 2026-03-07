@@ -11,7 +11,7 @@ class TestSourcesConfig:
 
     def test_non_implemented_sources_disabled(self):
         """Sources not yet implemented should remain disabled."""
-        implemented = {"pncp", "comprasgov", "transparencia", "querido_diario"}
+        implemented = {"pncp", "comprasgov", "transparencia", "querido_diario", "tce_rj"}
         for name, cfg in SOURCES_CONFIG.items():
             if name not in implemented:
                 assert cfg["enabled"] is False, f"{name} should be disabled"
