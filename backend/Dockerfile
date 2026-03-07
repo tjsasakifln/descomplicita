@@ -27,7 +27,9 @@ WORKDIR /app
 
 # Copy installed dependencies from builder
 COPY --from=builder /build/deps /app/deps
-ENV PYTHONPATH="/app/deps:${PYTHONPATH}"
+ENV PYTHONPATH="/app/deps:${PYTHONPATH}" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 # Copy application code
 COPY . .
