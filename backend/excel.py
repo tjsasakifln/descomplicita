@@ -24,14 +24,6 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-SOURCE_LABELS = {
-    "pncp": "PNCP",
-    "comprasgov": "Compras.gov",
-    "transparencia": "Transparência",
-    "querido_diario": "Diários Oficiais",
-    "tce_rj": "TCE-RJ",
-}
-
 
 def create_excel(licitacoes: list[dict]) -> BytesIO:
     """
@@ -74,7 +66,6 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
 
     # === HEADERS ===
     headers = [
-        ("Código PNCP", 25),
         ("Tipo", 12),
         ("Objeto", 60),
         ("Órgão", 40),
@@ -83,10 +74,8 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
         ("Valor Estimado", 18),
         ("Modalidade", 20),
         ("Publicação", 12),
-        ("Abertura", 16),
-        ("Situação", 15),
+        ("Início", 16),
         ("Link", 15),
-        ("Fonte", 18),
     ]
 
     for col, (header_name, width) in enumerate(headers, start=1):
@@ -102,49 +91,43 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
 
     # === DADOS ===
     for row_idx, lic in enumerate(licitacoes, start=2):
-        # A: Código PNCP
-        ws.cell(row=row_idx, column=1, value=lic.get("codigoCompra", ""))
-
-        # B: Tipo
+        # A: Tipo
         tipo = lic.get("tipo", "licitacao")
         tipo_label = "Ata RP" if tipo == "ata_registro_preco" else "Licitacao"
-        ws.cell(row=row_idx, column=2, value=tipo_label)
+        ws.cell(row=row_idx, column=1, value=tipo_label)
 
-        # C: Objeto
-        ws.cell(row=row_idx, column=3, value=lic.get("objetoCompra", ""))
+        # B: Objeto
+        ws.cell(row=row_idx, column=2, value=lic.get("objetoCompra", ""))
 
-        # D: Órgão
-        ws.cell(row=row_idx, column=4, value=lic.get("nomeOrgao", ""))
+        # C: Órgão
+        ws.cell(row=row_idx, column=3, value=lic.get("nomeOrgao", ""))
 
-        # E: UF
-        ws.cell(row=row_idx, column=5, value=lic.get("uf", ""))
+        # D: UF
+        ws.cell(row=row_idx, column=4, value=lic.get("uf", ""))
 
-        # F: Município
-        ws.cell(row=row_idx, column=6, value=lic.get("municipio", ""))
+        # E: Município
+        ws.cell(row=row_idx, column=5, value=lic.get("municipio", ""))
 
-        # G: Valor (formatado como moeda)
-        valor_cell = ws.cell(row=row_idx, column=7, value=lic.get("valorTotalEstimado"))
+        # F: Valor (formatado como moeda)
+        valor_cell = ws.cell(row=row_idx, column=6, value=lic.get("valorTotalEstimado"))
         valor_cell.number_format = currency_format
 
-        # H: Modalidade
-        ws.cell(row=row_idx, column=8, value=lic.get("modalidadeNome", ""))
+        # G: Modalidade
+        ws.cell(row=row_idx, column=7, value=lic.get("modalidadeNome", ""))
 
-        # I: Data Publicação
+        # H: Data Publicação
         data_pub = parse_datetime(lic.get("dataPublicacaoPncp"))
-        pub_cell = ws.cell(row=row_idx, column=9, value=data_pub)
+        pub_cell = ws.cell(row=row_idx, column=8, value=data_pub)
         if data_pub:
             pub_cell.number_format = date_format
 
-        # J: Data Abertura
+        # I: Data Início (Abertura)
         data_abertura = parse_datetime(lic.get("dataAberturaProposta"))
-        abertura_cell = ws.cell(row=row_idx, column=10, value=data_abertura)
+        abertura_cell = ws.cell(row=row_idx, column=9, value=data_abertura)
         if data_abertura:
             abertura_cell.number_format = datetime_format
 
-        # K: Situação
-        ws.cell(row=row_idx, column=11, value=lic.get("situacaoCompraNome", ""))
-
-        # L: Link (hyperlink)
+        # J: Link (hyperlink)
         cnpj = lic.get("cnpj", "")
         ano = lic.get("anoCompra", "")
         seq = lic.get("sequencialCompra", "")
@@ -153,19 +136,12 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
             if cnpj and ano and seq
             else f"https://pncp.gov.br/app/editais?q={lic.get('codigoCompra', '')}"
         )
-        link_cell = ws.cell(row=row_idx, column=12, value="Abrir")
+        link_cell = ws.cell(row=row_idx, column=10, value="Abrir")
         link_cell.hyperlink = link
         link_cell.font = Font(color="0563C1", underline="single")
 
-        # M: Fonte
-        source = lic.get("source", "")
-        sources_list = lic.get("sources", [source]) if source else []
-        source_label = SOURCE_LABELS.get(source, source.upper() if source else "")
-        extra = f" (+{len(sources_list)-1})" if len(sources_list) > 1 else ""
-        ws.cell(row=row_idx, column=13, value=f"{source_label}{extra}")
-
         # Aplicar bordas e alinhamento em todas as células da linha
-        for col in range(1, 14):
+        for col in range(1, 11):
             cell = ws.cell(row=row_idx, column=col)
             cell.border = thin_border
             cell.alignment = cell_alignment
@@ -173,10 +149,10 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
     # === LINHA DE TOTAIS ===
     if licitacoes:  # Só adiciona linha de totais se houver dados
         total_row = len(licitacoes) + 2
-        ws.cell(row=total_row, column=6, value="TOTAL:").font = Font(bold=True)
+        ws.cell(row=total_row, column=5, value="TOTAL:").font = Font(bold=True)
 
         total_cell = ws.cell(
-            row=total_row, column=7, value=f"=SUM(G2:G{total_row - 1})"
+            row=total_row, column=6, value=f"=SUM(F2:F{total_row - 1})"
         )
         total_cell.number_format = currency_format
         total_cell.font = Font(bold=True)

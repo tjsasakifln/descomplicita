@@ -84,10 +84,10 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
             # Verificar headers
-            assert ws["A1"].value == "Código PNCP"
-            assert ws["B1"].value == "Tipo"
-            assert ws["C1"].value == "Objeto"
-            assert ws["L1"].value == "Link"
+            assert ws["A1"].value == "Tipo"
+            assert ws["B1"].value == "Objeto"
+            assert ws["C1"].value == "Órgão"
+            assert ws["J1"].value == "Link"
 
             # Verificar formatação do header
             assert ws["A1"].font.bold is True
@@ -99,7 +99,7 @@ class TestCreateExcel:
             )  # Verde (openpyxl ARGB format)
 
             # Verificar que não há linha de totais (lista vazia)
-            assert ws["G3"].value is None
+            assert ws["F3"].value is None
 
     def test_create_excel_with_single_item(self):
         """Deve gerar Excel com um item e linha de totais."""
@@ -123,30 +123,28 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
             # Verificar dados na linha 2
-            assert ws["A2"].value == "12345"
-            assert ws["B2"].value == "Licitacao"  # Tipo column
-            assert ws["C2"].value == "Aquisição de uniformes escolares"
-            assert ws["D2"].value == "Prefeitura Municipal"
-            assert ws["E2"].value == "SP"
-            assert ws["F2"].value == "São Paulo"
-            assert ws["G2"].value == 150000.50
-            assert ws["H2"].value == "Pregão Eletrônico"
-            assert ws["K2"].value == "Em Disputa"
+            assert ws["A2"].value == "Licitacao"  # Tipo column
+            assert ws["B2"].value == "Aquisição de uniformes escolares"
+            assert ws["C2"].value == "Prefeitura Municipal"
+            assert ws["D2"].value == "SP"
+            assert ws["E2"].value == "São Paulo"
+            assert ws["F2"].value == 150000.50
+            assert ws["G2"].value == "Pregão Eletrônico"
 
             # Verificar formatação de moeda
-            assert "R$" in ws["G2"].number_format
+            assert "R$" in ws["F2"].number_format
 
-            # Verificar hyperlink (coluna L)
-            assert ws["L2"].value == "Abrir"
-            assert ws["L2"].hyperlink.target == "https://pncp.gov.br/app/editais/12345"
-            assert ws["L2"].font.color.rgb == "000563C1"  # Azul (openpyxl ARGB format)
-            assert ws["L2"].font.underline == "single"
+            # Verificar hyperlink (coluna J)
+            assert ws["J2"].value == "Abrir"
+            assert ws["J2"].hyperlink.target == "https://pncp.gov.br/app/editais/12345"
+            assert ws["J2"].font.color.rgb == "000563C1"  # Azul (openpyxl ARGB format)
+            assert ws["J2"].font.underline == "single"
 
             # Verificar linha de totais (row 3)
-            assert ws["F3"].value == "TOTAL:"
+            assert ws["E3"].value == "TOTAL:"
+            assert ws["E3"].font.bold is True
+            assert "=SUM(F2:F2)" in ws["F3"].value
             assert ws["F3"].font.bold is True
-            assert "=SUM(G2:G2)" in ws["G3"].value
-            assert ws["G3"].font.bold is True
 
             # Verificar bordas
             assert ws["A2"].border.left.style == "thin"
@@ -177,12 +175,12 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
         # Verificar 3 linhas de dados
-        assert ws["A2"].value == "123"
-        assert ws["A3"].value == "456"
-        assert ws["A4"].value == "789"
+        assert ws["B2"].value == "Item 1"
+        assert ws["B3"].value == "Item 2"
+        assert ws["B4"].value == "Item 3"
 
         # Verificar linha de totais (row 5)
-        assert "=SUM(G2:G4)" in ws["G5"].value
+        assert "=SUM(F2:F4)" in ws["F5"].value
 
     def test_create_excel_with_none_values(self):
         """Deve lidar com valores None nos campos."""
@@ -200,12 +198,11 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
         # Verificar que não crashou
-        assert ws["A2"].value == "999"
-        assert ws["B2"].value == "Licitacao"  # Tipo column (always present)
-        assert ws["C2"].value is None  # Objeto
-        assert ws["G2"].value is None  # Valor
-        assert ws["I2"].value is None  # Publicacao
-        assert ws["J2"].value is None  # Abertura
+        assert ws["A2"].value == "Licitacao"  # Tipo column (always present)
+        assert ws["B2"].value is None  # Objeto
+        assert ws["F2"].value is None  # Valor
+        assert ws["H2"].value is None  # Publicacao
+        assert ws["I2"].value is None  # Início
 
     def test_create_excel_with_missing_link(self):
         """Deve gerar link padrão usando CNPJ/ano/sequencial se linkPncp não existir."""
@@ -222,7 +219,7 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
         # Verificar link gerado com formato correto: /editais/{cnpj}/{ano}/{seq}
-        assert ws["L2"].hyperlink.target == "https://pncp.gov.br/app/editais/83845701000159/2026/16"
+        assert ws["J2"].hyperlink.target == "https://pncp.gov.br/app/editais/83845701000159/2026/16"
 
     def test_create_excel_fallback_link_without_cnpj(self):
         """Deve gerar link de busca se CNPJ/ano/sequencial não existirem."""
@@ -234,7 +231,7 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
         # Fallback: search URL when structured fields are missing
-        assert ws["L2"].hyperlink.target == "https://pncp.gov.br/app/editais?q=ABC123"
+        assert ws["J2"].hyperlink.target == "https://pncp.gov.br/app/editais?q=ABC123"
 
     def test_create_excel_frozen_panes(self):
         """Deve congelar a primeira linha (headers)."""
@@ -301,8 +298,8 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
             # Verificar formatação de data (columns shifted +1 for Tipo)
-            assert "DD/MM/YYYY" in ws["I2"].number_format  # Publicação
-            assert "DD/MM/YYYY HH:MM" in ws["J2"].number_format  # Abertura
+            assert "DD/MM/YYYY" in ws["H2"].number_format  # Publicação
+            assert "DD/MM/YYYY HH:MM" in ws["I2"].number_format  # Início
 
     def test_create_excel_column_widths(self):
         """Deve definir larguras corretas das colunas."""
@@ -312,10 +309,10 @@ class TestCreateExcel:
             ws = wb["Licitações Uniformes"]
 
             # Verificar algumas larguras (PRD Section 5.1)
-            assert ws.column_dimensions["A"].width == 25  # Código PNCP
-            assert ws.column_dimensions["B"].width == 12  # Tipo
-            assert ws.column_dimensions["C"].width == 60  # Objeto
-            assert ws.column_dimensions["E"].width == 6  # UF
+            assert ws.column_dimensions["A"].width == 12  # Tipo
+            assert ws.column_dimensions["B"].width == 60  # Objeto
+            assert ws.column_dimensions["C"].width == 40  # Órgão
+            assert ws.column_dimensions["D"].width == 6  # UF
 
     def test_create_excel_invalid_input(self):
         """Deve lançar ValueError se input não for lista."""
@@ -334,9 +331,8 @@ class TestCreateExcel:
         with open_workbook(buffer) as wb:
             ws = wb["Licitações Uniformes"]
 
-            assert ws["A2"].value == "TEST123"
-            assert ws["B2"].value == "Licitacao"  # Tipo column
-            assert ws["C2"].value == "Test"  # Objeto column
+            assert ws["A2"].value == "Licitacao"  # Tipo column
+            assert ws["B2"].value == "Test"  # Objeto column
 
             # Verificar que pode ser salvo novamente
             new_buffer = BytesIO()
