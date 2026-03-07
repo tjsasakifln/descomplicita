@@ -104,8 +104,9 @@ SOURCES_CONFIG = {
         "timeout": 60,
         "priority": 4,
     },
+    # SR-001.5: API endpoint /api/v1/compras-diretas returns 404 since ~2026-03; endpoint deprecated
     "tce_rj": {
-        "enabled": True,
+        "enabled": False,
         "base_url": "https://dados.tcerj.tc.br",
         "auth": None,
         "rate_limit_rps": 3,

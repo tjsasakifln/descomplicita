@@ -16,6 +16,18 @@ class TestSourcesConfig:
             if name not in implemented:
                 assert cfg["enabled"] is False, f"{name} should be disabled"
 
+    def test_deprecated_sources_disabled(self):
+        """Sources with deprecated/broken endpoints must be disabled."""
+        deprecated = {
+            "comprasgov": "SR-001.3",
+            "querido_diario": "SR-001.4",
+            "tce_rj": "SR-001.5",
+        }
+        for name, story in deprecated.items():
+            assert SOURCES_CONFIG[name]["enabled"] is False, (
+                f"{name} should be disabled per {story}"
+            )
+
     def test_all_sources_have_required_keys(self):
         required_keys = {"enabled", "base_url", "auth", "rate_limit_rps", "timeout", "priority"}
         for name, cfg in SOURCES_CONFIG.items():
