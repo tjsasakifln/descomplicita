@@ -27,6 +27,9 @@ class SectorConfig:
     threshold: float = 0.6  # Minimum score to approve
     # High-precision terms for PNCP server-side palavraChave filtering (SE-001.1)
     search_keywords: List[str] = field(default_factory=list)
+    # Sector-specific value range for filter_batch (SE-001.4)
+    valor_min: float = 10_000.0
+    valor_max: float = 10_000_000.0
 
 
 SECTORS: Dict[str, SectorConfig] = {
@@ -180,6 +183,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "bebida alcoólica", "bebida alcoolica",
         },
         search_keywords=["alimento", "merenda", "genero alimenticio", "cesta basica", "hortifruti"],
+        valor_min=5_000.0,
+        valor_max=20_000_000.0,
     ),
     "informatica": SectorConfig(
         id="informatica",
@@ -299,6 +304,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "switch grass",
         },
         search_keywords=["informatica", "computador", "notebook", "impressora", "software"],
+        valor_min=5_000.0,
+        valor_max=50_000_000.0,
     ),
     "limpeza": SectorConfig(
         id="limpeza",
@@ -413,6 +420,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "lencol descartavel", "lençol descartável",
         },
         search_keywords=["material de limpeza", "detergente", "desinfetante", "saneante", "papel higienico"],
+        valor_min=2_000.0,
+        valor_max=5_000_000.0,
     ),
     "mobiliario": SectorConfig(
         id="mobiliario",
@@ -487,6 +496,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "taxa bancaria", "taxa bancária",
         },
         search_keywords=["mobiliario", "cadeira", "armario", "mesa de escritorio", "estante"],
+        valor_min=5_000.0,
+        valor_max=10_000_000.0,
     ),
     "papelaria": SectorConfig(
         id="papelaria",
@@ -551,6 +562,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "fora de expediente",
         },
         search_keywords=["material de escritorio", "papelaria", "papel sulfite", "material escolar", "caneta"],
+        valor_min=1_000.0,
+        valor_max=2_000_000.0,
     ),
     "saude": SectorConfig(
         id="saude",
@@ -624,6 +637,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "sonda espacial",
         },
         search_keywords=["medicamento", "hospitalar", "farmaceutico", "insumo hospitalar", "material hospitalar"],
+        valor_min=1_000.0,
+        valor_max=50_000_000.0,
     ),
     "veiculos": SectorConfig(
         id="veiculos",
@@ -693,6 +708,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "sistema de abastecimento de agua", "sistema de abastecimento de água",
         },
         search_keywords=["veiculo", "combustivel", "pneu", "peca automotiva", "manutencao veicular"],
+        valor_min=20_000.0,
+        valor_max=100_000_000.0,
     ),
     "engenharia": SectorConfig(
         id="engenharia",
@@ -845,6 +862,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "cobertura obstetra", "cobertura obstétrica",
         },
         search_keywords=["obra", "construcao civil", "pavimentacao", "reforma predial", "engenharia"],
+        valor_min=50_000.0,
+        valor_max=500_000_000.0,
     ),
     "hospitalar": SectorConfig(
         id="hospitalar",
@@ -917,6 +936,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "centrifuga de acucar", "centrífuga de açúcar",
         },
         search_keywords=["equipamento hospitalar", "equipamento medico", "cama hospitalar", "autoclave", "raio-x"],
+        valor_min=5_000.0,
+        valor_max=50_000_000.0,
     ),
     "servicos_gerais": SectorConfig(
         id="servicos_gerais",
@@ -997,6 +1018,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "reforma trabalhista",
         },
         search_keywords=["servicos gerais", "manutencao predial", "jardinagem", "portaria", "dedetizacao"],
+        valor_min=5_000.0,
+        valor_max=20_000_000.0,
     ),
     "seguranca": SectorConfig(
         id="seguranca",
@@ -1081,6 +1104,8 @@ SECTORS: Dict[str, SectorConfig] = {
             "vigilancia ambiental", "vigilância ambiental",
         },
         search_keywords=["vigilancia patrimonial", "CFTV", "controle de acesso", "camera de seguranca", "vigilante"],
+        valor_min=10_000.0,
+        valor_max=20_000_000.0,
     ),
 }
 

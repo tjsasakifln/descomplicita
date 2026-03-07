@@ -9,6 +9,7 @@ from filter import (
     KEYWORDS_UNIFORMES,
     KEYWORDS_EXCLUSAO,
 )
+from sectors import SECTORS, SectorConfig
 
 
 class TestNormalizeText:
@@ -769,3 +770,147 @@ class TestFilterBatch:
         assert len(aprovadas) == 1000
         assert stats["total"] == 1000
         assert stats["aprovadas"] == 1000
+
+
+class TestSectorValueRanges:
+    """Tests for sector-specific value ranges (SE-001.4)."""
+
+    EXPECTED_RANGES = {
+        "vestuario": (10_000.0, 10_000_000.0),
+        "alimentos": (5_000.0, 20_000_000.0),
+        "informatica": (5_000.0, 50_000_000.0),
+        "limpeza": (2_000.0, 5_000_000.0),
+        "mobiliario": (5_000.0, 10_000_000.0),
+        "papelaria": (1_000.0, 2_000_000.0),
+        "saude": (1_000.0, 50_000_000.0),
+        "veiculos": (20_000.0, 100_000_000.0),
+        "engenharia": (50_000.0, 500_000_000.0),
+        "hospitalar": (5_000.0, 50_000_000.0),
+        "servicos_gerais": (5_000.0, 20_000_000.0),
+        "seguranca": (10_000.0, 20_000_000.0),
+    }
+
+    def test_all_sectors_have_value_range(self):
+        """Every sector must define valor_min and valor_max."""
+        for sector_id, sector in SECTORS.items():
+            assert hasattr(sector, "valor_min"), f"{sector_id} missing valor_min"
+            assert hasattr(sector, "valor_max"), f"{sector_id} missing valor_max"
+            assert sector.valor_min > 0, f"{sector_id} valor_min must be positive"
+            assert sector.valor_max > sector.valor_min, (
+                f"{sector_id} valor_max ({sector.valor_max}) must be > valor_min ({sector.valor_min})"
+            )
+
+    def test_all_12_sectors_present(self):
+        """Must have exactly 12 sectors with value ranges."""
+        assert len(SECTORS) == 12
+
+    def test_each_sector_has_correct_range(self):
+        """Each sector must match the specified value range from the story."""
+        for sector_id, (expected_min, expected_max) in self.EXPECTED_RANGES.items():
+            sector = SECTORS[sector_id]
+            assert sector.valor_min == expected_min, (
+                f"{sector_id}: valor_min expected {expected_min}, got {sector.valor_min}"
+            )
+            assert sector.valor_max == expected_max, (
+                f"{sector_id}: valor_max expected {expected_max}, got {sector.valor_max}"
+            )
+
+    def test_vestuario_regression_keeps_default_range(self):
+        """Vestuario must keep the original 10k-10M range (backward compat)."""
+        sector = SECTORS["vestuario"]
+        assert sector.valor_min == 10_000.0
+        assert sector.valor_max == 10_000_000.0
+
+    def test_sector_config_default_values(self):
+        """SectorConfig defaults must match original hardcoded values."""
+        config = SectorConfig(id="test", name="Test", description="test", keywords=set())
+        assert config.valor_min == 10_000.0
+        assert config.valor_max == 10_000_000.0
+
+    def test_saude_accepts_low_value_bids(self):
+        """Saude sector should accept bids as low as R$1.000 (fracionados)."""
+        licitacao = {
+            "uf": "SP",
+            "valorTotalEstimado": 2_500.0,
+            "objetoCompra": "Medicamentos diversos",
+        }
+        sector = SECTORS["saude"]
+        aprovada, _ = filter_licitacao(
+            licitacao, {"SP"},
+            valor_min=sector.valor_min,
+            valor_max=sector.valor_max,
+            keywords=sector.keywords,
+        )
+        assert aprovada is True, "Saude should accept R$2.500 bid (medicamentos fracionados)"
+
+    def test_saude_accepts_high_value_bids(self):
+        """Saude sector should accept bids up to R$50M (atas consolidadas)."""
+        licitacao = {
+            "uf": "SP",
+            "valorTotalEstimado": 45_000_000.0,
+            "objetoCompra": "Registro de precos para medicamentos",
+        }
+        sector = SECTORS["saude"]
+        aprovada, _ = filter_licitacao(
+            licitacao, {"SP"},
+            valor_min=sector.valor_min,
+            valor_max=sector.valor_max,
+            keywords=sector.keywords,
+        )
+        assert aprovada is True, "Saude should accept R$45M bid (ata consolidada)"
+
+    def test_engenharia_rejects_below_min(self):
+        """Engenharia sector should reject bids below R$50k."""
+        licitacao = {
+            "uf": "SP",
+            "valorTotalEstimado": 30_000.0,
+            "objetoCompra": "Reforma predial",
+        }
+        sector = SECTORS["engenharia"]
+        aprovada, motivo = filter_licitacao(
+            licitacao, {"SP"},
+            valor_min=sector.valor_min,
+            valor_max=sector.valor_max,
+            keywords=sector.keywords,
+        )
+        assert aprovada is False
+        assert "fora da faixa" in motivo
+
+    def test_sector_range_propagated_to_filter_batch(self):
+        """Sector value range should be usable in filter_batch."""
+        future_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        sector = SECTORS["papelaria"]
+
+        licitacoes = [
+            # Within papelaria range (1k-2M)
+            {
+                "uf": "SP",
+                "valorTotalEstimado": 1_500.0,
+                "objetoCompra": "Material de escritorio e papelaria",
+                "dataAberturaProposta": future_date,
+            },
+            # Below papelaria min
+            {
+                "uf": "SP",
+                "valorTotalEstimado": 500.0,
+                "objetoCompra": "Papel sulfite",
+                "dataAberturaProposta": future_date,
+            },
+            # Above papelaria max
+            {
+                "uf": "SP",
+                "valorTotalEstimado": 3_000_000.0,
+                "objetoCompra": "Material escolar",
+                "dataAberturaProposta": future_date,
+            },
+        ]
+
+        aprovadas, stats = filter_batch(
+            licitacoes, {"SP"},
+            valor_min=sector.valor_min,
+            valor_max=sector.valor_max,
+            keywords=sector.keywords,
+        )
+
+        assert len(aprovadas) == 1
+        assert stats["rejeitadas_valor"] == 2

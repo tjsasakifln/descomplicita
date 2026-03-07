@@ -420,8 +420,8 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             lambda: filter_batch(
                 licitacoes_raw,
                 ufs_selecionadas=set(request.ufs),
-                valor_min=10_000.0,
-                valor_max=10_000_000.0,
+                valor_min=sector.valor_min,
+                valor_max=sector.valor_max,
                 keywords=active_keywords,
                 exclusions=sector.exclusions if not custom_terms else set(),
                 keywords_a=sector.keywords_a if not custom_terms else None,
