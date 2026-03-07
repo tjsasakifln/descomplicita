@@ -36,6 +36,14 @@ from job_store import JobStore, SearchJob
 from pncp_client import PNCPClient
 from sources.pncp_source import PNCPSource
 from sources.base import SearchQuery
+from sources.orchestrator import (
+    MultiSourceOrchestrator,
+    get_enabled_source_names,
+)
+from sources.comprasgov_source import ComprasGovSource
+from sources.transparencia_source import TransparenciaSource
+from sources.querido_diario_source import QueridoDiarioSource
+from sources.tce_rj_source import TCERJSource
 from exceptions import PNCPAPIError, PNCPRateLimitError
 from filter import filter_batch
 from excel import create_excel
@@ -155,6 +163,25 @@ def _get_pncp_source() -> PNCPSource:
 def _get_pncp_client() -> PNCPClient:
     """Get the underlying PNCPClient (for cache/debug endpoints)."""
     return _get_pncp_source().client
+
+
+# Shared orchestrator instance
+_orchestrator: MultiSourceOrchestrator | None = None
+
+
+def _get_orchestrator() -> MultiSourceOrchestrator:
+    """Get or create the shared MultiSourceOrchestrator."""
+    global _orchestrator
+    if _orchestrator is None:
+        sources = [
+            _get_pncp_source(),
+            ComprasGovSource(),
+            TransparenciaSource(),
+            QueridoDiarioSource(),
+            TCERJSource(),
+        ]
+        _orchestrator = MultiSourceOrchestrator(sources=sources)
+    return _orchestrator
 
 
 # Global job store for async search jobs
@@ -326,25 +353,53 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                 f"[job={job_id}] Using sector keywords ({len(active_keywords)} terms)"
             )
 
-        # --- Phase: fetching ---
+        # --- Phase: fetching (multi-source orchestrator) ---
+        orchestrator = _get_orchestrator()
+        enabled = orchestrator.enabled_sources
+        sources_total = len(enabled)
+
         await _job_store.update_progress(
-            job_id, phase="fetching", ufs_total=len(request.ufs)
+            job_id,
+            phase="fetching",
+            ufs_total=len(request.ufs),
+            sources_total=sources_total,
         )
 
-        logger.info(f"[job={job_id}] Fetching bids from PNCP API")
-        client = _get_pncp_client()
+        source_names = [s.source_name for s in enabled]
+        logger.info(
+            f"[job={job_id}] Fetching bids from {sources_total} sources: {source_names}"
+        )
 
-        licitacoes_raw = await loop.run_in_executor(
-            None,
-            lambda: list(
-                client.fetch_all(
-                    data_inicial=request.data_inicial,
-                    data_final=request.data_final,
-                    ufs=request.ufs,
+        query = SearchQuery(
+            data_inicial=request.data_inicial,
+            data_final=request.data_final,
+            ufs=request.ufs,
+        )
+
+        async def _on_progress(completed: int, total: int):
+            await _job_store.update_progress(
+                job_id,
+                sources_completed=completed,
+                sources_total=total,
+            )
+
+        orch_result = await orchestrator.search_all(
+            query,
+            on_progress=lambda c, t: asyncio.ensure_future(
+                _job_store.update_progress(
+                    job_id, sources_completed=c, sources_total=t,
                 )
             ),
         )
-        logger.info(f"[job={job_id}] Fetched {len(licitacoes_raw)} raw bids from PNCP")
+
+        # Convert NormalizedRecords to legacy dicts for filter_batch compatibility
+        licitacoes_raw = [r.to_legacy_dict() for r in orch_result.records]
+
+        logger.info(
+            f"[job={job_id}] Fetched {len(licitacoes_raw)} records from "
+            f"{len(orch_result.sources_used)} sources "
+            f"({orch_result.dedup_removed} duplicates removed)"
+        )
 
         # --- Phase: filtering ---
         await _job_store.update_progress(
@@ -434,6 +489,18 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                 "total_raw": len(licitacoes_raw),
                 "total_filtrado": 0,
                 "filter_stats": fs,
+                "sources_used": orch_result.sources_used,
+                "source_stats": {
+                    k: {
+                        "total_fetched": v.total_fetched,
+                        "after_dedup": v.after_dedup,
+                        "elapsed_ms": v.elapsed_ms,
+                        "status": v.status,
+                        "error_message": v.error_message,
+                    }
+                    for k, v in orch_result.source_stats.items()
+                },
+                "dedup_removed": orch_result.dedup_removed,
             }
             await _job_store.complete(job_id, result)
             logger.info(
@@ -495,6 +562,18 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             "total_raw": len(licitacoes_raw),
             "total_filtrado": len(licitacoes_filtradas),
             "filter_stats": fs,
+            "sources_used": orch_result.sources_used,
+            "source_stats": {
+                k: {
+                    "total_fetched": v.total_fetched,
+                    "after_dedup": v.after_dedup,
+                    "elapsed_ms": v.elapsed_ms,
+                    "status": v.status,
+                    "error_message": v.error_message,
+                }
+                for k, v in orch_result.source_stats.items()
+            },
+            "dedup_removed": orch_result.dedup_removed,
         }
         await _job_store.complete(job_id, result)
 

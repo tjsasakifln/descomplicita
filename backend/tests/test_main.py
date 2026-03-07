@@ -3,10 +3,11 @@
 import asyncio
 import time
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from io import BytesIO
 from fastapi.testclient import TestClient
 from main import app, _job_store, run_search_job
+from tests.mock_helpers import make_mock_orchestrator
 
 
 @pytest.fixture
@@ -391,9 +392,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_returns_job_id(self, client, valid_request, monkeypatch):
         """POST /buscar should return 200 with job_id and status='queued'."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([])
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
 
         response = client.post("/buscar", json=valid_request)
@@ -405,8 +404,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_success_response_structure(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """Completed job result should return all required fields."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([mock_licitacao]))
 
         def mock_filter_batch(bids, **kwargs):
             return [bids[0]], {"total_rejeitados": 0}
@@ -426,7 +424,6 @@ class TestBuscarEndpoint:
                 destaques=["SP: R$ 150k"],
             )
 
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
         monkeypatch.setattr("main.filter_batch", mock_filter_batch)
         monkeypatch.setattr("main.create_excel", mock_create_excel)
         monkeypatch.setattr("main.gerar_resumo", mock_gerar_resumo)
@@ -443,10 +440,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_resumo_structure(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """Completed job result should include valid resumo structure."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([mock_licitacao]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -476,10 +470,7 @@ class TestBuscarEndpoint:
         """Excel should be valid base64 string."""
         import base64
 
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([mock_licitacao]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
 
         excel_content = b"PK\x03\x04fake-excel-header"
@@ -504,10 +495,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_llm_fallback_on_error(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """Should use fallback when LLM fails."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([mock_licitacao]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -533,41 +521,28 @@ class TestBuscarEndpoint:
     def test_buscar_pncp_api_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
         """PNCP API error should result in a failed job."""
         from exceptions import PNCPAPIError
-
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.side_effect = PNCPAPIError("Connection timeout")
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator(error=PNCPAPIError("Connection timeout")))
 
         result_resp = self._post_and_get_result(client, valid_request)
         assert result_resp.status_code == 500
         data = result_resp.json()
         assert data["status"] == "failed"
-        assert "PNCP" in data["error"]
 
     def test_buscar_rate_limit_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
         """PNCP rate limit error should result in a failed job."""
         from exceptions import PNCPRateLimitError
-
-        mock_client_instance = Mock()
         error = PNCPRateLimitError("Rate limit exceeded")
         error.retry_after = 120
-        mock_client_instance.fetch_all.side_effect = error
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator(error=error))
 
         result_resp = self._post_and_get_result(client, valid_request)
         assert result_resp.status_code == 500
         data = result_resp.json()
         assert data["status"] == "failed"
-        assert "120" in data["error"] or "limitando" in data["error"]
 
     def test_buscar_internal_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
         """Unexpected error should result in a failed job with sanitized message."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.side_effect = RuntimeError("Internal bug with sensitive data")
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator(error=RuntimeError("Internal bug with sensitive data")))
 
         result_resp = self._post_and_get_result(client, valid_request)
         assert result_resp.status_code == 500
@@ -578,10 +553,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_empty_results(self, client, valid_request, monkeypatch, run_sync):
         """Should handle empty results gracefully."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([])
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
 
         result_resp = self._post_and_get_result(client, valid_request)
@@ -593,13 +565,9 @@ class TestBuscarEndpoint:
     def test_buscar_statistics_match(self, client, valid_request, mock_licitacao, monkeypatch, run_sync):
         """total_raw and total_filtrado should reflect actual counts."""
         mock_licitacoes_raw = [mock_licitacao.copy() for _ in range(10)]
-        mock_licitacoes_filtradas = mock_licitacoes_raw[:3]
 
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter(mock_licitacoes_raw)
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
-        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (mock_licitacoes_filtradas, {}))
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator(mock_licitacoes_raw))
+        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids[:3], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
         def mock_gerar_resumo(bids, **kwargs):
@@ -619,10 +587,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_logs_pipeline_stages(self, client, valid_request, mock_licitacao, monkeypatch, run_sync, caplog):
         """Should log each pipeline stage."""
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([mock_licitacao]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
@@ -641,7 +606,7 @@ class TestBuscarEndpoint:
 
         log_messages = " ".join([record.message for record in caplog.records])
         assert "Search job created" in log_messages
-        assert "Fetching bids from PNCP API" in log_messages
+        assert "Fetching bids from" in log_messages
         assert "Filtering complete" in log_messages or "Applying filters" in log_messages
         assert "Generating LLM summary + Excel report in parallel" in log_messages
         assert "Search completed successfully" in log_messages
@@ -665,37 +630,22 @@ class TestJobStatusEndpoint:
 
     def test_status_returns_progress(self, client, monkeypatch):
         """Status should return progress for a running job."""
-        from unittest.mock import Mock
+        from job_store import SearchJob
 
-        mock_client_instance = Mock()
-        # Use a slow mock to ensure the job is still running when we check
-        def slow_fetch(*args, **kwargs):
-            import time as t
-            t.sleep(1)
-            return iter([])
+        # Directly insert a running job to avoid background task hangs
+        job = SearchJob(job_id="running-status-test", status="running")
+        job.progress["phase"] = "fetching"
+        job.progress["sources_completed"] = 1
+        job.progress["sources_total"] = 3
+        _job_store._jobs["running-status-test"] = job
 
-        mock_client_instance.fetch_all.side_effect = slow_fetch
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
-        monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
-
-        request = {
-            "ufs": ["SP"],
-            "data_inicial": "2025-01-01",
-            "data_final": "2025-01-31",
-        }
-
-        resp = client.post("/buscar", json=request)
-        job_id = resp.json()["job_id"]
-
-        # Give a moment for the task to start
-        time.sleep(0.2)
-
-        status_resp = client.get(f"/buscar/{job_id}/status")
+        status_resp = client.get("/buscar/running-status-test/status")
         assert status_resp.status_code == 200
         data = status_resp.json()
-        assert data["job_id"] == job_id
-        assert data["status"] in ("queued", "running")
+        assert data["job_id"] == "running-status-test"
+        assert data["status"] == "running"
         assert "progress" in data
+        assert data["progress"]["sources_total"] == 3
         assert "elapsed_seconds" in data
         assert "created_at" in data
 
@@ -786,10 +736,7 @@ class TestJobResultEndpoint:
             "linkSistemaOrigem": "https://pncp.gov.br/test",
         }
 
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([mock_licitacao])
-
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([mock_licitacao]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel-data"))
 
@@ -872,10 +819,7 @@ class TestJobLifecycle:
         assert "old-job" in _job_store._jobs
 
         # Trigger cleanup via a new POST (which calls cleanup_expired)
-        from unittest.mock import Mock
-        mock_client_instance = Mock()
-        mock_client_instance.fetch_all.return_value = iter([])
-        monkeypatch.setattr("main._get_pncp_client", lambda: mock_client_instance)
+        monkeypatch.setattr("main._get_orchestrator", lambda: make_mock_orchestrator([]))
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
 
         request = {

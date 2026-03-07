@@ -18,6 +18,8 @@ class SearchJob:
         "ufs_total": 0,
         "items_fetched": 0,
         "items_filtered": 0,
+        "sources_completed": 0,
+        "sources_total": 0,
     })
     result: Optional[Dict] = None
     error: Optional[str] = None

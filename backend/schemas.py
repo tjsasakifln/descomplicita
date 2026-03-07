@@ -159,6 +159,7 @@ class BuscaResponse(BaseModel):
     - AI-generated executive summary
     - Excel file as base64-encoded string
     - Statistics about raw vs filtered results
+    - Multi-source metadata (sources used, dedup stats)
 
     The Excel file can be decoded and downloaded by the frontend.
     """
@@ -170,7 +171,7 @@ class BuscaResponse(BaseModel):
         ..., description="Excel file encoded as base64 string (decode for download)"
     )
     total_raw: int = Field(
-        ..., ge=0, description="Total records fetched from PNCP API (before filtering)"
+        ..., ge=0, description="Total records fetched from all sources (before filtering)"
     )
     total_filtrado: int = Field(
         ...,
@@ -179,6 +180,15 @@ class BuscaResponse(BaseModel):
     )
     filter_stats: Optional[FilterStats] = Field(
         default=None, description="Breakdown of filter rejection reasons"
+    )
+    sources_used: Optional[List[str]] = Field(
+        default=None, description="Data sources that returned results successfully"
+    )
+    source_stats: Optional[dict] = Field(
+        default=None, description="Per-source statistics (fetched, dedup, elapsed, status)"
+    )
+    dedup_removed: Optional[int] = Field(
+        default=None, description="Number of duplicate records removed across sources"
     )
 
     class Config:
@@ -220,6 +230,8 @@ class JobProgress(BaseModel):
     ufs_total: int = 0
     items_fetched: int = 0
     items_filtered: int = 0
+    sources_completed: int = 0
+    sources_total: int = 0
 
 
 class JobStatusResponse(BaseModel):
