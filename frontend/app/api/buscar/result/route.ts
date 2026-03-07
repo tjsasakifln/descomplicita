@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import { writeFile } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
-const DOWNLOAD_TTL_MS = parseInt(process.env.DOWNLOAD_TTL_MS || String(60 * 60 * 1000), 10);
 const API_KEY = process.env.BACKEND_API_KEY || "";
 
 export async function GET(request: NextRequest) {
@@ -58,36 +53,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Job completed — save Excel and return response
-  let downloadId: string | null = null;
-  if (resultData.excel_base64) {
-    downloadId = `${Date.now()}_${randomUUID()}`;
-    const buffer = Buffer.from(resultData.excel_base64, "base64");
-    const tmpDir = tmpdir();
-    const filePath = join(tmpDir, `descomplicita_${downloadId}.xlsx`);
-
-    try {
-      await writeFile(filePath, buffer);
-      console.log(`Excel saved to: ${filePath}`);
-
-      setTimeout(async () => {
-        try {
-          const { unlink } = await import("fs/promises");
-          await unlink(filePath);
-          console.log(`Cleaned up expired download: ${downloadId}`);
-        } catch (error) {
-          console.error(`Failed to clean up ${downloadId}:`, error);
-        }
-      }, DOWNLOAD_TTL_MS);
-    } catch (error) {
-      console.error("Failed to save Excel to filesystem:", error);
-      downloadId = null;
-    }
-  }
-
+  // Job completed — return result with download_id = job_id
+  // Excel is served via streaming from backend /buscar/{job_id}/download
   return NextResponse.json({
     resumo: resultData.resumo,
-    download_id: downloadId,
+    download_id: resultData.job_id,
     total_raw: resultData.total_raw || 0,
     total_filtrado: resultData.total_filtrado || 0,
     total_atas: resultData.total_atas || 0,

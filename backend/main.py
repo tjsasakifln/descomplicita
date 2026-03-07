@@ -3,51 +3,42 @@ Descomplicita POC - Backend API
 
 FastAPI application for searching and analyzing uniform procurement bids
 from Brazil's PNCP (Portal Nacional de Contratações Públicas).
-
-This API provides endpoints for:
-- Searching procurement opportunities by state and date range
-- Filtering results by keywords and value thresholds
-- Generating Excel reports with formatted data
-- Creating AI-powered executive summaries (GPT-4.1-nano)
 """
 
 import asyncio
-import base64
 import logging
 import os
 import time
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException, Request
+from io import BytesIO
+
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
 from config import setup_logging
 from middleware.auth import APIKeyMiddleware
 from schemas import (
     BuscaRequest,
-    BuscaResponse,
-    FilterStats,
-    ResumoLicitacoes,
     JobCreatedResponse,
     JobStatusResponse,
-    JobResultResponse,
     JobProgress,
 )
-from job_store import JobStore, SearchJob
-from pncp_client import PNCPClient
-from sources.pncp_source import PNCPSource
-from sources.base import SearchQuery
-from sources.orchestrator import (
-    MultiSourceOrchestrator,
-    get_enabled_source_names,
+from dependencies import (
+    init_dependencies,
+    shutdown_dependencies,
+    get_job_store,
+    get_orchestrator,
+    get_pncp_source,
+    get_redis,
+    get_redis_cache,
 )
-from sources.comprasgov_source import ComprasGovSource
-from sources.transparencia_source import TransparenciaSource
-from sources.querido_diario_source import QueridoDiarioSource
-from sources.tce_rj_source import TCERJSource
+from sources.base import SearchQuery
 from exceptions import PNCPAPIError, PNCPRateLimitError
 from filter import filter_batch
 from excel import create_excel
@@ -58,7 +49,44 @@ from sectors import get_sector, list_sectors
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI application
+
+# ---------------------------------------------------------------------------
+# Lifespan context manager (TD-014)
+# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: initialize and cleanup dependencies."""
+    # Startup
+    await init_dependencies()
+
+    # Launch periodic cleanup
+    job_store = get_job_store()
+
+    async def _periodic_cleanup():
+        while True:
+            await asyncio.sleep(60)
+            await job_store.cleanup_expired()
+
+    cleanup_task = asyncio.create_task(_periodic_cleanup())
+    logger.info("Periodic job cleanup task started")
+
+    yield
+
+    # Shutdown
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    await shutdown_dependencies()
+    logger.info("Application shutdown complete")
+
+
+# ---------------------------------------------------------------------------
+# FastAPI application
+# ---------------------------------------------------------------------------
+
 app = FastAPI(
     title="Descomplicita API",
     description=(
@@ -66,10 +94,11 @@ app = FastAPI(
         "Permite filtrar oportunidades por estado, valor e keywords, "
         "gerando relatórios Excel e resumos executivos via IA."
     ),
-    version="0.2.0",
+    version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 # Rate limiter
@@ -109,17 +138,15 @@ logger.info(
 )
 
 
+# ---------------------------------------------------------------------------
+# Public endpoints
+# ---------------------------------------------------------------------------
+
 @app.get("/")
 async def root():
-    """
-    API root endpoint - provides navigation to documentation.
-
-    Returns:
-        dict: API information and links to documentation endpoints
-    """
     return {
         "name": "Descomplicita API",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "description": "API para busca de licitações de uniformes no PNCP",
         "endpoints": {
             "docs": "/docs",
@@ -132,94 +159,22 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    """
-    Health check endpoint for monitoring and load balancers.
-
-    Provides lightweight service health verification without triggering
-    heavy operations (PNCP API calls, LLM processing, etc.). Designed
-    for use by orchestrators (Docker, Kubernetes), load balancers, and
-    uptime monitoring tools.
-
-    Returns:
-        dict: Service health status with timestamp and version
-
-    Response Schema:
-        - status (str): "healthy" when service is operational
-        - timestamp (str): Current server time in ISO 8601 format
-        - version (str): API version from app configuration
-
-    Example:
-        >>> response = await health()
-        >>> response
-        {
-            'status': 'healthy',
-            'timestamp': '2026-01-25T23:15:42.123456',
-            'version': '0.2.0'
-        }
-
-    HTTP Status Codes:
-        - 200: Service is healthy and operational
-        - 503: Service is degraded (future: dependency checks fail)
-    """
-    from datetime import datetime
+async def health(redis=Depends(get_redis)):
+    """Health check endpoint with Redis status."""
+    redis_status = "disconnected"
+    if redis:
+        try:
+            await redis.ping()
+            redis_status = "connected"
+        except Exception:
+            redis_status = "error"
 
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "version": app.version,
+        "redis": redis_status,
     }
-
-
-# Shared PNCPSource instance for cache persistence across requests
-_pncp_source: PNCPSource | None = None
-
-
-def _get_pncp_source() -> PNCPSource:
-    """Get or create the shared PNCPSource instance."""
-    global _pncp_source
-    if _pncp_source is None:
-        _pncp_source = PNCPSource()
-    return _pncp_source
-
-
-# Backward-compatible alias used by tests and internal endpoints
-def _get_pncp_client() -> PNCPClient:
-    """Get the underlying PNCPClient (for cache/debug endpoints)."""
-    return _get_pncp_source().client
-
-
-# Shared orchestrator instance
-_orchestrator: MultiSourceOrchestrator | None = None
-
-
-def _get_orchestrator() -> MultiSourceOrchestrator:
-    """Get or create the shared MultiSourceOrchestrator."""
-    global _orchestrator
-    if _orchestrator is None:
-        sources = [
-            _get_pncp_source(),
-            ComprasGovSource(),
-            TransparenciaSource(),
-            QueridoDiarioSource(),
-            TCERJSource(),
-        ]
-        _orchestrator = MultiSourceOrchestrator(sources=sources)
-    return _orchestrator
-
-
-# Global job store for async search jobs
-_job_store = JobStore()
-
-
-@app.on_event("startup")
-async def startup_cleanup_task():
-    """Launch periodic cleanup of expired jobs."""
-    async def _periodic_cleanup():
-        while True:
-            await asyncio.sleep(60)
-            await _job_store.cleanup_expired()
-    asyncio.create_task(_periodic_cleanup())
 
 
 @app.get("/setores")
@@ -228,31 +183,30 @@ async def listar_setores():
     return {"setores": list_sectors()}
 
 
+# ---------------------------------------------------------------------------
+# Debug endpoints
+# ---------------------------------------------------------------------------
+
 _debug_enabled = os.getenv("ENABLE_DEBUG_ENDPOINTS", "false").lower() == "true"
 
 
 @app.get("/cache/stats")
-async def cache_stats():
-    """Return cache statistics: entries, hits, misses, hit ratio."""
+async def cache_stats(pncp_source=Depends(get_pncp_source)):
     if not _debug_enabled:
         raise HTTPException(status_code=404, detail="Not Found")
-    client = _get_pncp_client()
-    return client.cache_stats()
+    return await pncp_source.cache_stats()
 
 
 @app.post("/cache/clear")
-async def cache_clear():
-    """Clear all cache entries manually (for debug/deploy)."""
+async def cache_clear(pncp_source=Depends(get_pncp_source)):
     if not _debug_enabled:
         raise HTTPException(status_code=404, detail="Not Found")
-    client = _get_pncp_client()
-    removed = client.cache_clear()
+    removed = await pncp_source.cache_clear()
     return {"cleared": removed}
 
 
 @app.get("/debug/pncp-test")
-async def debug_pncp_test():
-    """Diagnostic: test if PNCP API is reachable from this server."""
+async def debug_pncp_test(pncp_source=Depends(get_pncp_source)):
     if not _debug_enabled:
         raise HTTPException(status_code=404, detail="Not Found")
     import time as t
@@ -260,10 +214,10 @@ async def debug_pncp_test():
 
     start = t.time()
     try:
-        client = _get_pncp_client()
+        client = pncp_source.client
         hoje = date.today()
         tres_dias = hoje - timedelta(days=3)
-        response = client.fetch_page(
+        response = await client.fetch_page(
             data_inicial=tres_dias.strftime("%Y-%m-%d"),
             data_final=hoje.strftime("%Y-%m-%d"),
             modalidade=6,
@@ -291,47 +245,27 @@ async def debug_pncp_test():
 # Async job-based search (SP-001.3)
 # ---------------------------------------------------------------------------
 
-
 @app.post("/buscar", response_model=JobCreatedResponse)
 @limiter.limit("10/minute")
-async def buscar_licitacoes(request: Request, body: BuscaRequest):
-    """
-    Start an asynchronous procurement search job.
+async def buscar_licitacoes(
+    request: Request,
+    body: BuscaRequest,
+    job_store=Depends(get_job_store),
+    orchestrator=Depends(get_orchestrator),
+):
+    """Start an asynchronous procurement search job."""
+    await job_store.cleanup_expired()
 
-    Creates a background job that executes the full search pipeline:
-        1. Fetch bids from PNCP API (with automatic pagination)
-        2. Apply sequential filters (UF, value, keywords, status)
-        3. Generate executive summary via GPT-4.1-nano (with fallback)
-        4. Create formatted Excel report
-
-    Poll GET /buscar/{job_id}/status for progress.
-    Retrieve results from GET /buscar/{job_id}/result when completed.
-
-    Args:
-        request: BuscaRequest with ufs, data_inicial, data_final
-
-    Returns:
-        JobCreatedResponse with job_id and status="queued"
-
-    Raises:
-        HTTPException 429: Too many concurrent jobs
-    """
-    # Run cleanup of expired jobs
-    await _job_store.cleanup_expired()
-
-    # Check capacity
-    if _job_store.is_full:
+    if job_store.is_full:
         raise HTTPException(
             status_code=429,
             detail="Muitas buscas simultâneas. Aguarde a conclusão de uma busca anterior.",
         )
 
-    # Create job
     job_id = str(uuid.uuid4())
-    await _job_store.create(job_id)
+    await job_store.create(job_id)
 
-    # Launch background task
-    asyncio.create_task(run_search_job(job_id, body))
+    asyncio.create_task(run_search_job(job_id, body, job_store, orchestrator))
 
     logger.info(
         "Search job created",
@@ -341,16 +275,13 @@ async def buscar_licitacoes(request: Request, body: BuscaRequest):
     return JobCreatedResponse(job_id=job_id, status="queued")
 
 
-async def run_search_job(job_id: str, request: BuscaRequest) -> None:
-    """
-    Execute the full search pipeline as a background async task.
-
-    Mirrors the original synchronous POST /buscar logic but updates
-    job progress at each phase boundary and stores the result (or error)
-    in the job store.
-
-    Phases: fetching -> filtering -> summarizing -> generating_excel -> done
-    """
+async def run_search_job(
+    job_id: str,
+    request: BuscaRequest,
+    job_store,
+    orchestrator,
+) -> None:
+    """Execute the full search pipeline as a background async task."""
     loop = asyncio.get_event_loop()
 
     try:
@@ -358,7 +289,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
         try:
             sector = get_sector(request.setor_id)
         except KeyError as e:
-            await _job_store.fail(job_id, f"Setor inválido: {e}")
+            await job_store.fail(job_id, f"Setor inválido: {e}")
             return
 
         logger.info(
@@ -366,7 +297,6 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             f"({len(sector.keywords)} keywords)"
         )
 
-        # Determine keywords: custom terms REPLACE sector keywords
         custom_terms: list[str] = []
         if request.termos_busca and request.termos_busca.strip():
             custom_terms = [
@@ -387,12 +317,11 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                 f"[job={job_id}] Using sector keywords ({len(active_keywords)} terms)"
             )
 
-        # --- Phase: fetching (multi-source orchestrator) ---
-        orchestrator = _get_orchestrator()
+        # --- Phase: fetching ---
         enabled = orchestrator.enabled_sources
         sources_total = len(enabled)
 
-        await _job_store.update_progress(
+        await job_store.update_progress(
             job_id,
             phase="fetching",
             ufs_total=len(request.ufs),
@@ -410,23 +339,15 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             ufs=request.ufs,
         )
 
-        async def _on_progress(completed: int, total: int):
-            await _job_store.update_progress(
-                job_id,
-                sources_completed=completed,
-                sources_total=total,
-            )
-
         orch_result = await orchestrator.search_all(
             query,
             on_progress=lambda c, t: asyncio.ensure_future(
-                _job_store.update_progress(
+                job_store.update_progress(
                     job_id, sources_completed=c, sources_total=t,
                 )
             ),
         )
 
-        # Convert NormalizedRecords to legacy dicts for filter_batch compatibility
         licitacoes_raw = [r.to_legacy_dict() for r in orch_result.records]
 
         logger.info(
@@ -436,7 +357,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
         )
 
         # --- Phase: filtering ---
-        await _job_store.update_progress(
+        await job_store.update_progress(
             job_id, phase="filtering", items_fetched=len(licitacoes_raw)
         )
 
@@ -471,7 +392,6 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             logger.info(f"[job={job_id}]   - Rejeitadas (Prazo): {stats.get('rejeitadas_prazo', 0)}")
             logger.info(f"[job={job_id}]   - Rejeitadas (Outros): {stats.get('rejeitadas_outros', 0)}")
 
-        # Diagnostic: sample of keyword-rejected items for debugging
         if stats.get('rejeitadas_keyword', 0) > 0:
             keyword_rejected_sample = []
             for lic in licitacoes_raw[:200]:
@@ -488,7 +408,6 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                     f"{keyword_rejected_sample}"
                 )
 
-        # Build filter stats dict for result
         fs = {
             "rejeitadas_uf": stats.get("rejeitadas_uf", 0),
             "rejeitadas_valor": stats.get("rejeitadas_valor", 0),
@@ -497,7 +416,6 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             "rejeitadas_outros": stats.get("rejeitadas_outros", 0),
         }
 
-        # Count atas vs licitacoes for frontend badge
         total_atas = sum(
             1 for lic in licitacoes_filtradas
             if lic.get("tipo") == "ata_registro_preco"
@@ -505,11 +423,10 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
         total_licitacoes = len(licitacoes_filtradas) - total_atas
 
         # --- Phase: summarizing ---
-        await _job_store.update_progress(
+        await job_store.update_progress(
             job_id, phase="summarizing", items_filtered=len(licitacoes_filtradas)
         )
 
-        # Early return if no results passed filters — skip LLM and Excel
         if not licitacoes_filtradas:
             logger.info(
                 f"[job={job_id}] No bids passed filters — skipping LLM and Excel"
@@ -526,7 +443,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             }
             result = {
                 "resumo": resumo_dict,
-                "excel_base64": "",
+                "excel_bytes": b"",
                 "total_raw": len(licitacoes_raw),
                 "total_filtrado": 0,
                 "total_atas": 0,
@@ -546,14 +463,13 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                 "dedup_removed": orch_result.dedup_removed,
                 "truncated_combos": orch_result.truncated_combos,
             }
-            await _job_store.complete(job_id, result)
+            await job_store.complete(job_id, result)
             logger.info(
                 f"[job={job_id}] Search completed with 0 results",
                 extra={"total_raw": len(licitacoes_raw), "total_filtrado": 0},
             )
             return
 
-        # Steps 3+4: Generate LLM summary and Excel report in parallel
         def _generate_resumo():
             try:
                 r = gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
@@ -570,20 +486,18 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
 
         def _generate_excel():
             buf = create_excel(licitacoes_filtradas)
-            b64 = base64.b64encode(buf.read()).decode("utf-8")
-            logger.info(f"[job={job_id}] Excel report generated ({len(b64)} base64 chars)")
-            return b64
+            excel_bytes = buf.read()
+            logger.info(f"[job={job_id}] Excel report generated ({len(excel_bytes)} bytes)")
+            return excel_bytes
 
         logger.info(f"[job={job_id}] Generating LLM summary + Excel report in parallel")
 
-        # --- Phase: generating_excel (covers both LLM + Excel generation) ---
-        await _job_store.update_progress(job_id, phase="generating_excel")
+        await job_store.update_progress(job_id, phase="generating_excel")
 
         resumo_future = loop.run_in_executor(None, _generate_resumo)
         excel_future = loop.run_in_executor(None, _generate_excel)
-        resumo, excel_base64 = await asyncio.gather(resumo_future, excel_future)
+        resumo, excel_bytes = await asyncio.gather(resumo_future, excel_future)
 
-        # CRITICAL: Override LLM-generated counts with actual computed values.
         actual_total = len(licitacoes_filtradas)
         actual_valor = sum(
             lic.get("valorTotalEstimado", 0) or 0 for lic in licitacoes_filtradas
@@ -596,13 +510,11 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
         resumo.total_oportunidades = actual_total
         resumo.valor_total = actual_valor
 
-        # Convert Pydantic model to plain dict for serialization
         resumo_dict = resumo.model_dump()
 
-        # --- Phase: done ---
         result = {
             "resumo": resumo_dict,
-            "excel_base64": excel_base64,
+            "excel_bytes": excel_bytes,
             "total_raw": len(licitacoes_raw),
             "total_filtrado": len(licitacoes_filtradas),
             "total_atas": total_atas,
@@ -622,7 +534,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             "dedup_removed": orch_result.dedup_removed,
             "truncated_combos": orch_result.truncated_combos,
         }
-        await _job_store.complete(job_id, result)
+        await job_store.complete(job_id, result)
 
         logger.info(
             f"[job={job_id}] Search completed successfully",
@@ -636,7 +548,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
     except PNCPRateLimitError as e:
         logger.error(f"[job={job_id}] PNCP rate limit exceeded: {e}", exc_info=True)
         retry_after = getattr(e, "retry_after", 60)
-        await _job_store.fail(
+        await job_store.fail(
             job_id,
             f"O PNCP está limitando requisições. "
             f"Aguarde {retry_after} segundos e tente novamente.",
@@ -644,16 +556,16 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
 
     except PNCPAPIError as e:
         logger.error(f"[job={job_id}] PNCP API error: {e}", exc_info=True)
-        await _job_store.fail(
+        await job_store.fail(
             job_id,
             "O Portal Nacional de Contratações (PNCP) está temporariamente "
             "indisponível ou retornou um erro. Tente novamente em alguns "
             "instantes ou reduza o número de estados selecionados.",
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception(f"[job={job_id}] Internal server error during search")
-        await _job_store.fail(
+        await job_store.fail(
             job_id,
             "Erro interno do servidor. Tente novamente em alguns instantes.",
         )
@@ -663,12 +575,15 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
 # Job polling endpoints
 # ---------------------------------------------------------------------------
 
-
 @app.get("/buscar/{job_id}/status", response_model=JobStatusResponse)
 @limiter.limit("30/minute")
-async def job_status(job_id: str, request: Request):
+async def job_status(
+    job_id: str,
+    request: Request,
+    job_store=Depends(get_job_store),
+):
     """Return current status and progress of a search job."""
-    job = await _job_store.get(job_id)
+    job = await job_store.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -684,17 +599,23 @@ async def job_status(job_id: str, request: Request):
 
 @app.get("/buscar/{job_id}/result")
 @limiter.limit("5/minute")
-async def job_result(job_id: str, request: Request):
+async def job_result(
+    job_id: str,
+    request: Request,
+    job_store=Depends(get_job_store),
+):
     """Return the result of a completed (or failed) search job.
 
-    Returns HTTP 202 if the job is still in progress.
+    Excel data is NOT included — use GET /buscar/{job_id}/download instead.
     """
-    job = await _job_store.get(job_id)
+    job = await job_store.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     if job.status == "completed":
-        return JSONResponse(content={"job_id": job_id, "status": "completed", **job.result})
+        # Return result WITHOUT excel_bytes (use download endpoint)
+        result_data = {k: v for k, v in job.result.items() if k != "excel_bytes"}
+        return JSONResponse(content={"job_id": job_id, "status": "completed", **result_data})
     elif job.status == "failed":
         return JSONResponse(
             content={"job_id": job_id, "status": "failed", "error": job.error},
@@ -705,3 +626,34 @@ async def job_result(job_id: str, request: Request):
             content={"job_id": job_id, "status": job.status},
             status_code=202,
         )
+
+
+@app.get("/buscar/{job_id}/download")
+@limiter.limit("10/minute")
+async def job_download(
+    job_id: str,
+    request: Request,
+    job_store=Depends(get_job_store),
+):
+    """Download the Excel file for a completed search job as a streaming response."""
+    job = await job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != "completed":
+        raise HTTPException(status_code=409, detail="Job not yet completed")
+
+    excel_bytes = job.result.get("excel_bytes", b"")
+    if not excel_bytes:
+        raise HTTPException(status_code=404, detail="No Excel data available")
+
+    filename = f"descomplicita_{job_id[:8]}.xlsx"
+
+    return StreamingResponse(
+        BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(excel_bytes)),
+        },
+    )

@@ -1,12 +1,12 @@
-"""PNCP data source adapter — wraps PNCPClient behind the DataSourceClient ABC."""
+"""PNCP data source adapter — wraps AsyncPNCPClient behind the DataSourceClient ABC."""
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 from config import RetryConfig, MAX_PAGES_PER_COMBO
-from pncp_client import PNCPClient
+from clients.async_pncp_client import AsyncPNCPClient
+from cache.redis_cache import RedisCache
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 
 logger = logging.getLogger(__name__)
@@ -34,26 +34,31 @@ def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
 class PNCPSource(DataSourceClient):
     """PNCP data source adapter.
 
-    Wraps the existing PNCPClient (with its retry, rate-limiting, caching,
-    and pagination logic) behind the DataSourceClient interface.
+    Wraps the AsyncPNCPClient (httpx-based) behind the DataSourceClient interface.
+    Optionally uses RedisCache for caching PNCP responses.
     """
 
     @property
     def source_name(self) -> str:
         return "PNCP"
 
-    def __init__(self, config: RetryConfig | None = None):
-        self._client = PNCPClient(config)
-        # Partial results buffer — survives orchestrator timeout/cancellation
+    def __init__(
+        self,
+        async_client: AsyncPNCPClient | None = None,
+        config: RetryConfig | None = None,
+        cache: RedisCache | None = None,
+    ):
+        self._client = async_client or AsyncPNCPClient(config)
+        self._cache = cache
         self._partial_results: List[dict] = []
 
     @property
-    def client(self) -> PNCPClient:
-        """Expose underlying PNCPClient for cache/debug operations."""
+    def client(self) -> AsyncPNCPClient:
+        """Expose underlying AsyncPNCPClient for cache/debug operations."""
         return self._client
 
     def normalize(self, raw: dict) -> NormalizedRecord:
-        """Convert a flat PNCP dict (already processed by _normalize_item) to NormalizedRecord."""
+        """Convert a flat PNCP dict to NormalizedRecord."""
         cnpj = raw.get("cnpj", "")
         ano = raw.get("anoCompra", "")
         seq = raw.get("sequencialCompra", "")
@@ -90,36 +95,19 @@ class PNCPSource(DataSourceClient):
         query: SearchQuery,
         on_progress: Callable[[int, int, int], None] | None = None,
     ) -> List[NormalizedRecord]:
-        """Fetch PNCP records matching the query.
-
-        Delegates to PNCPClient.fetch_all() (sync, threaded) via
-        run_in_executor to avoid blocking the async event loop.
-
-        Uses MAX_PAGES_PER_COMBO to cap pagination per UF×modalidade combo,
-        preventing timeouts on high-volume combinations (e.g., SP×Pregão
-        with 228+ pages). Partial results are collected incrementally so
-        that if an unexpected timeout occurs, whatever was fetched is
-        returned rather than discarded.
-        """
-        loop = asyncio.get_event_loop()
-
-        # Reset partial results buffer (instance variable so orchestrator
-        # can recover data even if asyncio.wait_for cancels our task)
+        """Fetch PNCP records matching the query using async httpx client."""
         self._partial_results = []
 
-        def _fetch() -> None:
-            for item in self._client.fetch_all(
+        try:
+            items = await self._client.fetch_all(
                 data_inicial=query.data_inicial,
                 data_final=query.data_final,
                 ufs=query.ufs,
                 modalidades=query.modalidades,
                 on_progress=on_progress,
                 max_pages=MAX_PAGES_PER_COMBO,
-            ):
-                self._partial_results.append(item)
-
-        try:
-            await loop.run_in_executor(None, _fetch)
+            )
+            self._partial_results = items
         except Exception as e:
             logger.warning(
                 "PNCP fetch interrupted (%s), returning %d partial results",
@@ -134,32 +122,33 @@ class PNCPSource(DataSourceClient):
 
     @property
     def truncated_combos(self) -> int:
-        """Number of UF×modalidade combos truncated by max_pages."""
+        """Number of UF x modalidade combos truncated by max_pages."""
         return self._client.truncated_combos
 
     def is_healthy(self) -> bool:
-        """Quick health check — verifies the HTTP session is open."""
-        try:
-            return self._client.session is not None
-        except Exception:
-            return False
+        """Quick health check."""
+        return self._client is not None
 
-    # --- Cache delegation ---
+    async def cache_stats(self) -> Dict[str, Any]:
+        """Return cache statistics."""
+        if self._cache:
+            stats = self._cache.stats()
+            stats["entries"] = await self._cache.entry_count()
+            return stats
+        return {"entries": 0, "hits": 0, "misses": 0, "hit_ratio": 0.0}
 
-    def cache_stats(self) -> Dict[str, Any]:
-        """Return cache statistics from the underlying PNCPClient."""
-        return self._client.cache_stats()
+    async def cache_clear(self) -> int:
+        """Clear cache."""
+        if self._cache:
+            return await self._cache.clear()
+        return 0
 
-    def cache_clear(self) -> int:
-        """Clear cache in the underlying PNCPClient."""
-        return self._client.cache_clear()
+    async def close(self) -> None:
+        """Close the underlying client."""
+        await self._client.close()
 
-    def close(self) -> None:
-        """Close the underlying PNCPClient session."""
-        self._client.close()
-
-    def __enter__(self):
+    async def __aenter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()

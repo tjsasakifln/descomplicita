@@ -245,7 +245,7 @@ class TestRetryConfig:
         assert config.max_delay == 10.0
         assert config.exponential_base == 2
         assert config.jitter is True
-        assert config.timeout == 25
+        assert config.timeout == 40
 
     def test_retryable_status_codes_default(self):
         """Test default retryable HTTP status codes."""

@@ -154,22 +154,18 @@ class FilterStats(BaseModel):
 
 class BuscaResponse(BaseModel):
     """
-    Response schema for /buscar endpoint.
+    Response schema for /buscar endpoint (v0.3.0+).
 
     Returns the complete search results including:
     - AI-generated executive summary
-    - Excel file as base64-encoded string
     - Statistics about raw vs filtered results
     - Multi-source metadata (sources used, dedup stats)
 
-    The Excel file can be decoded and downloaded by the frontend.
+    Excel download is available via GET /buscar/{job_id}/download (StreamingResponse).
     """
 
     resumo: ResumoLicitacoes = Field(
         ..., description="Executive summary (AI-generated or fallback)"
-    )
-    excel_base64: str = Field(
-        ..., description="Excel file encoded as base64 string (decode for download)"
     )
     total_raw: int = Field(
         ..., ge=0, description="Total records fetched from all sources (before filtering)"
@@ -204,7 +200,6 @@ class BuscaResponse(BaseModel):
                     "destaques": ["3 urgentes"],
                     "alerta_urgencia": None,
                 },
-                "excel_base64": "UEsDBBQABg...",
                 "total_raw": 523,
                 "total_filtrado": 15,
             }
@@ -251,7 +246,6 @@ class JobResultResponse(BaseModel):
     job_id: str
     status: str
     resumo: Optional[ResumoLicitacoes] = None
-    excel_base64: Optional[str] = None
     total_raw: Optional[int] = None
     total_filtrado: Optional[int] = None
     filter_stats: Optional[FilterStats] = None

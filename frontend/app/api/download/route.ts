@@ -1,37 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, readdir, unlink, stat } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
 
-const DOWNLOAD_TTL_MS = parseInt(process.env.DOWNLOAD_TTL_MS || String(60 * 60 * 1000), 10); // 1 hour
-
-async function cleanupExpiredDownloads() {
-  const dir = tmpdir();
-  try {
-    const files = await readdir(dir);
-    const now = Date.now();
-    for (const file of files) {
-      if (!file.startsWith("descomplicita_")) continue;
-      const filePath = join(dir, file);
-      try {
-        // Try timestamp from filename first (format: descomplicita_{timestamp}_{uuid}.xlsx)
-        const tsMatch = file.match(/^descomplicita_(\d+)_/);
-        if (tsMatch) {
-          const createdAt = parseInt(tsMatch[1], 10);
-          if (now - createdAt > DOWNLOAD_TTL_MS) {
-            await unlink(filePath);
-          }
-          continue;
-        }
-        // Fallback to file mtime for legacy filenames
-        const { mtimeMs } = await stat(filePath);
-        if (now - mtimeMs > DOWNLOAD_TTL_MS) {
-          await unlink(filePath);
-        }
-      } catch { /* file already deleted or inaccessible */ }
-    }
-  } catch { /* tmpdir read failed, skip cleanup */ }
-}
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const API_KEY = process.env.BACKEND_API_KEY || "";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -44,33 +14,48 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Lazy cleanup of expired downloads
-  cleanupExpiredDownloads().catch(() => {});
-
-  // Read from filesystem
-  const tmpDir = tmpdir();
-  const filePath = join(tmpDir, `descomplicita_${id}.xlsx`);
-
+  // Proxy the download request to the backend streaming endpoint
+  let response: Response;
   try {
-    const buffer = await readFile(filePath);
-    const filename = `descomplicita_${new Date().toISOString().split("T")[0]}.xlsx`;
-
-    console.log(`✅ Download served: ${id} (${buffer.length} bytes)`);
-
-    // Convert Buffer to Uint8Array for Next.js Response
-    const uint8Array = new Uint8Array(buffer);
-
-    return new NextResponse(uint8Array, {
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${filename}"`
-      }
+    response = await fetch(`${BACKEND_URL}/buscar/${id}/download`, {
+      headers: API_KEY ? { "X-API-Key": API_KEY } : {},
     });
   } catch (error) {
-    console.error(`❌ Download failed for ${id}:`, error);
+    console.error(`Download proxy error for ${id}:`, error);
     return NextResponse.json(
-      { message: "Download expirado ou inválido. Faça uma nova busca para gerar o Excel." },
-      { status: 404 }
+      { message: "Backend indisponível. Tente novamente." },
+      { status: 503 }
     );
   }
+
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 409) {
+      return NextResponse.json(
+        { message: "Download expirado ou inválido. Faça uma nova busca para gerar o Excel." },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json(
+      { message: "Erro ao baixar arquivo." },
+      { status: response.status }
+    );
+  }
+
+  // Stream the binary response through
+  const contentType = response.headers.get("content-type") ||
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const contentDisposition = response.headers.get("content-disposition") ||
+    `attachment; filename="descomplicita_${new Date().toISOString().split("T")[0]}.xlsx"`;
+
+  const buffer = await response.arrayBuffer();
+  const uint8Array = new Uint8Array(buffer);
+
+  console.log(`Download served: ${id} (${uint8Array.length} bytes)`);
+
+  return new NextResponse(uint8Array, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Disposition": contentDisposition,
+    }
+  });
 }

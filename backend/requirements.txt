@@ -7,10 +7,11 @@ pydantic==2.11.7
 pydantic-settings==2.10.1
 starlette==0.45.3
 
-# HTTP client
+# HTTP client (async)
 httpx==0.28.1
-requests==2.32.3
-urllib3==2.3.0
+
+# Redis (async)
+redis[hiredis]==5.2.1
 
 # Excel generation
 openpyxl==3.1.5

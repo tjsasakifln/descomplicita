@@ -20,6 +20,26 @@
 
 services:
   # ---------------------------------------------------------------------------
+  # Redis (persistent storage for job state + PNCP cache)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: descomplicita-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bidiq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
   # Backend Service (FastAPI + Python 3.11)
   # ---------------------------------------------------------------------------
   backend:
@@ -43,6 +63,9 @@ services:
       # Backend Configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
 
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+
       # PNCP Client Configuration
       - PNCP_TIMEOUT=${PNCP_TIMEOUT:-30}
       - PNCP_MAX_RETRIES=${PNCP_MAX_RETRIES:-5}
@@ -53,6 +76,9 @@ services:
       - LLM_MODEL=${LLM_MODEL:-gpt-4.1-nano}
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.3}
       - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-500}
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - bidiq-network
     restart: unless-stopped
@@ -98,6 +124,6 @@ networks:
 # =============================================================================
 # Volumes (for future use with databases, etc.)
 # =============================================================================
-# volumes:
-#   postgres_data:
-#   redis_data:
+volumes:
+  redis_data:
+    driver: local

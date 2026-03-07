@@ -1,12 +1,12 @@
 """Unit tests for sources/pncp_source.py — PNCPSource adapter."""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from datetime import datetime
 
 from sources.pncp_source import PNCPSource, _parse_datetime
 from sources.base import SearchQuery, NormalizedRecord
+from clients.async_pncp_client import AsyncPNCPClient
 
 
 class TestParseDatetime:
@@ -56,8 +56,9 @@ class TestPNCPSourceInit:
         assert source.client.config.max_retries == 1
         assert source.client.config.timeout == 5
 
-    def test_context_manager(self):
-        with PNCPSource() as source:
+    @pytest.mark.asyncio
+    async def test_async_context_manager(self):
+        async with PNCPSource() as source:
             assert source.is_healthy() is True
 
 
@@ -70,7 +71,6 @@ class TestPNCPSourceNormalize:
 
     @pytest.fixture
     def raw_pncp_item(self):
-        """A flat PNCP dict as produced by PNCPClient._normalize_item."""
         return {
             "numeroControlePNCP": "00012345678900-2025-000001",
             "objetoCompra": "Aquisição de uniformes escolares para rede municipal",
@@ -151,7 +151,6 @@ class TestPNCPSourceNormalize:
         assert record.raw_data["valorTotalEstimado"] == 287500.0
 
     def test_normalize_missing_fields(self, source):
-        """Normalize should handle minimal dicts gracefully."""
         record = source.normalize({})
         assert record.id == ""
         assert record.objeto == ""
@@ -159,19 +158,14 @@ class TestPNCPSourceNormalize:
         assert record.data_abertura is None
 
     def test_normalize_to_legacy_dict_roundtrip(self, source, raw_pncp_item):
-        """to_legacy_dict should contain all original PNCP fields."""
         record = source.normalize(raw_pncp_item)
         legacy = record.to_legacy_dict()
-
-        # PNCP-specific fields used by excel.py / llm.py
         assert legacy["objetoCompra"] == raw_pncp_item["objetoCompra"]
         assert legacy["valorTotalEstimado"] == raw_pncp_item["valorTotalEstimado"]
         assert legacy["codigoCompra"] == raw_pncp_item["codigoCompra"]
         assert legacy["nomeOrgao"] == raw_pncp_item["nomeOrgao"]
         assert legacy["uf"] == "SP"
         assert legacy["municipio"] == "São Paulo"
-
-        # Normalized fields also present
         assert legacy["objeto"] == record.objeto
         assert legacy["valor_estimado"] == record.valor_estimado
 
@@ -181,14 +175,15 @@ class TestPNCPSourceFetchRecords:
 
     @pytest.fixture
     def source_with_mock_client(self):
-        source = PNCPSource()
-        source._client = Mock()
+        mock_client = AsyncMock(spec=AsyncPNCPClient)
+        mock_client.truncated_combos = 0
+        source = PNCPSource(async_client=mock_client)
         return source
 
     @pytest.mark.asyncio
     async def test_fetch_records_returns_normalized_records(self, source_with_mock_client):
         source = source_with_mock_client
-        source._client.fetch_all.return_value = iter([
+        source._client.fetch_all = AsyncMock(return_value=[
             {
                 "numeroControlePNCP": "001",
                 "objetoCompra": "Uniformes",
@@ -217,7 +212,7 @@ class TestPNCPSourceFetchRecords:
     @pytest.mark.asyncio
     async def test_fetch_records_passes_query_params(self, source_with_mock_client):
         source = source_with_mock_client
-        source._client.fetch_all.return_value = iter([])
+        source._client.fetch_all = AsyncMock(return_value=[])
 
         query = SearchQuery(
             data_inicial="2025-01-01",
@@ -239,17 +234,16 @@ class TestPNCPSourceFetchRecords:
     @pytest.mark.asyncio
     async def test_fetch_records_empty_results(self, source_with_mock_client):
         source = source_with_mock_client
-        source._client.fetch_all.return_value = iter([])
+        source._client.fetch_all = AsyncMock(return_value=[])
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31")
         records = await source.fetch_records(query)
-
         assert records == []
 
     @pytest.mark.asyncio
     async def test_fetch_records_multiple_items(self, source_with_mock_client):
         source = source_with_mock_client
-        source._client.fetch_all.return_value = iter([
+        source._client.fetch_all = AsyncMock(return_value=[
             {"numeroControlePNCP": "001", "objetoCompra": "Item 1", "uf": "SP",
              "municipio": "", "nomeOrgao": "", "valorTotalEstimado": 50000.0,
              "codigoCompra": "001", "cnpj": "", "anoCompra": "", "sequencialCompra": ""},
@@ -260,37 +254,37 @@ class TestPNCPSourceFetchRecords:
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31")
         records = await source.fetch_records(query)
-
         assert len(records) == 2
         assert records[0].id == "001"
         assert records[1].id == "002"
 
 
 class TestPNCPSourceCacheDelegation:
-    """Tests for cache operation delegation to underlying PNCPClient."""
+    """Tests for cache operation delegation."""
 
-    def test_cache_stats(self):
+    @pytest.mark.asyncio
+    async def test_cache_stats_no_cache(self):
         source = PNCPSource()
-        stats = source.cache_stats()
+        stats = await source.cache_stats()
         assert "entries" in stats
         assert "hits" in stats
         assert "misses" in stats
         assert "hit_ratio" in stats
 
-    def test_cache_clear(self):
+    @pytest.mark.asyncio
+    async def test_cache_clear_no_cache(self):
         source = PNCPSource()
-        cleared = source.cache_clear()
-        assert cleared == 0  # Empty cache
+        cleared = await source.cache_clear()
+        assert cleared == 0
 
 
 class TestPNCPSourceHealthCheck:
-    """Tests for PNCPSource.is_healthy()."""
 
-    def test_healthy_when_session_exists(self):
+    def test_healthy_when_client_exists(self):
         source = PNCPSource()
         assert source.is_healthy() is True
 
-    def test_unhealthy_when_session_none(self):
+    def test_unhealthy_when_client_none(self):
         source = PNCPSource()
-        source._client.session = None
+        source._client = None
         assert source.is_healthy() is False

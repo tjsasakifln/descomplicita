@@ -1,11 +1,22 @@
 """Shared test fixtures for the Descomplicita backend test suite."""
 
+import asyncio
 import os
 import pytest
 from unittest.mock import AsyncMock, Mock
 
+from job_store import JobStore
 from sources.orchestrator import OrchestratorResult, SourceStats
 from sources.base import NormalizedRecord
+
+
+# Module-level job store for tests (replaces the DI-provided one)
+_test_job_store = JobStore()
+
+
+def get_test_job_store():
+    """Return the test job store instance."""
+    return _test_job_store
 
 
 @pytest.fixture(autouse=True)
@@ -16,7 +27,6 @@ def _reset_rate_limiter():
     try:
         limiter.reset()
     except Exception:
-        # reset() may not exist on all storage backends; clear manually
         if hasattr(limiter, "_storage") and hasattr(limiter._storage, "storage"):
             limiter._storage.storage.clear()
 
@@ -27,22 +37,80 @@ def _disable_auth_for_tests(monkeypatch):
     monkeypatch.delenv("API_KEY", raising=False)
 
 
-def make_mock_orchestrator(raw_records=None, error=None):
-    """Create a mock MultiSourceOrchestrator from raw legacy dicts.
+@pytest.fixture(autouse=True)
+def _override_dependencies():
+    """Override DI dependencies for testing (no Redis, in-memory stores)."""
+    from main import app
+    from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_redis, get_redis_cache
 
-    This bridges the old PNCPClient.fetch_all() test pattern to the new
-    orchestrator-based flow. Converts raw dicts to NormalizedRecords so
-    orchestrator.search_all() returns them properly, and downstream
-    to_legacy_dict() re-produces the original dicts for filter_batch.
+    # Use test job store
+    app.dependency_overrides[get_job_store] = get_test_job_store
+    app.dependency_overrides[get_redis] = lambda: None
+    app.dependency_overrides[get_redis_cache] = lambda: None
 
-    Args:
-        raw_records: List of raw dicts (like old PNCPClient responses).
-                     Each will be wrapped in a NormalizedRecord.
-        error: If set, search_all will raise this exception.
+    yield
 
-    Returns:
-        A mock object compatible with MultiSourceOrchestrator.
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_job_store():
+    """Clear the test job store before and after every test."""
+    _test_job_store._jobs.clear()
+    yield
+    _test_job_store._jobs.clear()
+
+
+@pytest.fixture()
+def run_sync(monkeypatch):
     """
+    Make background search jobs execute synchronously inside the TestClient.
+
+    Patches run_search_job to avoid thread pool deadlocks with Starlette's
+    TestClient, and patches asyncio.create_task to run the background
+    coroutine inline.
+
+    Updated for the new 4-param signature:
+        run_search_job(job_id, request, job_store, orchestrator)
+    """
+    import main as main_module
+
+    original_run_search_job = main_module.run_search_job
+
+    async def _inline_run_search_job(job_id, request, job_store, orchestrator):
+        loop = asyncio.get_event_loop()
+        original_rie = loop.run_in_executor
+
+        def _sync_rie(executor, func, *args):
+            fut = loop.create_future()
+            try:
+                fut.set_result(func(*args))
+            except Exception as exc:
+                fut.set_exception(exc)
+            return fut
+
+        loop.run_in_executor = _sync_rie
+        try:
+            await original_run_search_job(job_id, request, job_store, orchestrator)
+        finally:
+            loop.run_in_executor = original_rie
+
+    monkeypatch.setattr("main.run_search_job", _inline_run_search_job)
+
+    original_create_task = asyncio.create_task
+
+    def _inline_create_task(coro, *args, **kwargs):
+        coro_name = getattr(coro, "__qualname__", "") or getattr(coro, "__name__", "")
+        if "run_search_job" in coro_name or "_inline" in coro_name:
+            loop = asyncio.get_event_loop()
+            return loop.create_task(coro)
+        return original_create_task(coro, *args, **kwargs)
+
+    monkeypatch.setattr("main.asyncio.create_task", _inline_create_task)
+
+
+def make_mock_orchestrator(raw_records=None, error=None):
+    """Create a mock MultiSourceOrchestrator from raw legacy dicts."""
     mock_orch = Mock()
     mock_orch.enabled_sources = [Mock(source_name="pncp")]
 
