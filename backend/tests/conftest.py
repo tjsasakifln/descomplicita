@@ -78,7 +78,7 @@ def run_sync(monkeypatch):
     original_run_search_job = main_module.run_search_job
 
     async def _inline_run_search_job(job_id, request, job_store, orchestrator):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         original_rie = loop.run_in_executor
 
         def _sync_rie(executor, func, *args):
@@ -102,7 +102,7 @@ def run_sync(monkeypatch):
     def _inline_create_task(coro, *args, **kwargs):
         coro_name = getattr(coro, "__qualname__", "") or getattr(coro, "__name__", "")
         if "run_search_job" in coro_name or "_inline" in coro_name:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             return loop.create_task(coro)
         return original_create_task(coro, *args, **kwargs)
 

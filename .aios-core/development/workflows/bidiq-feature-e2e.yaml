@@ -1,6 +1,6 @@
 workflow:
   id: bidiq-feature-e2e
-  name: BidIQ Feature End-to-End
+  name: Descomplicita Feature End-to-End
   description: >-
     Workflow completo para implementação de feature full-stack: backend (FastAPI) +
     frontend (Next.js/React) + testes. Desde a criação da story até PR e validação CI.
@@ -190,7 +190,7 @@ workflow:
       - Nova feature que requer backend + frontend
       - Endpoint novo com UI correspondente
       - Feature completa end-to-end com testes
-      - Adição de funcionalidade ao sistema BidIQ
+      - Adição de funcionalidade ao sistema Descomplicita
       - Qualquer mudança que toca ambos backend e frontend
 
   handoff_prompts:

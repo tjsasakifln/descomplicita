@@ -1,4 +1,4 @@
-# 🗺️ ROADMAP — BidIQ Uniformes POC
+# 🗺️ ROADMAP — Descomplicita POC
 
 **Versão:** 1.30 (POC Complete - Production Deployed)
 **Última Atualização:** 2026-01-28 12:30 (UTC)
@@ -8,7 +8,7 @@
 
 ## 📋 Visão Geral
 
-O **BidIQ Uniformes POC** é uma aplicação web que automatiza a busca, filtragem e análise de licitações de uniformes/fardamentos no Portal Nacional de Contratações Públicas (PNCP).
+O **Descomplicita POC** é uma aplicação web que automatiza a busca, filtragem e análise de licitações de uniformes/fardamentos no Portal Nacional de Contratações Públicas (PNCP).
 
 **Objetivo:** Demonstrar viabilidade técnica da solução com funcionalidades core implementadas.
 
@@ -552,7 +552,7 @@ Não existe design system documentado. Precisa de: domain exploration (procureme
 **Acceptance Criteria:**
 - [ ] Domain: 5+ conceitos do mundo de licitações
 - [ ] Color world: 5+ cores do domínio de procurement público
-- [ ] Signature element: 1 elemento visual único do BidIQ
+- [ ] Signature element: 1 elemento visual único do Descomplicita
 - [ ] Defaults rejeitados: 3+ padrões genéricos substituídos
 - [ ] Tokens semânticos nomeados (não genéricos)
 - [ ] Direction, depth strategy, spacing base documentados

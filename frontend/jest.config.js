@@ -31,6 +31,7 @@ const customJestConfig = {
     '^@/(.*)$': '<rootDir>/app/$1',
     '^@/components/(.*)$': '<rootDir>/app/components/$1',
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
+    '^@sentry/nextjs$': '<rootDir>/__mocks__/@sentry/nextjs.js',
   },
 
   // Test file patterns

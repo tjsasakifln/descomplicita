@@ -2,7 +2,7 @@
 
 **Workflow:** brownfield-discovery.yaml
 **Comando:** `*brown-disc`
-**Projeto:** BidIQ Uniformes - POC v0.2
+**Projeto:** Descomplicita - POC v0.2
 **Data:** January 26, 2026
 **Status:** ✅ **FASES 1-9 COMPLETAS** (Fase 10 - stories criada)
 
@@ -42,7 +42,7 @@ Timeline: 3-4 semanas (2-3 devs)
 ### FASE 2: Coleta - Database
 **Arquivo:** N/A (SKIPPED - Projeto não tem DB)
 **Status:** ⏭️ PULADA
-**Motivo:** BidIQ v0.2 é stateless (sem Supabase/PostgreSQL)
+**Motivo:** Descomplicita v0.2 é stateless (sem Supabase/PostgreSQL)
 **Para Fase 2:** Database pode ser adicionada post-MVP
 
 ---

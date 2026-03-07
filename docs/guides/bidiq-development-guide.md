@@ -1,4 +1,4 @@
-# BidIQ Development Acceleration Guide
+# Descomplicita Development Acceleration Guide
 
 **Status:** MVP v0.1 (Week 1)
 **Framework:** Synkra AIOS v2.0
@@ -114,7 +114,7 @@
 
 ## Development Squads
 
-### 1. Team BidIQ Backend
+### 1. Team Descomplicita Backend
 
 **When to use:** Building backend features, API changes, database work
 
@@ -164,7 +164,7 @@ Create PR → Auto-merge → Deploy to main
 
 ---
 
-### 2. Team BidIQ Frontend
+### 2. Team Descomplicita Frontend
 
 **When to use:** Building frontend features, UI components, user interactions
 
@@ -218,7 +218,7 @@ Create PR → Code review → Auto-merge → Deploy
 
 ---
 
-### 3. Team BidIQ Feature Complete
+### 3. Team Descomplicita Feature Complete
 
 **When to use:** Building complete features requiring backend + frontend + coordination
 

@@ -8,6 +8,7 @@ from Brazil's PNCP (Portal Nacional de Contratações Públicas).
 import asyncio
 import logging
 import os
+import signal
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -21,12 +22,14 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from config import setup_logging
+from config import setup_logging, MAX_DATE_RANGE_DAYS, MAX_DOWNLOAD_SIZE
 from middleware.auth import APIKeyMiddleware
+from middleware.correlation_id import CorrelationIdMiddleware
 from schemas import (
     BuscaRequest,
     JobCreatedResponse,
     JobStatusResponse,
+    JobResultResponse,
     JobProgress,
 )
 from dependencies import (
@@ -48,6 +51,28 @@ from sectors import get_sector, list_sectors
 # Configure structured logging
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Sentry integration (TD-057)
+# ---------------------------------------------------------------------------
+_sentry_dsn = os.getenv("SENTRY_DSN", "")
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+            integrations=[
+                StarletteIntegration(),
+                FastApiIntegration(),
+            ],
+        )
+        logger.info("Sentry initialized successfully")
+    except Exception:
+        logger.warning("Failed to initialize Sentry", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +96,19 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(_periodic_cleanup())
     logger.info("Periodic job cleanup task started")
 
+    # --- SIGTERM graceful shutdown handler (TD-025) ---
+    _shutdown_event = asyncio.Event()
+
+    def _sigterm_handler():
+        logger.info("SIGTERM received — initiating graceful shutdown")
+        _shutdown_event.set()
+
+    loop = asyncio.get_running_loop()
+    try:
+        loop.add_signal_handler(signal.SIGTERM, _sigterm_handler)
+    except NotImplementedError:
+        pass  # Windows doesn't support add_signal_handler
+
     yield
 
     # Shutdown
@@ -79,6 +117,16 @@ async def lifespan(app: FastAPI):
         await cleanup_task
     except asyncio.CancelledError:
         pass
+
+    # Flush Sentry events before exit
+    if _sentry_dsn:
+        try:
+            import sentry_sdk
+            sentry_sdk.flush(timeout=5)
+            logger.info("Sentry events flushed")
+        except Exception:
+            pass
+
     await shutdown_dependencies()
     logger.info("Application shutdown complete")
 
@@ -132,6 +180,9 @@ app.add_middleware(
 # API key authentication middleware
 app.add_middleware(APIKeyMiddleware)
 
+# Correlation ID middleware (TD-017)
+app.add_middleware(CorrelationIdMiddleware)
+
 logger.info(
     "FastAPI application initialized — PORT=%s",
     os.getenv("PORT", "8000"),
@@ -171,7 +222,7 @@ async def health(redis=Depends(get_redis)):
 
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": app.version,
         "redis": redis_status,
     }
@@ -282,7 +333,7 @@ async def run_search_job(
     orchestrator,
 ) -> None:
     """Execute the full search pipeline as a background async task."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     try:
         # --- Validate sector ---
@@ -293,8 +344,8 @@ async def run_search_job(
             return
 
         logger.info(
-            f"[job={job_id}] Using sector: {sector.name} "
-            f"({len(sector.keywords)} keywords)"
+            "[job=%s] Using sector: %s (%s keywords)",
+            job_id, sector.name, len(sector.keywords),
         )
 
         custom_terms: list[str] = []
@@ -308,13 +359,14 @@ async def run_search_job(
         if custom_terms:
             active_keywords = set(custom_terms)
             logger.info(
-                f"[job={job_id}] Using {len(custom_terms)} custom search terms: "
-                f"{custom_terms}"
+                "[job=%s] Using %s custom search terms: %s",
+                job_id, len(custom_terms), custom_terms,
             )
         else:
             active_keywords = set(sector.keywords)
             logger.info(
-                f"[job={job_id}] Using sector keywords ({len(active_keywords)} terms)"
+                "[job=%s] Using sector keywords (%s terms)",
+                job_id, len(active_keywords),
             )
 
         # --- Phase: fetching ---
@@ -330,7 +382,8 @@ async def run_search_job(
 
         source_names = [s.source_name for s in enabled]
         logger.info(
-            f"[job={job_id}] Fetching bids from {sources_total} sources: {source_names}"
+            "[job=%s] Fetching bids from %s sources: %s",
+            job_id, sources_total, source_names,
         )
 
         query = SearchQuery(
@@ -351,9 +404,9 @@ async def run_search_job(
         licitacoes_raw = [r.to_legacy_dict() for r in orch_result.records]
 
         logger.info(
-            f"[job={job_id}] Fetched {len(licitacoes_raw)} records from "
-            f"{len(orch_result.sources_used)} sources "
-            f"({orch_result.dedup_removed} duplicates removed)"
+            "[job=%s] Fetched %s records from %s sources (%s duplicates removed)",
+            job_id, len(licitacoes_raw), len(orch_result.sources_used),
+            orch_result.dedup_removed,
         )
 
         # --- Phase: filtering ---
@@ -361,7 +414,7 @@ async def run_search_job(
             job_id, phase="filtering", items_fetched=len(licitacoes_raw)
         )
 
-        logger.info(f"[job={job_id}] Applying filters to raw bids")
+        logger.info("[job=%s] Applying filters to raw bids", job_id)
 
         licitacoes_filtradas, stats = await loop.run_in_executor(
             None,
@@ -380,33 +433,17 @@ async def run_search_job(
         )
 
         logger.info(
-            f"[job={job_id}] Filtering complete: "
-            f"{len(licitacoes_filtradas)}/{len(licitacoes_raw)} bids passed"
+            "[job=%s] Filtering complete: %s/%s bids passed",
+            job_id, len(licitacoes_filtradas), len(licitacoes_raw),
         )
         if stats:
-            logger.info(f"[job={job_id}]   - Total processadas: {stats.get('total', len(licitacoes_raw))}")
-            logger.info(f"[job={job_id}]   - Aprovadas: {stats.get('aprovadas', len(licitacoes_filtradas))}")
-            logger.info(f"[job={job_id}]   - Rejeitadas (UF): {stats.get('rejeitadas_uf', 0)}")
-            logger.info(f"[job={job_id}]   - Rejeitadas (Valor): {stats.get('rejeitadas_valor', 0)}")
-            logger.info(f"[job={job_id}]   - Rejeitadas (Keyword): {stats.get('rejeitadas_keyword', 0)}")
-            logger.info(f"[job={job_id}]   - Rejeitadas (Prazo): {stats.get('rejeitadas_prazo', 0)}")
-            logger.info(f"[job={job_id}]   - Rejeitadas (Outros): {stats.get('rejeitadas_outros', 0)}")
-
-        if stats.get('rejeitadas_keyword', 0) > 0:
-            keyword_rejected_sample = []
-            for lic in licitacoes_raw[:200]:
-                obj = lic.get("objetoCompra", "")
-                from filter import match_keywords, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO
-                matched, _, _score = match_keywords(obj, KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
-                if not matched:
-                    keyword_rejected_sample.append(obj[:120])
-                    if len(keyword_rejected_sample) >= 3:
-                        break
-            if keyword_rejected_sample:
-                logger.debug(
-                    f"[job={job_id}]   - Sample keyword-rejected objects: "
-                    f"{keyword_rejected_sample}"
-                )
+            logger.info("[job=%s]   - Total processadas: %s", job_id, stats.get("total", len(licitacoes_raw)))
+            logger.info("[job=%s]   - Aprovadas: %s", job_id, stats.get("aprovadas", len(licitacoes_filtradas)))
+            logger.info("[job=%s]   - Rejeitadas (UF): %s", job_id, stats.get("rejeitadas_uf", 0))
+            logger.info("[job=%s]   - Rejeitadas (Valor): %s", job_id, stats.get("rejeitadas_valor", 0))
+            logger.info("[job=%s]   - Rejeitadas (Keyword): %s", job_id, stats.get("rejeitadas_keyword", 0))
+            logger.info("[job=%s]   - Rejeitadas (Prazo): %s", job_id, stats.get("rejeitadas_prazo", 0))
+            logger.info("[job=%s]   - Rejeitadas (Outros): %s", job_id, stats.get("rejeitadas_outros", 0))
 
         fs = {
             "rejeitadas_uf": stats.get("rejeitadas_uf", 0),
@@ -429,7 +466,7 @@ async def run_search_job(
 
         if not licitacoes_filtradas:
             logger.info(
-                f"[job={job_id}] No bids passed filters — skipping LLM and Excel"
+                "[job=%s] No bids passed filters — skipping LLM and Excel", job_id,
             )
             resumo_dict = {
                 "resumo_executivo": (
@@ -465,7 +502,7 @@ async def run_search_job(
             }
             await job_store.complete(job_id, result)
             logger.info(
-                f"[job={job_id}] Search completed with 0 results",
+                "[job=%s] Search completed with 0 results", job_id,
                 extra={"total_raw": len(licitacoes_raw), "total_filtrado": 0},
             )
             return
@@ -473,24 +510,24 @@ async def run_search_job(
         def _generate_resumo():
             try:
                 r = gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
-                logger.info(f"[job={job_id}] LLM summary generated successfully")
+                logger.info("[job=%s] LLM summary generated successfully", job_id)
                 return r
             except Exception as e:
                 logger.warning(
-                    f"[job={job_id}] LLM generation failed, using fallback: {e}",
-                    exc_info=True,
+                    "[job=%s] LLM generation failed, using fallback: %s",
+                    job_id, e, exc_info=True,
                 )
                 r = gerar_resumo_fallback(licitacoes_filtradas, sector_name=sector.name)
-                logger.info(f"[job={job_id}] Fallback summary generated successfully")
+                logger.info("[job=%s] Fallback summary generated successfully", job_id)
                 return r
 
         def _generate_excel():
             buf = create_excel(licitacoes_filtradas)
             excel_bytes = buf.read()
-            logger.info(f"[job={job_id}] Excel report generated ({len(excel_bytes)} bytes)")
+            logger.info("[job=%s] Excel report generated (%s bytes)", job_id, len(excel_bytes))
             return excel_bytes
 
-        logger.info(f"[job={job_id}] Generating LLM summary + Excel report in parallel")
+        logger.info("[job=%s] Generating LLM summary + Excel report in parallel", job_id)
 
         await job_store.update_progress(job_id, phase="generating_excel")
 
@@ -504,8 +541,8 @@ async def run_search_job(
         )
         if resumo.total_oportunidades != actual_total:
             logger.warning(
-                f"[job={job_id}] LLM returned total_oportunidades="
-                f"{resumo.total_oportunidades}, overriding with actual={actual_total}"
+                "[job=%s] LLM returned total_oportunidades=%s, overriding with actual=%s",
+                job_id, resumo.total_oportunidades, actual_total,
             )
         resumo.total_oportunidades = actual_total
         resumo.valor_total = actual_valor
@@ -537,7 +574,7 @@ async def run_search_job(
         await job_store.complete(job_id, result)
 
         logger.info(
-            f"[job={job_id}] Search completed successfully",
+            "[job=%s] Search completed successfully", job_id,
             extra={
                 "total_raw": len(licitacoes_raw),
                 "total_filtrado": len(licitacoes_filtradas),
@@ -546,7 +583,7 @@ async def run_search_job(
         )
 
     except PNCPRateLimitError as e:
-        logger.error(f"[job={job_id}] PNCP rate limit exceeded: {e}", exc_info=True)
+        logger.error("[job=%s] PNCP rate limit exceeded: %s", job_id, e, exc_info=True)
         retry_after = getattr(e, "retry_after", 60)
         await job_store.fail(
             job_id,
@@ -555,7 +592,7 @@ async def run_search_job(
         )
 
     except PNCPAPIError as e:
-        logger.error(f"[job={job_id}] PNCP API error: {e}", exc_info=True)
+        logger.error("[job=%s] PNCP API error: %s", job_id, e, exc_info=True)
         await job_store.fail(
             job_id,
             "O Portal Nacional de Contratações (PNCP) está temporariamente "
@@ -564,7 +601,7 @@ async def run_search_job(
         )
 
     except Exception:
-        logger.exception(f"[job={job_id}] Internal server error during search")
+        logger.exception("[job=%s] Internal server error during search", job_id)
         await job_store.fail(
             job_id,
             "Erro interno do servidor. Tente novamente em alguns instantes.",
@@ -597,7 +634,7 @@ async def job_status(
     )
 
 
-@app.get("/buscar/{job_id}/result")
+@app.get("/buscar/{job_id}/result", response_model=JobResultResponse)
 @limiter.limit("5/minute")
 async def job_result(
     job_id: str,
@@ -646,6 +683,12 @@ async def job_download(
     excel_bytes = job.result.get("excel_bytes", b"")
     if not excel_bytes:
         raise HTTPException(status_code=404, detail="No Excel data available")
+
+    if len(excel_bytes) > MAX_DOWNLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="File exceeds maximum download size (%s MB)" % (MAX_DOWNLOAD_SIZE // (1024 * 1024)),
+        )
 
     filename = f"descomplicita_{job_id[:8]}.xlsx"
 

@@ -1,6 +1,6 @@
 # Frontend Specification -- Descomplicita
 
-**Project:** Descomplicita (formerly BidIQ) -- Brazilian Procurement Search Platform
+**Project:** Descomplicita (formerly Descomplicita) -- Brazilian Procurement Search Platform
 **Date:** March 2026
 **Version:** 2.0
 **Status:** MVP -- Production-ready single-page application
@@ -95,7 +95,7 @@ frontend/
     error.tsx           -- Error boundary
     globals.css         -- Design system tokens + animations
     types.ts            -- Shared TypeScript interfaces
-    icon.svg            -- Favicon (still shows "B" from BidIQ era)
+    icon.svg            -- Favicon (still shows "B" from Descomplicita era)
     api/
       buscar/
         route.ts        -- POST: Submit search job
@@ -421,7 +421,7 @@ Implementation uses inline `<script>` in `<head>` to prevent flash of unstyled c
 
 The design system is **well-defined but inconsistently applied**:
 - `error.tsx` uses hardcoded Tailwind colors (`bg-gray-50`, `bg-green-600`, `text-gray-900`) instead of design tokens
-- The `icon.svg` still shows "B" (from BidIQ) with green background (`#166534`) instead of brand navy
+- The `icon.svg` still shows "B" (from Descomplicita) with green background (`#166534`) instead of brand navy
 - Some hardcoded Tailwind color classes in `SourceBadges.tsx` (`bg-green-100`, `bg-red-100`, etc.) instead of semantic tokens
 - `carouselData.ts` uses hardcoded Tailwind colors (`bg-blue-50`, `bg-green-50`, etc.) for category styling
 
@@ -569,7 +569,7 @@ GET /api/buscar/result?job_id= -> { resumo, download_id, ... }
 
 - Logo: External URL via `<img>` tag, not using Next.js `<Image>` component (eslint disable comment present)
 - `logo-descomplicita.png` exists in `/public/` but is not used -- logo comes from Wix CDN
-- `icon.svg` is outdated (shows "B" in green, from BidIQ era)
+- `icon.svg` is outdated (shows "B" in green, from Descomplicita era)
 
 ### Code Splitting
 
@@ -809,7 +809,7 @@ From `jest.config.js` thresholds (last recorded):
 - **Impact:** Logo may fail to load if Wix CDN is down. Not using Next.js `<Image>` means no optimization.
 
 ### TD-FE-007: Outdated Favicon
-- **Description:** `icon.svg` displays a green "B" (from BidIQ era). Should show Descomplicita branding.
+- **Description:** `icon.svg` displays a green "B" (from Descomplicita era). Should show Descomplicita branding.
 - **File:** `frontend/app/icon.svg`
 - **Severity:** Medium
 - **Category:** Design
@@ -851,7 +851,7 @@ From `jest.config.js` thresholds (last recorded):
 - **Impact:** Minor confusion if sectors take time to load.
 
 ### TD-FE-013: E2E Tests Reference Outdated Class Names
-- **Description:** E2E tests check for `bg-green-600` CSS class (old BidIQ theme) but the actual UI uses `bg-brand-navy`. These tests likely fail or are not being run.
+- **Description:** E2E tests check for `bg-green-600` CSS class (old Descomplicita theme) but the actual UI uses `bg-brand-navy`. These tests likely fail or are not being run.
 - **File:** `frontend/__tests__/e2e/01-happy-path.spec.ts` (line 64)
 - **Severity:** Low
 - **Category:** Code Quality

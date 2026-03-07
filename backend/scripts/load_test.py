@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load test script for BidIQ search pipeline (SP-001.5)."""
+"""Load test script for Descomplicita search pipeline (SP-001.5)."""
 
 import argparse
 import requests
@@ -193,13 +193,13 @@ def scenario_concurrency(base_url: str) -> list[tuple[str, str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="BidIQ load test script (SP-001.5)",
+        description="Descomplicita load test script (SP-001.5)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--base-url",
         default="http://localhost:8000",
-        help="Base URL of the BidIQ backend (default: http://localhost:8000)",
+        help="Base URL of the Descomplicita backend (default: http://localhost:8000)",
     )
     parser.add_argument(
         "--scenarios",
@@ -212,7 +212,7 @@ def main() -> int:
     base_url = args.base_url.rstrip("/")
     today = date.today().isoformat()
 
-    print("=== BidIQ Load Test Results ===")
+    print("=== Descomplicita Load Test Results ===")
     print(f"Date:   {today}")
     print(f"Server: {base_url}")
 

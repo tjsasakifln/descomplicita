@@ -1,6 +1,6 @@
 # 🔗 Integration Guide - Frontend ↔ Backend
 
-This document provides step-by-step instructions for validating the integration between the Next.js frontend and FastAPI backend in the BidIQ Uniformes POC.
+This document provides step-by-step instructions for validating the integration between the Next.js frontend and FastAPI backend in the Descomplicita POC.
 
 ## 📋 Table of Contents
 
@@ -133,7 +133,7 @@ Follow these steps to validate the complete integration:
 Navigate to http://localhost:3000 in your browser.
 
 **Expected UI:**
-- Header: "BidIQ Uniformes"
+- Header: "Descomplicita"
 - UF selection grid (27 state buttons)
 - Date range inputs (default: last 7 days)
 - Green "Buscar Licitações" button (enabled)

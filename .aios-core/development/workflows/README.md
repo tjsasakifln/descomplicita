@@ -15,7 +15,7 @@ This directory contains workflow definitions for the Synkra AIOS framework. Work
 ### Discovery & Audit Workflows
 - **brownfield-discovery.yaml** - Comprehensive technical debt assessment with multi-agent validation cycles
 
-### BidIQ-Specific Workflows
+### Descomplicita-Specific Workflows
 
 | Workflow | ID | Purpose | Agents |
 |----------|----|---------|--------|

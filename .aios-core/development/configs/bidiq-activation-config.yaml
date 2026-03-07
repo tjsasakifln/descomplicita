@@ -1,7 +1,7 @@
-# BidIQ Proactive Activation Configuration
+# Descomplicita Proactive Activation Configuration
 # Automatically suggests and activates appropriate squads based on context
 
-name: BidIQ Adaptive Activation
+name: Descomplicita Adaptive Activation
 version: 1.0
 
 # Proactive activation rules

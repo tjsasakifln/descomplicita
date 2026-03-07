@@ -1,4 +1,4 @@
-# PRD Técnico: BidIQ Uniformes — POC v0.2
+# PRD Técnico: Descomplicita — POC v0.2
 
 **Versão:** 0.2
 **Data:** Janeiro 2026
@@ -253,7 +253,7 @@ class PNCPClient:
         session.mount("http://", adapter)
 
         session.headers.update({
-            "User-Agent": "BidIQ-POC/0.2",
+            "User-Agent": "Descomplicita-POC/0.2",
             "Accept": "application/json"
         })
 
@@ -1294,7 +1294,7 @@ export default function HomePage() {
   return (
     <main className="max-w-4xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">
-        BidIQ Uniformes
+        Descomplicita
       </h1>
 
       {/* Seleção de UFs */}
@@ -1588,7 +1588,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import base64
 
-app = FastAPI(title="BidIQ Uniformes API")
+app = FastAPI(title="Descomplicita API")
 
 app.add_middleware(
     CORSMiddleware,

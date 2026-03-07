@@ -1,8 +1,10 @@
 """Pydantic schemas for API request/response validation."""
 
 from datetime import date
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import List, Optional
+
+from config import MAX_DATE_RANGE_DAYS
 
 
 class BuscaRequest(BaseModel):
@@ -71,18 +73,22 @@ class BuscaRequest(BaseModel):
                 "Data inicial deve ser anterior ou igual à data final"
             )
 
+        date_range = (d_fin - d_ini).days
+        if date_range > MAX_DATE_RANGE_DAYS:
+            raise ValueError(
+                f"Intervalo de datas excede o máximo permitido de {MAX_DATE_RANGE_DAYS} dias "
+                f"(solicitado: {date_range} dias)"
+            )
+
         return self
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
-            "example": {
-                "ufs": ["SP", "RJ"],
-                "data_inicial": "2025-01-01",
-                "data_final": "2025-01-31",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "ufs": ["SP", "RJ"],
+            "data_inicial": "2025-01-01",
+            "data_final": "2025-01-31",
         }
+    })
 
 
 class ResumoLicitacoes(BaseModel):
@@ -125,21 +131,18 @@ class ResumoLicitacoes(BaseModel):
         examples=["⚠️ 5 licitações encerram em 24 horas"],
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
-            "example": {
-                "resumo_executivo": "Encontradas 15 licitações de uniformes em SP e RJ.",
-                "total_oportunidades": 15,
-                "valor_total": 2300000.00,
-                "destaques": [
-                    "3 licitações com prazo até 48h",
-                    "Maior valor: R$ 500k em SP",
-                ],
-                "alerta_urgencia": "⚠️ 5 licitações encerram em 24 horas",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "resumo_executivo": "Encontradas 15 licitações de uniformes em SP e RJ.",
+            "total_oportunidades": 15,
+            "valor_total": 2300000.00,
+            "destaques": [
+                "3 licitações com prazo até 48h",
+                "Maior valor: R$ 500k em SP",
+            ],
+            "alerta_urgencia": None,
         }
+    })
 
 
 class FilterStats(BaseModel):
@@ -188,22 +191,19 @@ class BuscaResponse(BaseModel):
         default=None, description="Number of duplicate records removed across sources"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
-            "example": {
-                "resumo": {
-                    "resumo_executivo": "Encontradas 15 licitações.",
-                    "total_oportunidades": 15,
-                    "valor_total": 2300000.00,
-                    "destaques": ["3 urgentes"],
-                    "alerta_urgencia": None,
-                },
-                "total_raw": 523,
-                "total_filtrado": 15,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "resumo": {
+                "resumo_executivo": "Encontradas 15 licitações.",
+                "total_oportunidades": 15,
+                "valor_total": 2300000.00,
+                "destaques": ["3 urgentes"],
+                "alerta_urgencia": None,
+            },
+            "total_raw": 523,
+            "total_filtrado": 15,
         }
+    })
 
 
 # ---------------------------------------------------------------------------

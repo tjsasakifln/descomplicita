@@ -18,6 +18,7 @@ from config import (
     DEFAULT_MODALIDADES,
     PRIORITY_MODALIDADES,
     MODALIDADE_REDUCTION_UF_THRESHOLD,
+    PNCP_BASE_URL,
 )
 from exceptions import PNCPAPIError
 
@@ -78,16 +79,16 @@ def calculate_delay(attempt: int, config: RetryConfig) -> float:
 class PNCPClient:
     """Resilient HTTP client for PNCP API with retry logic and rate limiting."""
 
-    BASE_URL = "https://pncp.gov.br/api/consulta/v1"
-
-    def __init__(self, config: RetryConfig | None = None):
+    def __init__(self, config: RetryConfig | None = None, base_url: str | None = None):
         """
         Initialize PNCP client.
 
         Args:
             config: Retry configuration (uses defaults if not provided)
+            base_url: PNCP API base URL (defaults to PNCP_BASE_URL from config)
         """
         self.config = config or RetryConfig()
+        self.BASE_URL = base_url or PNCP_BASE_URL
         self.session = self._create_session()
         self._request_count = 0
         self._last_request_time = 0.0
@@ -221,7 +222,7 @@ class PNCPClient:
             elapsed = time.time() - self._last_request_time
             if elapsed < interval:
                 sleep_time = interval - elapsed
-                logger.debug(f"Rate limiting: sleeping {sleep_time:.3f}s")
+                logger.debug("Rate limiting: sleeping %.3fs", sleep_time)
                 time.sleep(sleep_time)
 
             self._last_request_time = time.time()
@@ -233,14 +234,14 @@ class PNCPClient:
             if was_timeout or response_time > 5.0:
                 # Server is struggling — double the interval (max 2s)
                 self._adaptive_interval = min(2.0, self._adaptive_interval * 2)
-                logger.debug(f"Rate limit increased to {self._adaptive_interval:.1f}s")
+                logger.debug("Rate limit increased to %.1fs", self._adaptive_interval)
             elif response_time < 2.0 and self._adaptive_interval > self._base_interval:
                 # Server is responsive — decay back toward baseline
                 self._adaptive_interval = max(
                     self._base_interval,
                     self._adaptive_interval * 0.8,
                 )
-                logger.debug(f"Rate limit decreased to {self._adaptive_interval:.1f}s")
+                logger.debug("Rate limit decreased to %.1fs", self._adaptive_interval)
 
     def fetch_page(
         self,
@@ -296,8 +297,8 @@ class PNCPClient:
         for attempt in range(self.config.max_retries + 1):
             try:
                 logger.debug(
-                    f"Request {url} params={params} attempt={attempt + 1}/"
-                    f"{self.config.max_retries + 1}"
+                    "Request %s params=%s attempt=%s/%s",
+                    url, params, attempt + 1, self.config.max_retries + 1,
                 )
 
                 req_start = time.time()
@@ -322,13 +323,13 @@ class PNCPClient:
                         ratio = self._rate_limit_count / self._total_fetch_count
                         if ratio > 0.20:
                             logger.warning(
-                                f"High 429 rate: {self._rate_limit_count}/{self._total_fetch_count} "
-                                f"({ratio:.0%}) requests rate-limited"
+                                "High 429 rate: %s/%s (%.0f%%) requests rate-limited",
+                                self._rate_limit_count, self._total_fetch_count, ratio * 100,
                             )
                     retry_after = int(response.headers.get("Retry-After", 60))
                     logger.warning(
-                        f"Rate limited (429). Waiting {retry_after}s "
-                        f"(Retry-After header)"
+                        "Rate limited (429). Waiting %ss (Retry-After header)",
+                        retry_after,
                     )
                     time.sleep(retry_after)
                     continue
@@ -336,14 +337,14 @@ class PNCPClient:
                 # Success case
                 if response.status_code == 200:
                     logger.debug(
-                        f"Success: fetched page {pagina} "
-                        f"({len(response.json().get('data', []))} items)"
+                        "Success: fetched page %s (%s items)",
+                        pagina, len(response.json().get("data", [])),
                     )
                     return response.json()
 
                 # No content - empty results (valid response)
                 if response.status_code == 204:
-                    logger.debug(f"No content (204) for page {pagina} - no results")
+                    logger.debug("No content (204) for page %s - no results", pagina)
                     return {
                         "data": [],
                         "totalRegistros": 0,
@@ -355,9 +356,8 @@ class PNCPClient:
                 # Non-retryable errors - fail immediately
                 if response.status_code not in self.config.retryable_status_codes:
                     logger.error(
-                        f"PNCP API error: status={response.status_code} "
-                        f"url={url} params={params} "
-                        f"body={response.text[:500]}"
+                        "PNCP API error: status=%s url=%s params=%s body=%s",
+                        response.status_code, url, params, response.text[:500],
                     )
                     error_msg = (
                         f"API returned non-retryable status {response.status_code}: "
@@ -369,9 +369,8 @@ class PNCPClient:
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
-                        f"Error {response.status_code}. "
-                        f"Attempt {attempt + 1}/{self.config.max_retries + 1}. "
-                        f"Retrying in {delay:.1f}s"
+                        "Error %s. Attempt %s/%s. Retrying in %.1fs",
+                        response.status_code, attempt + 1, self.config.max_retries + 1, delay,
                     )
                     time.sleep(delay)
                 else:
@@ -393,17 +392,16 @@ class PNCPClient:
                     pause = 15 * (ct // self._circuit_breaker_threshold)
                     pause = min(pause, 60)
                     logger.warning(
-                        f"Circuit breaker: {ct} consecutive timeouts, "
-                        f"pausing {pause}s to let PNCP recover"
+                        "Circuit breaker: %s consecutive timeouts, pausing %ss to let PNCP recover",
+                        ct, pause,
                     )
                     time.sleep(pause)
 
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
-                        f"Exception {type(e).__name__}: {e}. "
-                        f"Attempt {attempt + 1}/{self.config.max_retries + 1}. "
-                        f"Retrying in {delay:.1f}s"
+                        "Exception %s: %s. Attempt %s/%s. Retrying in %.1fs",
+                        type(e).__name__, e, attempt + 1, self.config.max_retries + 1, delay,
                     )
                     time.sleep(delay)
                 else:
@@ -469,18 +467,18 @@ class PNCPClient:
         # Check cache first
         cached = self._cache_get(cache_key)
         if cached is not None:
-            logger.info(f"Cache hit for {uf or 'ALL'}:{modalidade} ({len(cached)} items)")
+            logger.info("Cache hit for %s:%s (%s items)", uf or "ALL", modalidade, len(cached))
             return cached
 
-        logger.info(f"Fetching {label}")
+        logger.info("Fetching %s", label)
         try:
             items = list(self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress, max_pages))
-            logger.info(f"Completed {label}: {len(items)} items")
+            logger.info("Completed %s: %s items", label, len(items))
             # Store raw results in cache
             self._cache_put(cache_key, items)
             return items
         except PNCPAPIError as e:
-            logger.warning(f"Skipping {label}: {e}")
+            logger.warning("Skipping %s: %s", label, e)
             return []
 
     def fetch_all(
@@ -524,8 +522,8 @@ class PNCPClient:
         date_chunks = self._chunk_date_range(data_inicial, data_final)
         if len(date_chunks) > 1:
             logger.info(
-                f"Date range {data_inicial} to {data_final} split into "
-                f"{len(date_chunks)} chunks of up to 30 days"
+                "Date range %s to %s split into %s chunks of up to 30 days",
+                data_inicial, data_final, len(date_chunks),
             )
 
         # Reduce modalidades when many UFs are selected to keep request
@@ -537,8 +535,8 @@ class PNCPClient:
         elif num_ufs > MODALIDADE_REDUCTION_UF_THRESHOLD:
             modalidades_to_fetch = PRIORITY_MODALIDADES
             logger.info(
-                f"Using {len(modalidades_to_fetch)} priority modalidades "
-                f"(reduced from {len(DEFAULT_MODALIDADES)}) for {num_ufs} UFs"
+                "Using %s priority modalidades (reduced from %s) for %s UFs",
+                len(modalidades_to_fetch), len(DEFAULT_MODALIDADES), num_ufs,
             )
         else:
             modalidades_to_fetch = DEFAULT_MODALIDADES
@@ -547,8 +545,8 @@ class PNCPClient:
         for chunk_idx, (chunk_start, chunk_end) in enumerate(date_chunks):
             if len(date_chunks) > 1:
                 logger.info(
-                    f"Processing date chunk {chunk_idx + 1}/{len(date_chunks)}: "
-                    f"{chunk_start} to {chunk_end}"
+                    "Processing date chunk %s/%s: %s to %s",
+                    chunk_idx + 1, len(date_chunks), chunk_start, chunk_end,
                 )
 
             # Build list of (modalidade, uf) tasks to run in parallel
@@ -572,14 +570,13 @@ class PNCPClient:
                 effective_max_pages = min(max_pages, max(2, 600 // len(tasks)))
                 if effective_max_pages != max_pages:
                     logger.info(
-                        f"Reduced max_pages {max_pages} → {effective_max_pages} "
-                        f"for {len(tasks)} tasks (cap ~600 total pages)"
+                        "Reduced max_pages %s -> %s for %s tasks (cap ~600 total pages)",
+                        max_pages, effective_max_pages, len(tasks),
                     )
 
             logger.info(
-                f"Launching {len(tasks)} parallel fetches "
-                f"({len(modalidades_to_fetch)} modalities × {len(ufs or ['ALL'])} UFs), "
-                f"max_pages={effective_max_pages}"
+                "Launching %s parallel fetches (%s modalities x %s UFs), max_pages=%s",
+                len(tasks), len(modalidades_to_fetch), len(ufs or ["ALL"]), effective_max_pages,
             )
 
             # Parallel fetch: each UF×modalidade runs in its own thread.
@@ -603,8 +600,8 @@ class PNCPClient:
                         items = future.result()
                     except Exception as e:
                         logger.warning(
-                            f"Unexpected error fetching modalidade={modalidade}, "
-                            f"UF={uf or 'ALL'}: {e}"
+                            "Unexpected error fetching modalidade=%s, UF=%s: %s",
+                            modalidade, uf or "ALL", e,
                         )
                         continue
 
@@ -616,8 +613,8 @@ class PNCPClient:
                             yield normalized
 
         logger.info(
-            f"Fetch complete: {len(seen_ids)} unique records across "
-            f"{len(modalidades_to_fetch)} modalities and {len(date_chunks)} date chunks"
+            "Fetch complete: %s unique records across %s modalities and %s date chunks",
+            len(seen_ids), len(modalidades_to_fetch), len(date_chunks),
         )
 
     @staticmethod
@@ -673,8 +670,8 @@ class PNCPClient:
 
         while True:
             logger.debug(
-                f"Fetching page {pagina} for modalidade={modalidade}, UF={uf or 'ALL'} "
-                f"(date range: {data_inicial} to {data_final})"
+                "Fetching page %s for modalidade=%s, UF=%s (date range: %s to %s)",
+                pagina, modalidade, uf or "ALL", data_inicial, data_final,
             )
 
             response = self.fetch_page(
@@ -695,8 +692,8 @@ class PNCPClient:
 
             # Log page info
             logger.info(
-                f"Page {pagina}/{total_pages}: {len(data)} items "
-                f"(total records: {total_registros})"
+                "Page %s/%s: %s items (total records: %s)",
+                pagina, total_pages, len(data), total_registros,
             )
 
             # Call progress callback if provided
@@ -711,17 +708,16 @@ class PNCPClient:
             # Check if there are more pages
             if not tem_proxima:
                 logger.info(
-                    f"Finished fetching modalidade={modalidade}, UF={uf or 'ALL'}: "
-                    f"{items_fetched} total items across {pagina} pages"
+                    "Finished fetching modalidade=%s, UF=%s: %s total items across %s pages",
+                    modalidade, uf or "ALL", items_fetched, pagina,
                 )
                 break
 
             # Stop if we've reached the max pages limit
             if max_pages > 0 and pagina >= max_pages:
                 logger.info(
-                    f"Reached max_pages={max_pages} for modalidade={modalidade}, "
-                    f"UF={uf or 'ALL'}: {items_fetched} items fetched "
-                    f"(total available: {total_registros})"
+                    "Reached max_pages=%s for modalidade=%s, UF=%s: %s items fetched (total available: %s)",
+                    max_pages, modalidade, uf or "ALL", items_fetched, total_registros,
                 )
                 # Track truncation for user transparency
                 with self._truncated_lock:
@@ -734,7 +730,7 @@ class PNCPClient:
     def close(self) -> None:
         """Close the HTTP session and cleanup resources."""
         self.session.close()
-        logger.debug(f"Session closed. Total requests made: {self._request_count}")
+        logger.debug("Session closed. Total requests made: %s", self._request_count)
 
     def __enter__(self):
         """Context manager entry."""

@@ -12,7 +12,7 @@
 
 ### Situacao Atual
 
-O Descomplicita e uma plataforma de busca de licitacoes publicas que agrega dados do Portal Nacional de Contratacoes Publicas (PNCP) e os apresenta de forma simplificada para empresas que vendem uniformes ao governo. A plataforma funciona e entrega valor -- usuarios conseguem pesquisar licitacoes por estado, setor e palavras-chave, visualizar resultados e exportar para Excel. A interface passou por um rebrand recente (de BidIQ para Descomplicita) e conta com 5 temas visuais, busca por 27 estados e exportacao de dados.
+O Descomplicita e uma plataforma de busca de licitacoes publicas que agrega dados do Portal Nacional de Contratacoes Publicas (PNCP) e os apresenta de forma simplificada para empresas que vendem uniformes ao governo. A plataforma funciona e entrega valor -- usuarios conseguem pesquisar licitacoes por estado, setor e palavras-chave, visualizar resultados e exportar para Excel. A interface passou por um rebrand recente (de Descomplicita para Descomplicita) e conta com 5 temas visuais, busca por 27 estados e exportacao de dados.
 
 No entanto, uma auditoria tecnica completa revelou **57 debitos tecnicos** que representam riscos concretos ao negocio. O mais grave: a plataforma **nao possui autenticacao** -- qualquer pessoa na internet pode consumir todos os recursos do sistema, fazer requisicoes ilimitadas a API do governo e ate limpar o cache do sistema. Alem disso, a base de testes esta parcialmente quebrada, o que significa que alteracoes futuras podem introduzir defeitos sem deteccao.
 
@@ -119,7 +119,7 @@ O maior gargalo tecnico e um unico arquivo de 1.071 linhas (`page.tsx`) que cont
 
 ### Sprint 0: Correcoes de Emergencia (Semana 1, Dias 1-2)
 
-**O que:** Corrigir testes automatizados quebrados (2 testes de backend referenciam nome antigo "BidIQ"; 1 teste E2E referencia cores desatualizadas).
+**O que:** Corrigir testes automatizados quebrados (2 testes de backend referenciam nome antigo "Descomplicita"; 1 teste E2E referencia cores desatualizadas).
 
 **Por que:** Sem testes funcionando, nao ha rede de seguranca para as mudancas seguintes. Prerequisito absoluto.
 

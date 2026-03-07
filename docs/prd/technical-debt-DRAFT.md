@@ -1,6 +1,6 @@
 # Technical Debt Assessment -- DRAFT
 
-**Project:** Descomplicita (formerly BidIQ Uniformes)
+**Project:** Descomplicita (formerly Descomplicita)
 **Date:** 2026-03-07
 **Status:** DRAFT -- Pending specialist validation
 **Consolidated by:** @architect (Atlas)
@@ -212,7 +212,7 @@
 | ID | Debt | Area | Severity | Est. Hours | Risk |
 |----|------|------|----------|------------|------|
 | TD-015 | `datetime.utcnow()` deprecated | Code Quality | Medium | 1-2 | Future breakage |
-| TD-016 | Branding inconsistency (BidIQ remnants) | Maintainability | Medium | 4-8 | User confusion |
+| TD-016 | Branding inconsistency (Descomplicita remnants) | Maintainability | Medium | 4-8 | User confusion |
 | TD-017 | No request/correlation ID logging | Maintainability | Medium | 4-8 | Debug difficulty |
 | TD-018 | Hardcoded PNCP base URL | Maintainability | Medium | 1-2 | Env inflexibility |
 | TD-019 | No API versioning | Maintainability | Medium | 4-8 | Breaking changes |
@@ -225,7 +225,7 @@
 | TD-026 | Cache not shared across restarts | Performance | Medium | 8-16 | Repeated fetches |
 | TD-027 | No skip-to-content link | Accessibility | Medium | 1-2 | WCAG failure |
 | TD-028 | External logo dependency (Wix CDN) | Performance | Medium | 2-4 | Reliability risk |
-| TD-029 | Outdated favicon (BidIQ "B") | Design | Medium | 1-2 | Brand inconsistency |
+| TD-029 | Outdated favicon (Descomplicita "B") | Design | Medium | 1-2 | Brand inconsistency |
 | TD-030 | Error boundary uses hardcoded colors | Design | Medium | 2-4 | Theme breakage |
 | TD-031 | Missing focus management after search | Accessibility | Medium | 2-4 | UX / a11y gap |
 
@@ -236,17 +236,17 @@
 - **Description:** `datetime.utcnow()` is deprecated in Python 3.12+ in favor of `datetime.now(timezone.utc)`.
 - **Effort:** 1-2 hours
 
-### TD-016: Branding Inconsistency (BidIQ Remnants)
+### TD-016: Branding Inconsistency (Descomplicita Remnants)
 
 - **Source IDs:** System TD-12, TD-13, TD-14; Frontend TD-FE-007
 - **Locations:**
   - `docker-compose.yml:30,74,94` -- container names `bidiq-backend`, `bidiq-frontend`, network `bidiq-network`
-  - `README.md:1` -- title says "BidIQ Uniformes"
-  - `backend/sectors.py:1` -- module docstring says "BidIQ"
-  - `frontend/app/icon.svg` -- shows green "B" from BidIQ era
-- **Description:** Multiple files retain BidIQ branding despite the rebrand to Descomplicita. This is a consolidated debt covering 4 original items.
+  - `README.md:1` -- title says "Descomplicita"
+  - `backend/sectors.py:1` -- module docstring says "Descomplicita"
+  - `frontend/app/icon.svg` -- shows green "B" from Descomplicita era
+- **Description:** Multiple files retain Descomplicita branding despite the rebrand to Descomplicita. This is a consolidated debt covering 4 original items.
 - **Impact:** User-facing brand confusion (favicon), developer confusion (documentation/config).
-- **Remediation:** Batch update all BidIQ references. Update favicon with Descomplicita brand mark.
+- **Remediation:** Batch update all Descomplicita references. Update favicon with Descomplicita brand mark.
 - **Effort:** 4-8 hours
 
 ### TD-017: No Request/Correlation ID Logging
@@ -337,11 +337,11 @@
 - **Remediation:** Use existing `public/logo-descomplicita.png` via Next.js `<Image>`.
 - **Effort:** 2-4 hours
 
-### TD-029: Outdated Favicon (BidIQ "B")
+### TD-029: Outdated Favicon (Descomplicita "B")
 
 - **Source ID:** Frontend TD-FE-007 (also covered in TD-016 branding consolidation)
 - **Location:** `frontend/app/icon.svg`
-- **Description:** Favicon displays a green "B" from the BidIQ era.
+- **Description:** Favicon displays a green "B" from the Descomplicita era.
 - **Note:** This is a sub-item of TD-016 but tracked separately for frontend team assignment.
 - **Effort:** 1-2 hours
 
@@ -393,7 +393,7 @@
 - **TD-038** (System TD-25): `job_store.py:158` creates a `job_store = JobStore()` singleton that is never used. `main.py` creates its own `_job_store`.
 - **TD-039** (Frontend TD-FE-011): `performance.timing.navigationStart` is deprecated. `frontend/app/components/AnalyticsProvider.tsx:52`.
 - **TD-040** (Frontend TD-FE-012): No loading indicator while fetching sector list from `/api/setores`. `frontend/app/page.tsx`.
-- **TD-041** (Frontend TD-FE-013): E2E tests check for `bg-green-600` (old BidIQ) but UI uses `bg-brand-navy`. `frontend/__tests__/e2e/01-happy-path.spec.ts:64`.
+- **TD-041** (Frontend TD-FE-013): E2E tests check for `bg-green-600` (old Descomplicita) but UI uses `bg-brand-navy`. `frontend/__tests__/e2e/01-happy-path.spec.ts:64`.
 - **TD-042** (Frontend TD-FE-015): All components statically imported. LoadingProgress (415 lines) and carouselData (368 lines) could use dynamic imports. `frontend/app/page.tsx`.
 - **TD-043** (Frontend TD-FE-016): Header lacks `<nav>` element for navigation area. `frontend/app/page.tsx`.
 - **TD-044** (Frontend TD-FE-017): SourceBadges and carouselData use raw Tailwind colors (`bg-green-100`, `bg-blue-50`) instead of design tokens. `frontend/app/components/SourceBadges.tsx`, `frontend/app/components/carouselData.ts`.
@@ -423,7 +423,7 @@ Seven accessibility debts indicate that WCAG 2.1 AA compliance was not a design 
 
 ### 6.4 Branding Migration Completeness (TD-016 + TD-029 + TD-028 + TD-045)
 
-The BidIQ-to-Descomplicita rebrand is incomplete across documentation, Docker configuration, favicon, and logo hosting. These are individually low-effort but collectively create a fragmented brand identity.
+The Descomplicita-to-Descomplicita rebrand is incomplete across documentation, Docker configuration, favicon, and logo hosting. These are individually low-effort but collectively create a fragmented brand identity.
 
 ### 6.5 Deprecated API Usage (TD-015 + TD-024 + TD-014 + TD-039)
 
@@ -566,7 +566,7 @@ TD-003 (auth), TD-011 (httpx migration), TD-019 (API versioning), remaining Low 
 
 | Merged Into | Original Items | Reason |
 |-------------|---------------|--------|
-| TD-016 | System TD-12, TD-13, TD-14; Frontend TD-FE-007 | All are BidIQ branding remnants; consolidated into one branding debt |
+| TD-016 | System TD-12, TD-13, TD-14; Frontend TD-FE-007 | All are Descomplicita branding remnants; consolidated into one branding debt |
 | TD-021 | System TD-19; Frontend TD-FE-009 | Identical issue: duplicate UFS array definition |
 | TD-029 | Frontend TD-FE-007 (also in TD-016) | Tracked separately for frontend team but acknowledged as part of branding |
 | TD-028 | Frontend TD-FE-006 + TD-FE-018 (related) | Logo hosting and unused local asset are two sides of the same fix |

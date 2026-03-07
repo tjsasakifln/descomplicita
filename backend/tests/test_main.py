@@ -100,13 +100,15 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
 
     def test_health_timestamp_format(self, client):
-        from datetime import datetime
+        from datetime import datetime, timezone
         response = client.get("/health")
         data = response.json()
         timestamp = data["timestamp"]
         parsed = datetime.fromisoformat(timestamp)
         assert isinstance(parsed, datetime)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
         delta = (now - parsed).total_seconds()
         assert abs(delta) < 5
 
@@ -273,7 +275,7 @@ class TestBuscarEndpoint:
         original_run_search_job = main_module.run_search_job
 
         async def _inline_run_search_job(job_id, request, job_store, orchestrator):
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             original_rie = loop.run_in_executor
 
             def _sync_run_in_executor(executor, func, *args):
@@ -580,7 +582,7 @@ class TestJobResultEndpoint:
         original_run_search_job = main_module.run_search_job
 
         async def _inline_run_search_job(job_id, request, job_store, orchestrator):
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             original_rie = loop.run_in_executor
 
             def _sync_rie(executor, func, *args):

@@ -1,6 +1,6 @@
 workflow:
   id: bidiq-hotfix
-  name: BidIQ Hotfix - Diagnóstico e Correção Rápida
+  name: Descomplicita Hotfix - Diagnóstico e Correção Rápida
   description: >-
     Workflow rápido para diagnóstico e correção de bugs em produção.
     Ciclo curto: reproduzir → diagnosticar → corrigir → testar → deploy.

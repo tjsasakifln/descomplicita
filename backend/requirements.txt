@@ -21,3 +21,6 @@ openai==1.91.0
 
 # Rate limiting
 slowapi==0.1.9
+
+# Error monitoring
+sentry-sdk[fastapi]==2.22.0

@@ -1,7 +1,7 @@
 # =============================================================================
-# BidIQ Uniformes - Backend Railway Configuration
+# Descomplicita - Backend Railway Configuration
 # =============================================================================
-# Service: bidiq-backend
+# Service: descomplicita-backend
 # Framework: FastAPI + Python 3.11
 # =============================================================================
 

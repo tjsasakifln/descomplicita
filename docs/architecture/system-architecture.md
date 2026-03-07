@@ -1,6 +1,6 @@
 # System Architecture -- Descomplicita
 
-**Project:** Descomplicita (formerly BidIQ Uniformes)
+**Project:** Descomplicita (formerly Descomplicita)
 **Date:** March 2026
 **Version:** 2.0
 **Author:** @architect (Atlas)
@@ -774,8 +774,8 @@ Located in `pncp_client.py`:
 | # | Description | Location | Category |
 |---|-------------|----------|----------|
 | TD-12 | **`docker-compose.yml` still references `bidiq-` names** -- container names and network are `bidiq-backend`, `bidiq-frontend`, `bidiq-network`. Should be rebranded to `descomplicita`. | `docker-compose.yml:30,74,94` | Maintainability |
-| TD-13 | **`README.md` title still says "BidIQ Uniformes"** -- inconsistent branding across documentation. | `README.md:1` | Maintainability |
-| TD-14 | **sectors.py module docstring says "BidIQ"** -- needs brand update. | `backend/sectors.py:1` | Maintainability |
+| TD-13 | **`README.md` title still says "Descomplicita"** -- inconsistent branding across documentation. | `README.md:1` | Maintainability |
+| TD-14 | **sectors.py module docstring says "Descomplicita"** -- needs brand update. | `backend/sectors.py:1` | Maintainability |
 | TD-15 | **No request ID / correlation ID** -- log entries for a single search are correlated only by job_id in string interpolation, not structured logging fields. | `backend/main.py` (throughout) | Maintainability |
 | TD-16 | **Hardcoded PNCP base URL** -- `PNCPClient.BASE_URL` is a class constant, not configurable via env. | `backend/pncp_client.py:81` | Maintainability |
 | TD-17 | **No API versioning** -- endpoints are unversioned (`/buscar` not `/v1/buscar`). Breaking changes will affect all clients simultaneously. | `backend/main.py` | Maintainability |

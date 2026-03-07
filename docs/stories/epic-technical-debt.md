@@ -22,7 +22,7 @@ Systematically resolve all 57 identified technical debts across security, access
 - [ ] API key authentication on all endpoints
 - [ ] No containers running as root
 - [ ] Debug endpoints disabled in production
-- [ ] All test assertions reference "Descomplicita" (not "BidIQ")
+- [ ] All test assertions reference "Descomplicita" (not "Descomplicita")
 - [ ] E2E happy-path test passes on current codebase
 - [ ] Sentry capturing production errors (backend + frontend)
 - [ ] Job state survives container restart (Redis-backed)
@@ -45,7 +45,7 @@ Systematically resolve all 57 identified technical debts across security, access
 ### Sprint 0: Emergency Fixes (Week 1, Days 1-2) -- 3-5 hours
 | ID | Debt | Hours | Owner |
 |----|------|-------|-------|
-| TD-054 | Broken backend test assertions (BidIQ title) | 1-2 | Backend |
+| TD-054 | Broken backend test assertions (Descomplicita title) | 1-2 | Backend |
 | TD-041 | E2E tests reference outdated class names | 2-3 | Frontend |
 
 ### Sprint 1: Security Hardening + Quick Wins (Weeks 1-2) -- 22-41 hours
@@ -75,7 +75,7 @@ Systematically resolve all 57 identified technical debts across security, access
 |----|------|-------|-------|
 | TD-008 | Modal missing focus trap and dialog role | 4-6 | Frontend |
 | TD-031 | Missing focus management after search | 3-5 | Frontend |
-| TD-029 | Outdated favicon (BidIQ "B") | 1-2 | Frontend |
+| TD-029 | Outdated favicon (Descomplicita "B") | 1-2 | Frontend |
 | TD-030 | Error boundary uses hardcoded colors | 2-4 | Frontend |
 | TD-042 | No code splitting for components | 4-6 | Frontend |
 | TD-043 | No nav semantic element | 1 | Frontend |
@@ -104,7 +104,7 @@ Systematically resolve all 57 identified technical debts across security, access
 | ID | Debt | Hours | Owner |
 |----|------|-------|-------|
 | TD-015 | datetime.utcnow() deprecated | 1-2 | Backend |
-| TD-016 | Branding inconsistency (BidIQ remnants) | 4-8 | Both |
+| TD-016 | Branding inconsistency (Descomplicita remnants) | 4-8 | Both |
 | TD-017 | No request/correlation ID logging | 4-8 | Backend |
 | TD-018 | Hardcoded PNCP base URL | 1-2 | Backend |
 | TD-020 | Filter diagnostic code in production | 1-2 | Backend |

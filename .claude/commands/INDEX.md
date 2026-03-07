@@ -1,6 +1,6 @@
 # Claude Code Commands Index
 
-**Project:** BidIQ Uniformes (PNCP POC v0.2)
+**Project:** Descomplicita (PNCP POC v0.2)
 **Framework:** Synkra AIOS v2.0
 
 ## Command-Agent Mapping
@@ -40,13 +40,13 @@ All commands listed below activate their corresponding agent with full persona a
 | `/squad-creator` | @squad-creator | `.claude/commands/squad-creator.md` | Agent team assembler |
 | `/ux-design-expert` | @ux-design-expert | `.claude/commands/ux-design-expert.md` | UX designer (Uma) |
 
-### BidIQ Project Commands
+### Descomplicita Project Commands
 
 | Command | File | Purpose |
 |---------|------|---------|
-| `/bidiq` | `.claude/commands/bidiq.md` | BidIQ development command hub (squads, quick actions) |
+| `/bidiq` | `.claude/commands/bidiq.md` | Descomplicita development command hub (squads, quick actions) |
 
-**BidIQ Squads (Agent Teams):**
+**Descomplicita Squads (Agent Teams):**
 - `team-bidiq-backend` - FastAPI backend development (architect, dev, data-engineer, qa)
 - `team-bidiq-frontend` - React/Next.js frontend (ux-design-expert, dev, qa)
 - `team-bidiq-feature` - Complete features (pm, architect, dev, qa, devops)
@@ -179,7 +179,7 @@ According to `CLAUDE.md`, agents should be **proactively invoked** based on cont
 - Verify command is listed in agent's commands section
 - Check agent file for dependency availability
 
-## BidIQ Development Resources
+## Descomplicita Development Resources
 
 - **Development Guide:** `docs/guides/bidiq-development-guide.md` (comprehensive with examples)
 - **Backend Squad:** `.aios-core/development/agent-teams/team-bidiq-backend.yaml`
@@ -192,11 +192,11 @@ According to `CLAUDE.md`, agents should be **proactively invoked** based on cont
 - **Task Catalog:** `.aios-core/development/tasks/` (115+ tasks)
 - **Workflow Definitions:** `.aios-core/development/workflows/` (7 workflows)
 - **Project Setup:** `CLAUDE.md` in root directory
-- **BidIQ Quick Start:** `/bidiq` command hub
+- **Descomplicita Quick Start:** `/bidiq` command hub
 
 ---
 
 **Last Updated:** 2026-01-26
-**Status:** ✅ All 12 agents + 3 governance commands + BidIQ MVP configured
+**Status:** ✅ All 12 agents + 3 governance commands + Descomplicita MVP configured
 **Framework Version:** Synkra AIOS v2.0
-**BidIQ MVP:** ✅ 3 squads + meta-command + development guide (Week 1)
+**Descomplicita MVP:** ✅ 3 squads + meta-command + development guide (Week 1)

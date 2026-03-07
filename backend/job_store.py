@@ -152,7 +152,3 @@ class JobStore:
     def is_full(self) -> bool:
         """Whether the store has reached its max active jobs limit."""
         return self.active_count >= self.max_jobs
-
-
-# Module-level singleton for use across the application.
-job_store = JobStore()

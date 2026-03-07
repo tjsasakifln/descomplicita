@@ -182,7 +182,7 @@ jobs:
           fi
 
           echo "2. Contains expected content..."
-          curl -sf "${FRONTEND_URL}" | grep -q "BidIQ"
+          curl -sf "${FRONTEND_URL}" | grep -q "Descomplicita"
 
           echo "All frontend smoke tests passed"
 

@@ -1,4 +1,4 @@
-# BidIQ Proactive Squad Activation Guide
+# Descomplicita Proactive Squad Activation Guide
 
 **Status:** Auto-activation system ready
 **Version:** 1.0
@@ -8,7 +8,7 @@
 
 ## Overview
 
-Never worry about which squad to activate. BidIQ's intelligent context detection automatically:
+Never worry about which squad to activate. Descomplicita's intelligent context detection automatically:
 
 ✅ **Detects your context** - Analyzes what you're doing
 ✅ **Suggests squad proactively** - Offers the right squad automatically
@@ -25,7 +25,7 @@ When you start work, the system automatically:
 
 ```
 ┌─────────────────────────────────────────┐
-│ Analyzing BidIQ Project Context...      │
+│ Analyzing Descomplicita Project Context...      │
 └─────────────────────────────────────────┘
           ↓
   ┌─────────────────────────┐
@@ -47,14 +47,14 @@ When you start work, the system automatically:
 You see a personalized greeting:
 
 ```
-🐍 BidIQ Development Assistant
+🐍 Descomplicita Development Assistant
 
 📍 Detected: 🐍 Backend Development
    Modified: 5 backend files, 2 frontend files
    Branch: feature/issue-31-production-deployment
 
 💡 Recommended Squad:
-   🐍 Team BidIQ Backend
+   🐍 Team Descomplicita Backend
    FastAPI development, PNCP client, database work
    Agents: architect, dev, data-engineer, qa
    Confidence: 95%
@@ -127,7 +127,7 @@ When you exit a squad, you see:
 cd ~/projects/bidiq/backend
 
 # System automatically detects
-🐍 BidIQ Development Assistant
+🐍 Descomplicita Development Assistant
 📍 Detected: 🐍 Backend Development
 💡 Recommended: team-bidiq-backend
 🚀 Type: /bidiq backend
@@ -453,7 +453,7 @@ Edit `.aios-core/development/configs/bidiq-activation-config.yaml` to customize 
 ### Squad Not Activating Automatically?
 
 **Check:**
-1. Are you in a BidIQ project? (CLAUDE.md should exist)
+1. Are you in a Descomplicita project? (CLAUDE.md should exist)
 2. Is `activation.enabled: true` in bidiq-activation-config.yaml?
 3. Is confidence ≥ 40%?
 

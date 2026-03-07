@@ -16,7 +16,7 @@ Complete WCAG 2.1 AA accessibility compliance across all frontend components and
 |----|------|-------|-------|
 | TD-008 | Modal missing focus trap, dialog role, Escape close | 4-6 | Frontend |
 | TD-031 | Missing focus management after search (scroll, focus, aria-live) | 3-5 | Frontend |
-| TD-029 | Outdated favicon (BidIQ "B") | 1-2 | Frontend |
+| TD-029 | Outdated favicon (Descomplicita "B") | 1-2 | Frontend |
 | TD-030 | Error boundary uses hardcoded colors instead of design tokens | 2-4 | Frontend |
 | TD-042 | No code splitting (dynamic imports for heavy components) | 4-6 | Frontend |
 | TD-043 | No `<nav>` semantic element in header | 1 | Frontend |
@@ -66,7 +66,7 @@ Complete WCAG 2.1 AA accessibility compliance across all frontend components and
 - [ ] After search completes, focus moves to results section and screen reader announces result count
 - [ ] All dropdown menus implement full ARIA menu pattern with keyboard navigation (Arrow keys, Enter, Escape)
 - [ ] window.confirm() is no longer called anywhere in the codebase
-- [ ] Favicon displays Descomplicita brand (not "B" for BidIQ)
+- [ ] Favicon displays Descomplicita brand (not "B" for Descomplicita)
 - [ ] SourceBadges renders correctly in all 5 themes (Default Light, Default Dark, Paperwhite, Sepia, High Contrast) using semantic status tokens
 - [ ] Error boundary is styled correctly even when theme CSS fails to load
 - [ ] Code splitting reduces initial bundle size (measured before/after with `next build`)

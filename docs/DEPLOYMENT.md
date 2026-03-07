@@ -1,4 +1,4 @@
-# 🚀 BidIQ Uniformes - Production Deployment Guide
+# 🚀 Descomplicita - Production Deployment Guide
 
 **Version:** 1.0
 **Last Updated:** 2026-01-25
@@ -22,7 +22,7 @@
 
 ## Overview
 
-This guide provides step-by-step instructions for deploying the BidIQ Uniformes POC to production using:
+This guide provides step-by-step instructions for deploying the Descomplicita POC to production using:
 
 - **Frontend:** Vercel (Next.js optimized platform)
 - **Backend:** Railway (Python/FastAPI containerized deployment)
@@ -605,5 +605,5 @@ open https://bidiq-backend-production.up.railway.app/docs
 ---
 
 **Document Version:** 1.0
-**Maintained By:** BidIQ Engineering Team
+**Maintained By:** Descomplicita Engineering Team
 **Last Review:** 2026-01-25

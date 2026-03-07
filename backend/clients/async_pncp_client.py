@@ -14,6 +14,7 @@ from config import (
     DEFAULT_MODALIDADES,
     PRIORITY_MODALIDADES,
     MODALIDADE_REDUCTION_UF_THRESHOLD,
+    PNCP_BASE_URL,
 )
 from exceptions import PNCPAPIError
 
@@ -35,10 +36,9 @@ def calculate_delay(attempt: int, config: RetryConfig) -> float:
 class AsyncPNCPClient:
     """Async HTTP client for PNCP API with retry logic, rate limiting, and caching."""
 
-    BASE_URL = "https://pncp.gov.br/api/consulta/v1"
-
-    def __init__(self, config: RetryConfig | None = None) -> None:
+    def __init__(self, config: RetryConfig | None = None, base_url: str | None = None) -> None:
         self.config = config or RetryConfig()
+        self.BASE_URL = base_url or PNCP_BASE_URL
         self._client: httpx.AsyncClient | None = None
         self._request_count = 0
         self._last_request_time = 0.0
@@ -83,7 +83,7 @@ class AsyncPNCPClient:
             elapsed = time.time() - self._last_request_time
             if elapsed < interval:
                 sleep_time = interval - elapsed
-                logger.debug(f"Rate limiting: sleeping {sleep_time:.3f}s")
+                logger.debug("Rate limiting: sleeping %.3fs", sleep_time)
                 await asyncio.sleep(sleep_time)
             self._last_request_time = time.time()
             self._request_count += 1
@@ -93,13 +93,13 @@ class AsyncPNCPClient:
         async with self._lock:
             if was_timeout or response_time > 5.0:
                 self._adaptive_interval = min(2.0, self._adaptive_interval * 2)
-                logger.debug(f"Rate limit increased to {self._adaptive_interval:.1f}s")
+                logger.debug("Rate limit increased to %.1fs", self._adaptive_interval)
             elif response_time < 2.0 and self._adaptive_interval > self._base_interval:
                 self._adaptive_interval = max(
                     self._base_interval,
                     self._adaptive_interval * 0.8,
                 )
-                logger.debug(f"Rate limit decreased to {self._adaptive_interval:.1f}s")
+                logger.debug("Rate limit decreased to %.1fs", self._adaptive_interval)
 
     async def fetch_page(
         self,
@@ -133,8 +133,8 @@ class AsyncPNCPClient:
         for attempt in range(self.config.max_retries + 1):
             try:
                 logger.debug(
-                    f"Request {url} params={params} attempt={attempt + 1}/"
-                    f"{self.config.max_retries + 1}"
+                    "Request %s params=%s attempt=%s/%s",
+                    url, params, attempt + 1, self.config.max_retries + 1,
                 )
 
                 req_start = time.time()
@@ -152,23 +152,23 @@ class AsyncPNCPClient:
                         ratio = self._rate_limit_count / self._total_fetch_count
                         if ratio > 0.20:
                             logger.warning(
-                                f"High 429 rate: {self._rate_limit_count}/{self._total_fetch_count} "
-                                f"({ratio:.0%}) requests rate-limited"
+                                "High 429 rate: %s/%s (%.0f%%) requests rate-limited",
+                                self._rate_limit_count, self._total_fetch_count, ratio * 100,
                             )
                     retry_after = int(response.headers.get("Retry-After", "60"))
-                    logger.warning(f"Rate limited (429). Waiting {retry_after}s")
+                    logger.warning("Rate limited (429). Waiting %ss", retry_after)
                     await asyncio.sleep(retry_after)
                     continue
 
                 if response.status_code == 200:
                     logger.debug(
-                        f"Success: fetched page {pagina} "
-                        f"({len(response.json().get('data', []))} items)"
+                        "Success: fetched page %s (%s items)",
+                        pagina, len(response.json().get("data", [])),
                     )
                     return response.json()
 
                 if response.status_code == 204:
-                    logger.debug(f"No content (204) for page {pagina}")
+                    logger.debug("No content (204) for page %s", pagina)
                     return {
                         "data": [],
                         "totalRegistros": 0,
@@ -187,9 +187,8 @@ class AsyncPNCPClient:
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
-                        f"Error {response.status_code}. "
-                        f"Attempt {attempt + 1}/{self.config.max_retries + 1}. "
-                        f"Retrying in {delay:.1f}s"
+                        "Error %s. Attempt %s/%s. Retrying in %.1fs",
+                        response.status_code, attempt + 1, self.config.max_retries + 1, delay,
                     )
                     await asyncio.sleep(delay)
                 else:
@@ -206,15 +205,16 @@ class AsyncPNCPClient:
                 if ct >= self._circuit_breaker_threshold:
                     pause = min(60, 15 * (ct // self._circuit_breaker_threshold))
                     logger.warning(
-                        f"Circuit breaker: {ct} consecutive timeouts, pausing {pause}s"
+                        "Circuit breaker: %s consecutive timeouts, pausing %ss",
+                        ct, pause,
                     )
                     await asyncio.sleep(pause)
 
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
-                        f"Timeout: {e}. Attempt {attempt + 1}/{self.config.max_retries + 1}. "
-                        f"Retrying in {delay:.1f}s"
+                        "Timeout: %s. Attempt %s/%s. Retrying in %.1fs",
+                        e, attempt + 1, self.config.max_retries + 1, delay,
                     )
                     await asyncio.sleep(delay)
                 else:
@@ -231,16 +231,16 @@ class AsyncPNCPClient:
                 if ct >= self._circuit_breaker_threshold:
                     pause = min(60, 15 * (ct // self._circuit_breaker_threshold))
                     logger.warning(
-                        f"Circuit breaker: {ct} consecutive timeouts, pausing {pause}s"
+                        "Circuit breaker: %s consecutive timeouts, pausing %ss",
+                        ct, pause,
                     )
                     await asyncio.sleep(pause)
 
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
-                        f"Exception {type(e).__name__}: {e}. "
-                        f"Attempt {attempt + 1}/{self.config.max_retries + 1}. "
-                        f"Retrying in {delay:.1f}s"
+                        "Exception %s: %s. Attempt %s/%s. Retrying in %.1fs",
+                        type(e).__name__, e, attempt + 1, self.config.max_retries + 1, delay,
                     )
                     await asyncio.sleep(delay)
                 else:
@@ -296,8 +296,8 @@ class AsyncPNCPClient:
             tem_proxima = paginas_restantes > 0
 
             logger.info(
-                f"Page {pagina}/{total_pages}: {len(data)} items "
-                f"(total records: {total_registros})"
+                "Page %s/%s: %s items (total records: %s)",
+                pagina, total_pages, len(data), total_registros,
             )
 
             if on_progress:
@@ -309,16 +309,15 @@ class AsyncPNCPClient:
 
             if not tem_proxima:
                 logger.info(
-                    f"Finished fetching modalidade={modalidade}, UF={uf or 'ALL'}: "
-                    f"{items_fetched} total items across {pagina} pages"
+                    "Finished fetching modalidade=%s, UF=%s: %s total items across %s pages",
+                    modalidade, uf or "ALL", items_fetched, pagina,
                 )
                 break
 
             if max_pages > 0 and pagina >= max_pages:
                 logger.info(
-                    f"Reached max_pages={max_pages} for modalidade={modalidade}, "
-                    f"UF={uf or 'ALL'}: {items_fetched} items fetched "
-                    f"(total available: {total_registros})"
+                    "Reached max_pages=%s for modalidade=%s, UF=%s: %s items fetched (total available: %s)",
+                    max_pages, modalidade, uf or "ALL", items_fetched, total_registros,
                 )
                 self._truncated_combos += 1
                 break
@@ -338,15 +337,15 @@ class AsyncPNCPClient:
     ) -> List[Dict[str, Any]]:
         """Fetch all pages for a single UF+modalidade combination with caching."""
         label = f"modalidade={modalidade}, UF={uf or 'ALL'}"
-        logger.info(f"Fetching {label}")
+        logger.info("Fetching %s", label)
         try:
             items = await self._fetch_by_uf(
                 data_inicial, data_final, modalidade, uf, on_progress, max_pages
             )
-            logger.info(f"Completed {label}: {len(items)} items")
+            logger.info("Completed %s: %s items", label, len(items))
             return items
         except PNCPAPIError as e:
-            logger.warning(f"Skipping {label}: {e}")
+            logger.warning("Skipping %s: %s", label, e)
             return []
 
     async def fetch_all(
@@ -366,8 +365,8 @@ class AsyncPNCPClient:
         date_chunks = self._chunk_date_range(data_inicial, data_final)
         if len(date_chunks) > 1:
             logger.info(
-                f"Date range {data_inicial} to {data_final} split into "
-                f"{len(date_chunks)} chunks of up to 30 days"
+                "Date range %s to %s split into %s chunks of up to 30 days",
+                data_inicial, data_final, len(date_chunks),
             )
 
         num_ufs = len(ufs) if ufs else 1
@@ -376,8 +375,8 @@ class AsyncPNCPClient:
         elif num_ufs > MODALIDADE_REDUCTION_UF_THRESHOLD:
             modalidades_to_fetch = PRIORITY_MODALIDADES
             logger.info(
-                f"Using {len(modalidades_to_fetch)} priority modalidades "
-                f"(reduced from {len(DEFAULT_MODALIDADES)}) for {num_ufs} UFs"
+                "Using %s priority modalidades (reduced from %s) for %s UFs",
+                len(modalidades_to_fetch), len(DEFAULT_MODALIDADES), num_ufs,
             )
         else:
             modalidades_to_fetch = DEFAULT_MODALIDADES
@@ -388,8 +387,8 @@ class AsyncPNCPClient:
         for chunk_idx, (chunk_start, chunk_end) in enumerate(date_chunks):
             if len(date_chunks) > 1:
                 logger.info(
-                    f"Processing date chunk {chunk_idx + 1}/{len(date_chunks)}: "
-                    f"{chunk_start} to {chunk_end}"
+                    "Processing date chunk %s/%s: %s to %s",
+                    chunk_idx + 1, len(date_chunks), chunk_start, chunk_end,
                 )
 
             tasks: list[tuple[int, str | None]] = []
@@ -405,14 +404,13 @@ class AsyncPNCPClient:
                 effective_max_pages = min(max_pages, max(2, 600 // len(tasks)))
                 if effective_max_pages != max_pages:
                     logger.info(
-                        f"Reduced max_pages {max_pages} -> {effective_max_pages} "
-                        f"for {len(tasks)} tasks (cap ~600 total pages)"
+                        "Reduced max_pages %s -> %s for %s tasks (cap ~600 total pages)",
+                        max_pages, effective_max_pages, len(tasks),
                     )
 
             logger.info(
-                f"Launching {len(tasks)} concurrent fetches "
-                f"({len(modalidades_to_fetch)} modalities x {len(ufs or ['ALL'])} UFs), "
-                f"max_pages={effective_max_pages}"
+                "Launching %s concurrent fetches (%s modalities x %s UFs), max_pages=%s",
+                len(tasks), len(modalidades_to_fetch), len(ufs or ["ALL"]), effective_max_pages,
             )
 
             # Use semaphore to limit concurrency to 3 (same as old ThreadPoolExecutor)
@@ -430,8 +428,8 @@ class AsyncPNCPClient:
             for (modalidade, uf), result in zip(tasks, results):
                 if isinstance(result, Exception):
                     logger.warning(
-                        f"Unexpected error fetching modalidade={modalidade}, "
-                        f"UF={uf or 'ALL'}: {result}"
+                        "Unexpected error fetching modalidade=%s, UF=%s: %s",
+                        modalidade, uf or "ALL", result,
                     )
                     continue
                 for item in result:
@@ -442,8 +440,8 @@ class AsyncPNCPClient:
                         all_results.append(normalized)
 
         logger.info(
-            f"Fetch complete: {len(seen_ids)} unique records across "
-            f"{len(modalidades_to_fetch)} modalities and {len(date_chunks)} date chunks"
+            "Fetch complete: %s unique records across %s modalities and %s date chunks",
+            len(seen_ids), len(modalidades_to_fetch), len(date_chunks),
         )
         return all_results
 
@@ -463,7 +461,7 @@ class AsyncPNCPClient:
         """Close the HTTP client and cleanup resources."""
         if self._client and not self._client.is_closed:
             await self._client.aclose()
-            logger.debug(f"Client closed. Total requests made: {self._request_count}")
+            logger.debug("Client closed. Total requests made: %s", self._request_count)
 
     async def __aenter__(self):
         return self

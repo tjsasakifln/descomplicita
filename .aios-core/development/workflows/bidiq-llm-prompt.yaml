@@ -1,8 +1,8 @@
 workflow:
   id: bidiq-llm-prompt
-  name: BidIQ LLM Prompt Engineering
+  name: Descomplicita LLM Prompt Engineering
   description: >-
-    Agent workflow for creating, testing, and iterating on LLM prompts for BidIQ.
+    Agent workflow for creating, testing, and iterating on LLM prompts for Descomplicita.
     Covers the full cycle: define objective, implement prompt + schema, test harness,
     evaluate outputs, refine, and validate with fallback behavior.
   type: brownfield
@@ -21,7 +21,7 @@ workflow:
       notes: >-
         Definir claramente o objetivo do prompt: qual output esperado, restrições
         (max_tokens, formato), exemplos de entrada/saída, e critérios de sucesso.
-        Considerar o contexto BidIQ: resumo executivo de licitações PNCP,
+        Considerar o contexto Descomplicita: resumo executivo de licitações PNCP,
         schema ResumoLicitacoes (Pydantic), limite de 50 licitações por chamada.
 
     - step: implement_prompt_template
@@ -82,7 +82,7 @@ workflow:
 
   decision_guidance:
     when_to_use:
-      - Creating new LLM prompts for BidIQ features
+      - Creating new LLM prompts for Descomplicita features
       - Iterating on existing prompt quality (resumo executivo)
       - Changing structured output schema (ResumoLicitacoes)
       - Optimizing token usage or reducing hallucinations

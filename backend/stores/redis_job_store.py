@@ -73,7 +73,7 @@ class RedisJobStore(JobStore):
                 self._serialize_job(job),
             )
         except Exception as e:
-            logger.warning(f"Redis write failed for job {job.job_id}: {e}")
+            logger.warning("Redis write failed for job %s: %s", job.job_id, e)
 
     async def _redis_get(self, job_id: str) -> Optional[SearchJob]:
         """Read job from Redis."""
@@ -83,7 +83,7 @@ class RedisJobStore(JobStore):
                 return None
             return self._deserialize_job(data)
         except Exception as e:
-            logger.warning(f"Redis read failed for job {job_id}: {e}")
+            logger.warning("Redis read failed for job %s: %s", job_id, e)
             return None
 
     async def create(self, job_id: str) -> SearchJob:

@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Completed UX audit of BidIQ/Descomplicita (frontend/app/page.tsx) and designed wireframe concepts for 3 MUST HAVE deliverables. Current UX score is **52/100** with critical issues in user control, memory load, efficiency, and help/documentation.
+Completed UX audit of Descomplicita/Descomplicita (frontend/app/page.tsx) and designed wireframe concepts for 3 MUST HAVE deliverables. Current UX score is **52/100** with critical issues in user control, memory load, efficiency, and help/documentation.
 
 **Design Philosophy for Value Sprint:**
 - **Minimize cognitive load** - Don't make users remember (fix Heuristic #6)

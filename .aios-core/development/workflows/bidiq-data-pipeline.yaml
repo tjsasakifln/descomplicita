@@ -1,6 +1,6 @@
 workflow:
   id: bidiq-data-pipeline
-  name: BidIQ Data Pipeline - Filtragem e Geração de Relatórios
+  name: Descomplicita Data Pipeline - Filtragem e Geração de Relatórios
   description: >-
     Workflow para criação ou modificação de pipeline de dados: filtros de licitações,
     transformações e geração de relatórios (Excel/PDF). Cobre o fluxo completo

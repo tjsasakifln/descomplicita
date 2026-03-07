@@ -1,8 +1,8 @@
 workflow:
   id: bidiq-deploy-release
-  name: BidIQ Deploy & Release
+  name: Descomplicita Deploy & Release
   description: >-
-    Agent workflow for the BidIQ release process from test validation through
+    Agent workflow for the Descomplicita release process from test validation through
     deployment and smoke testing. Ensures coverage thresholds, build integrity,
     and post-deploy verification.
   type: brownfield
@@ -86,7 +86,7 @@ workflow:
 
   decision_guidance:
     when_to_use:
-      - Ready to release a new version of BidIQ
+      - Ready to release a new version of Descomplicita
       - Sprint complete with all stories done
       - Critical bug fix needs expedited deployment
       - Infrastructure or dependency updates require redeployment

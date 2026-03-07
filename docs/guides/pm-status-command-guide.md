@@ -157,7 +157,7 @@ Quick overview for team sync-ups
 
 ```
 ╔════════════════════════════════════════════════════════════════════════════╗
-║                    📋 BidIQ PROJECT STATUS REPORT                          ║
+║                    📋 Descomplicita PROJECT STATUS REPORT                          ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 
 📊 PROJECT OVERVIEW

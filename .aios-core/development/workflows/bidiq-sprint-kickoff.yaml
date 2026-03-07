@@ -1,10 +1,10 @@
 workflow:
   id: bidiq-sprint-kickoff
-  name: BidIQ Sprint Kickoff
+  name: Descomplicita Sprint Kickoff
   description: >-
     Agent workflow for sprint planning ceremony. Reviews the backlog, prioritizes
     stories by business value, plans capacity, and breaks down work into actionable
-    tasks for the BidIQ development team.
+    tasks for the Descomplicita development team.
   type: brownfield
   project_types:
     - sprint-planning
@@ -30,7 +30,7 @@ workflow:
       action: prioritize stories by business value and dependencies
       creates: prioritized backlog
       notes: >-
-        Priorizar por: valor de negócio (funcionalidades core do BidIQ primeiro),
+        Priorizar por: valor de negócio (funcionalidades core do Descomplicita primeiro),
         dependências técnicas (backend antes de frontend), riscos (integração PNCP),
         e quick wins. Considerar: PNCP client, filtros, Excel, LLM, frontend.
 

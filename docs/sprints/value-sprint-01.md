@@ -35,7 +35,7 @@
 **Value:** Primeira impressão conta - reduzir tempo para primeira busca bem-sucedida
 **Acceptance Criteria:**
 - [ ] Wizard de 3 passos ao primeiro acesso
-- [ ] Passo 1: Explica o que é BidIQ/Descomplicita
+- [ ] Passo 1: Explica o que é Descomplicita/Descomplicita
 - [ ] Passo 2: Demonstra busca exemplo com resultados reais
 - [ ] Passo 3: Incentiva primeira busca personalizada
 - [ ] Skip option (não forçar quem já conhece)

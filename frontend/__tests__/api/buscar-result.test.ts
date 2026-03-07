@@ -50,7 +50,7 @@ describe("GET /api/buscar/result", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => mockResult,
+      json: async () => ({ ...mockResult, job_id: "test-123" }),
     });
 
     const response = await GET(makeRequest("test-123"));
@@ -60,7 +60,6 @@ describe("GET /api/buscar/result", () => {
     expect(data.resumo).toEqual(mockResult.resumo);
     expect(data.download_id).toBeDefined();
     expect(typeof data.download_id).toBe("string");
-    expect(data.download_id).toMatch(/_/);
     expect(data.total_raw).toBe(10);
     expect(data.total_filtrado).toBe(5);
     expect(data.sources_used).toEqual(["pncp", "comprasgov"]);
@@ -120,6 +119,7 @@ describe("GET /api/buscar/result", () => {
       status: 200,
       json: async () => ({
         ...mockResult,
+        job_id: "test-123",
         excel_base64: "",
       }),
     });
@@ -128,6 +128,6 @@ describe("GET /api/buscar/result", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.download_id).toBeNull();
+    expect(data.download_id).toBe("test-123");
   });
 });

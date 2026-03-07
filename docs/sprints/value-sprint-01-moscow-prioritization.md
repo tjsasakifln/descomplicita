@@ -170,7 +170,7 @@ Reviewed @analyst's baseline report and **CONFIRMED** MoSCoW prioritization with
 **Business Value:** HIGH - Reduces Bounce Rate, Improves First Impression
 
 **User Story:**
-> "As a first-time user, I want a guided tour so I understand how to use BidIQ and get value quickly, not fumble around confused."
+> "As a first-time user, I want a guided tour so I understand how to use Descomplicita and get value quickly, not fumble around confused."
 
 **Acceptance Criteria:**
 - [ ] 3-step wizard on first visit (localStorage flag to track)

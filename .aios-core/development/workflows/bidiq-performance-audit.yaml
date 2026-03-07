@@ -1,8 +1,8 @@
 workflow:
   id: bidiq-performance-audit
-  name: BidIQ Performance Audit
+  name: Descomplicita Performance Audit
   description: >-
-    Agent workflow for performance auditing of BidIQ. Defines baselines, profiles
+    Agent workflow for performance auditing of Descomplicita. Defines baselines, profiles
     current performance, identifies bottlenecks, implements optimizations, and
     validates improvements with regression testing.
   type: brownfield

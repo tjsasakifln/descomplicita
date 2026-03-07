@@ -8,14 +8,14 @@
 
 ## Objetivo
 
-Clean up deprecated API usage, complete the BidIQ-to-Descomplicita branding migration, add structured logging with correlation IDs, integrate Sentry for production error monitoring, and resolve remaining low-priority code quality items. After this sprint, the codebase will have zero deprecated API warnings, full brand consistency, and production-grade observability.
+Clean up deprecated API usage, complete the Descomplicita-to-Descomplicita branding migration, add structured logging with correlation IDs, integrate Sentry for production error monitoring, and resolve remaining low-priority code quality items. After this sprint, the codebase will have zero deprecated API warnings, full brand consistency, and production-grade observability.
 
 ## Debts Addressed
 
 | ID | Debt | Hours | Owner |
 |----|------|-------|-------|
 | TD-015 | `datetime.utcnow()` deprecated (Python 3.12+) | 1-2 | Backend |
-| TD-016 | Branding inconsistency -- BidIQ remnants in docker-compose, README, pyproject.toml | 4-8 | Both |
+| TD-016 | Branding inconsistency -- Descomplicita remnants in docker-compose, README, pyproject.toml | 4-8 | Both |
 | TD-017 | No request/correlation ID logging | 4-8 | Backend |
 | TD-018 | Hardcoded PNCP base URL in client | 1-2 | Backend |
 | TD-020 | Filter diagnostic code left in production | 1-2 | Backend |
@@ -41,7 +41,7 @@ Clean up deprecated API usage, complete the BidIQ-to-Descomplicita branding migr
 
 ### Branding Completion
 
-- [ ] Task 5: TD-016 -- Search all files for "BidIQ" references and update to "Descomplicita". Key locations: `docker-compose.yml` (service names, labels), `README.md`, `pyproject.toml` (project name, description), `backend/` module docstrings, CORS comment in `backend/main.py`.
+- [ ] Task 5: TD-016 -- Search all files for "Descomplicita" references and update to "Descomplicita". Key locations: `docker-compose.yml` (service names, labels), `README.md`, `pyproject.toml` (project name, description), `backend/` module docstrings, CORS comment in `backend/main.py`.
 - [ ] Task 6: TD-016 -- Verify favicon (TD-029 from Sprint 3) was updated. If not, update here.
 - [ ] Task 7: TD-035 -- Remove hardcoded emoji characters from frontend source files. Replace with CSS-based icons or remove decorative emoji from component strings.
 
@@ -68,7 +68,7 @@ Clean up deprecated API usage, complete the BidIQ-to-Descomplicita branding migr
 ## Criterios de Aceite
 
 - [ ] Zero `DeprecationWarning` when running `pytest -W error::DeprecationWarning` (all deprecated APIs replaced)
-- [ ] `grep -ri "BidIQ" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.yml" --include="*.yaml" --include="*.json" --include="*.md" .` returns zero matches (excluding CHANGELOG/history files)
+- [ ] `grep -ri "Descomplicita" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.yml" --include="*.yaml" --include="*.json" --include="*.md" .` returns zero matches (excluding CHANGELOG/history files)
 - [ ] Every backend log line includes a correlation ID (UUID format)
 - [ ] `X-Request-ID` header present in all API responses
 - [ ] Sentry receives test error from both backend and frontend (verified in Sentry dashboard)
@@ -105,7 +105,7 @@ Clean up deprecated API usage, complete the BidIQ-to-Descomplicita branding migr
 - [ ] Code reviewed
 - [ ] All tests passing
 - [ ] Zero deprecated API warnings in test output
-- [ ] No "BidIQ" references in codebase (verified by grep)
+- [ ] No "Descomplicita" references in codebase (verified by grep)
 - [ ] Sentry integration verified in staging environment
 - [ ] Correlation IDs visible in log output
 - [ ] `.env.example` updated with all new environment variables (SENTRY_DSN, PNCP_BASE_URL, MAX_DATE_RANGE_DAYS)

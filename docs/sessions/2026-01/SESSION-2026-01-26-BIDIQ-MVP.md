@@ -1,4 +1,4 @@
-# BidIQ Development Acceleration - MVP v0.1 Delivery
+# Descomplicita Development Acceleration - MVP v0.1 Delivery
 
 **Date:** 2026-01-26
 **Duration:** Single session implementation
@@ -9,7 +9,7 @@
 
 ## Objective
 
-Implement Week 1 MVP of BidIQ Development Acceleration Plan:
+Implement Week 1 MVP of Descomplicita Development Acceleration Plan:
 - 3 specialized squads for rapid development
 - 1 meta-command hub for squad activation
 - 1 comprehensive development guide
@@ -21,28 +21,28 @@ Implement Week 1 MVP of BidIQ Development Acceleration Plan:
 
 ### 1. Three Specialized Agent Squads
 
-#### A. Team BidIQ Backend (`team-bidiq-backend.yaml`)
+#### A. Team Descomplicita Backend (`team-bidiq-backend.yaml`)
 - **File:** `.aios-core/development/agent-teams/team-bidiq-backend.yaml`
 - **Agents:** architect, dev, data-engineer, qa
 - **Purpose:** FastAPI backend development, PNCP client, database work
 - **Quality Gates:** Coverage ≥70%, type checking, test validation
 - **Key Modules:** pncp_client.py, filter.py, excel.py, llm.py, schemas.py
 
-#### B. Team BidIQ Frontend (`team-bidiq-frontend.yaml`)
+#### B. Team Descomplicita Frontend (`team-bidiq-frontend.yaml`)
 - **File:** `.aios-core/development/agent-teams/team-bidiq-frontend.yaml`
 - **Agents:** ux-design-expert, dev, qa
 - **Purpose:** React/Next.js frontend, UI components, user interactions
 - **Quality Gates:** Coverage ≥60%, linting, type checking, build success
 - **Key Modules:** app/page.tsx, app/api/, components, Tailwind styling
 
-#### C. Team BidIQ Feature Complete (`team-bidiq-feature.yaml`)
+#### C. Team Descomplicita Feature Complete (`team-bidiq-feature.yaml`)
 - **File:** `.aios-core/development/agent-teams/team-bidiq-feature.yaml`
 - **Agents:** pm, architect, dev, qa, devops
 - **Purpose:** End-to-end features requiring backend + frontend
 - **Quality Gates:** Both backend (≥70%) and frontend (≥60%) coverage
 - **Workflow:** Story → Architecture → Implementation → Testing → Deployment
 
-### 2. BidIQ Command Hub (`/bidiq`)
+### 2. Descomplicita Command Hub (`/bidiq`)
 
 - **File:** `.claude/commands/bidiq.md`
 - **Type:** Project command (non-agent)
@@ -70,13 +70,13 @@ Implement Week 1 MVP of BidIQ Development Acceleration Plan:
 ### 4. Documentation Updates
 
 #### A. `.claude/commands/INDEX.md`
-- Added "BidIQ Project Commands" section
+- Added "Descomplicita Project Commands" section
 - Listed 3 squads and activation syntax
 - Cross-referenced development guide
 - Updated status to reflect MVP completion
 
 #### B. `CLAUDE.md`
-- Added "⚡ BidIQ Development Acceleration" section
+- Added "⚡ Descomplicita Development Acceleration" section
 - Quick start commands with squad options
 - Updated "Project Status & Roadmap" with MVP completion
 - Updated "Development Process" with squad workflow
@@ -194,12 +194,12 @@ Comprehensive with:
 | `.aios-core/development/agent-teams/team-bidiq-feature.yaml` | Squad | 4.5KB | Complete features |
 | `.claude/commands/bidiq.md` | Command | 9.1KB | Command hub |
 | `docs/guides/bidiq-development-guide.md` | Guide | 18KB | Comprehensive guide |
-| `.claude/commands/INDEX.md` | Update | - | Updated to reference BidIQ |
-| `CLAUDE.md` | Update | - | Updated with BidIQ info |
+| `.claude/commands/INDEX.md` | Update | - | Updated to reference Descomplicita |
+| `CLAUDE.md` | Update | - | Updated with Descomplicita info |
 | `docs/sessions/2026-01/SESSION-2026-01-26-BIDIQ-MVP.md` | Handoff | This file | Session summary |
 
 ### Modified (2 files)
-- `.claude/commands/INDEX.md` - Added BidIQ section
+- `.claude/commands/INDEX.md` - Added Descomplicita section
 - `CLAUDE.md` - Added acceleration notice and updated workflow
 
 ---
@@ -268,7 +268,7 @@ docs/guides/bidiq-development-guide.md
 - [x] Squad YAML files valid and complete
 - [x] `/bidiq` command file accessible
 - [x] Development guide comprehensive and clear
-- [x] INDEX.md updated with BidIQ section
+- [x] INDEX.md updated with Descomplicita section
 - [x] CLAUDE.md updated with acceleration info
 - [x] All cross-references working
 - [x] File sizes reasonable (9-18KB for comprehensive docs)
@@ -348,7 +348,7 @@ This MVP uses **zero-dependency approach**:
 ## Session Summary
 
 **What Was Accomplished:**
-- Implemented Week 1 MVP of BidIQ Development Acceleration
+- Implemented Week 1 MVP of Descomplicita Development Acceleration
 - Created 3 specialized agent squads (backend, frontend, feature)
 - Built command hub for squad activation
 - Wrote comprehensive development guide
@@ -356,9 +356,9 @@ This MVP uses **zero-dependency approach**:
 
 **What's Ready to Use:**
 - `/bidiq` command for squad activation
-- Team BidIQ Backend for FastAPI work
-- Team BidIQ Frontend for React/Next.js work
-- Team BidIQ Feature for end-to-end features
+- Team Descomplicita Backend for FastAPI work
+- Team Descomplicita Frontend for React/Next.js work
+- Team Descomplicita Feature for end-to-end features
 - Development guide with 4 workflow examples
 
 **What's Coming:**

@@ -37,19 +37,19 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
           user_agent: navigator.userAgent,
         });
 
-        console.log('✅ Mixpanel initialized successfully');
+        console.log('[Analytics] Mixpanel initialized successfully');
       } catch (error) {
-        console.warn('❌ Mixpanel initialization failed:', error);
+        console.warn('[Analytics] Mixpanel initialization failed:', error);
       }
     } else {
-      console.warn('⚠️ NEXT_PUBLIC_MIXPANEL_TOKEN not found. Analytics disabled.');
+      console.warn('[Analytics] NEXT_PUBLIC_MIXPANEL_TOKEN not found. Analytics disabled.');
     }
 
     // Track page_exit event when user leaves
     const handleBeforeUnload = () => {
       if (token) {
         try {
-          const sessionDuration = Date.now() - performance.timing.navigationStart;
+          const sessionDuration = Date.now() - performance.timeOrigin;
 
           mixpanel.track('page_exit', {
             path: pathname,

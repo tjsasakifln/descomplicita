@@ -1,5 +1,5 @@
 bundle:
-  name: Team BidIQ Frontend
+  name: Team Descomplicita Frontend
   icon: ⚛️
   description: Specialized squad for Next.js frontend development and UI implementation
 
@@ -42,7 +42,7 @@ quality_gates:
     threshold: Coverage ≥60%, build success, all tests passing
 
 purpose: |
-  Handles all Next.js frontend development for BidIQ uniformes procurement system:
+  Handles all Next.js frontend development for Descomplicita uniformes procurement system:
 
   1. **Search Interface** (@ux-design-expert + @dev):
      - UF multi-select buttons (27 states/DF)

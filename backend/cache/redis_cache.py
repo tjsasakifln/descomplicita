@@ -48,7 +48,7 @@ class RedisCache:
             self._hits += 1
             return json.loads(data)
         except Exception as e:
-            logger.warning(f"Redis cache get failed for {cache_key}: {e}")
+            logger.warning("Redis cache get failed for %s: %s", cache_key, e)
             self._misses += 1
             return None
 
@@ -61,7 +61,7 @@ class RedisCache:
                 json.dumps(data),
             )
         except Exception as e:
-            logger.warning(f"Redis cache put failed for {cache_key}: {e}")
+            logger.warning("Redis cache put failed for %s: %s", cache_key, e)
 
     def stats(self) -> Dict[str, Any]:
         """Return cache statistics."""
@@ -85,7 +85,7 @@ class RedisCache:
             self._misses = 0
             return len(keys)
         except Exception as e:
-            logger.warning(f"Redis cache clear failed: {e}")
+            logger.warning("Redis cache clear failed: %s", e)
             return 0
 
     async def entry_count(self) -> int:

@@ -1,6 +1,6 @@
 # Technical Debt Assessment -- FINAL
 
-**Project:** Descomplicita (formerly BidIQ Uniformes)
+**Project:** Descomplicita (formerly Descomplicita)
 **Date:** 2026-03-07
 **Version:** 1.0 (Validated)
 **Reviewed by:** @architect (Atlas), @ux-design-expert (Pixel), @qa (Shield)
@@ -28,7 +28,7 @@
 
 1. **Security is the most urgent concern.** Wildcard CORS (TD-001), no authentication (TD-003), root container execution (TD-002), exposed debug endpoints (TD-055), and no rate limiting (TD-006) combine to create an exploitable attack surface. An unauthenticated attacker from any origin can exhaust all 10 job slots and abuse government API access.
 
-2. **Tests are currently broken.** Backend tests assert the old app title ("BidIQ Uniformes API") while the codebase now says "Descomplicita API". E2E tests reference `bg-green-600` but the UI uses `bg-brand-navy`. These must be fixed before any other work (Sprint 0).
+2. **Tests are currently broken.** Backend tests assert the old app title ("Descomplicita API") while the codebase now says "Descomplicita API". E2E tests reference `bg-green-600` but the UI uses `bg-brand-navy`. These must be fixed before any other work (Sprint 0).
 
 3. **Frontend test coverage is ~49%, not 91.5%.** The 91.5% figure in the architecture document is factually incorrect. The canonical measurement from `jest.config.js` shows 49.45% statements and 39.56% branches.
 
@@ -65,7 +65,7 @@
 | TD-002 | Backend Dockerfile runs as root | Security | 1-2 | Sprint 1 | Backend |
 | TD-003 | No authentication or authorization | Security | 4-8 (Phase 1) | Sprint 1 | Backend |
 | TD-004 | God component (page.tsx, 1,071 lines) | Code Quality | 28-40 | Sprint 2 | Frontend |
-| TD-054 | Broken backend test assertions (BidIQ title) | Code Quality | 1-2 | Sprint 0 | Backend |
+| TD-054 | Broken backend test assertions (Descomplicita title) | Code Quality | 1-2 | Sprint 0 | Backend |
 
 **TD-001: CORS Allows All Origins**
 - Location: `backend/main.py:76`
@@ -104,8 +104,8 @@
 
 **TD-054: Broken Backend Test Assertions** (NEW -- QA-discovered)
 - Location: `tests/test_main.py:24,238`
-- `test_main.py` asserts `app.title == "BidIQ Uniformes API"` but `main.py:59` now says `"Descomplicita API"`. At least 2 test functions are currently failing or masking CI failures.
-- Also: `tests/test_pncp_client.py:75` asserts User-Agent contains "BidIQ".
+- `test_main.py` asserts `app.title == "Descomplicita API"` but `main.py:59` now says `"Descomplicita API"`. At least 2 test functions are currently failing or masking CI failures.
+- Also: `tests/test_pncp_client.py:75` asserts User-Agent contains "Descomplicita".
 - Remediation: Update all test assertions to match current branding.
 - Effort: 1-2 hours
 
@@ -152,7 +152,7 @@
 | ID | Debt | Area | Hours | Sprint | Owner |
 |----|------|------|-------|--------|-------|
 | TD-015 | `datetime.utcnow()` deprecated | Code Quality | 1-2 | Sprint 5 | Backend |
-| TD-016 | Branding inconsistency (BidIQ remnants) | Maintainability | 4-8 | Sprint 5 | Both |
+| TD-016 | Branding inconsistency (Descomplicita remnants) | Maintainability | 4-8 | Sprint 5 | Both |
 | TD-017 | No request/correlation ID logging | Maintainability | 4-8 | Sprint 5 | Backend |
 | TD-018 | Hardcoded PNCP base URL | Maintainability | 1-2 | Sprint 5 | Backend |
 | TD-019 | No API versioning | Maintainability | 4-8 | Backlog | Backend |
@@ -165,7 +165,7 @@
 | TD-026 | Cache not shared across restarts | Performance | 8-16 | Sprint 4 | Backend |
 | TD-027 | No skip-to-content link | Accessibility | 1-2 | Sprint 1 | Frontend |
 | TD-028 | External logo dependency (Wix CDN) | Performance | 2-3 | Sprint 2 | Frontend |
-| TD-029 | Outdated favicon (BidIQ "B") | Design | 1-2 | Sprint 3 | Frontend |
+| TD-029 | Outdated favicon (Descomplicita "B") | Design | 1-2 | Sprint 3 | Frontend |
 | TD-030 | Error boundary uses hardcoded colors | Design | 2-4 | Sprint 3 | Frontend |
 | TD-044 | SourceBadges/carouselData hardcoded colors | Design | 3-5 | Sprint 3 | Frontend |
 | TD-047 | Dropdown menus lack ARIA menu pattern | Accessibility | 2-3 | Sprint 3 | Frontend |
@@ -224,7 +224,7 @@ The backend has **no authentication, no per-client rate limiting, accepts reques
 
 ### Broken Tests (TD-054 + TD-041)
 
-At least 2 backend tests and 1 E2E test are currently failing due to the BidIQ-to-Descomplicita rebrand. This may be masking CI failures and prevents establishing a regression baseline before the TD-004 decomposition. These are not future debt -- they are currently broken and must be Sprint 0.
+At least 2 backend tests and 1 E2E test are currently failing due to the Descomplicita-to-Descomplicita rebrand. This may be masking CI failures and prevents establishing a regression baseline before the TD-004 decomposition. These are not future debt -- they are currently broken and must be Sprint 0.
 
 ### In-Memory Architecture Ceiling (TD-005 + TD-026 + TD-023)
 
@@ -245,7 +245,7 @@ Realistic targets:
 
 ### Branding Migration Completeness (TD-016 + TD-029 + TD-028 + TD-045 + TD-054)
 
-The BidIQ-to-Descomplicita rebrand is incomplete across documentation, Docker configuration, favicon, logo hosting, `pyproject.toml`, and test assertions. Individually low-effort but collectively creates a fragmented identity and broken tests.
+The Descomplicita-to-Descomplicita rebrand is incomplete across documentation, Docker configuration, favicon, logo hosting, `pyproject.toml`, and test assertions. Individually low-effort but collectively creates a fragmented identity and broken tests.
 
 ### Deprecated API Usage (TD-015 + TD-024 + TD-014 + TD-039)
 
@@ -261,7 +261,7 @@ Four items use deprecated Python/JS APIs. Note per QA review: backend test files
 
 | ID | Item | Hours | Owner |
 |----|------|-------|-------|
-| TD-054 | Fix broken backend test assertions (BidIQ title, User-Agent) | 1-2 | Backend |
+| TD-054 | Fix broken backend test assertions (Descomplicita title, User-Agent) | 1-2 | Backend |
 | TD-041 | Fix E2E test class name assertions (bg-green-600 to bg-brand-navy) | 2-3 | Frontend |
 
 **Total: 3-5 hours**
@@ -473,7 +473,7 @@ SPRINT 5
 - [ ] API key authentication on all endpoints
 - [ ] No containers running as root
 - [ ] Debug endpoints disabled in production
-- [ ] All test assertions reference "Descomplicita" (not "BidIQ")
+- [ ] All test assertions reference "Descomplicita" (not "Descomplicita")
 - [ ] E2E happy-path test passes on current codebase
 - [ ] Sentry capturing production errors (backend + frontend)
 - [ ] Job state survives container restart (Redis-backed)

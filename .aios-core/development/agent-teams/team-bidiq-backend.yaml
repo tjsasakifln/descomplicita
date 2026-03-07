@@ -1,5 +1,5 @@
 bundle:
-  name: Team BidIQ Backend
+  name: Team Descomplicita Backend
   icon: 🐍
   description: Specialized squad for FastAPI backend development and PNCP API integration
 
@@ -44,7 +44,7 @@ quality_gates:
     threshold: Coverage ≥70%, 100% tests passing
 
 purpose: |
-  Handles all FastAPI backend development for BidIQ uniformes procurement system:
+  Handles all FastAPI backend development for Descomplicita uniformes procurement system:
 
   1. **PNCP API Client** (@architect + @dev):
      - Resilient HTTP client with exponential backoff retry (max 5 retries, 60s max)

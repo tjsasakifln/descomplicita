@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Completed comprehensive analysis of BidIQ/Descomplicita current state to establish baselines for Value Sprint metrics. **Key finding: No analytics infrastructure exists**, requiring alternative baseline collection methods.
+Completed comprehensive analysis of Descomplicita/Descomplicita current state to establish baselines for Value Sprint metrics. **Key finding: No analytics infrastructure exists**, requiring alternative baseline collection methods.
 
 **Heuristic UX Score:** 52/100 (precário)
 
@@ -210,7 +210,7 @@ Since no historical data exists, recommend 3 complementary approaches:
 **If 5-7 users are accessible:**
 
 **Interview Script (15min each):**
-1. "Show me how you use BidIQ/Descomplicita" (screen share)
+1. "Show me how you use Descomplicita/Descomplicita" (screen share)
 2. "What's your biggest frustration?"
 3. "What would make this 10x better?"
 4. "How often do you use it? Why not daily?"

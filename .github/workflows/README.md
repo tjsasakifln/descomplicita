@@ -1,4 +1,4 @@
-# CI/CD Workflows - BidIQ Uniformes POC
+# CI/CD Workflows - Descomplicita POC
 
 ## 📋 Visão Geral
 

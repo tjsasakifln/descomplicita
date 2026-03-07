@@ -1,6 +1,6 @@
 # Claude Code Commands - AIOS Agent System
 
-**Project:** BidIQ Uniformes (PNCP POC v0.2)
+**Project:** Descomplicita (PNCP POC v0.2)
 **Framework:** Synkra AIOS v2.0
 **Setup Status:** ✅ Complete & Validated
 

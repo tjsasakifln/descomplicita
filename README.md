@@ -1,4 +1,4 @@
-# BidIQ Uniformes - POC v0.2
+# Descomplicita - POC v0.2
 
 [![Backend Tests](https://github.com/tjsasakifln/PNCP-poc/actions/workflows/tests.yml/badge.svg)](https://github.com/tjsasakifln/PNCP-poc/actions/workflows/tests.yml)
 [![CodeQL](https://github.com/tjsasakifln/PNCP-poc/actions/workflows/codeql.yml/badge.svg)](https://github.com/tjsasakifln/PNCP-poc/actions/workflows/codeql.yml)
@@ -10,7 +10,7 @@ Sistema de busca e análise de licitações de uniformes do Portal Nacional de C
 
 ## 📋 Sobre o Projeto
 
-O **BidIQ Uniformes** é um POC (Proof of Concept) que automatiza a descoberta de oportunidades de licitações de uniformes e fardamentos através da API do PNCP (Portal Nacional de Contratações Públicas).
+O **Descomplicita** é um POC (Proof of Concept) que automatiza a descoberta de oportunidades de licitações de uniformes e fardamentos através da API do PNCP (Portal Nacional de Contratações Públicas).
 
 ### Funcionalidades Principais
 
@@ -321,9 +321,9 @@ docker-compose logs -f
 ### Deploy em Produção
 
 **🌐 Live URLs:**
-- **Frontend:** https://bidiq-uniformes.vercel.app _(após deploy)_
-- **Backend API:** https://bidiq-backend-production.up.railway.app _(após deploy)_
-- **API Docs:** https://bidiq-backend-production.up.railway.app/docs _(após deploy)_
+- **Frontend:** https://descomplicita.vercel.app _(após deploy)_
+- **Backend API:** https://descomplicita-backend-production.up.railway.app _(após deploy)_
+- **API Docs:** https://descomplicita-backend-production.up.railway.app/docs _(após deploy)_
 
 **Plataformas:**
 - **Frontend:** Vercel (Next.js otimizado)
@@ -387,14 +387,14 @@ LLM_MAX_TOKENS=500                 # Máximo de tokens na resposta (default: 500
 # Linux: sudo systemctl start docker
 ```
 
-**Problema:** `Error response from daemon: Conflict. The container name "/bidiq-backend" is already in use`
+**Problema:** `Error response from daemon: Conflict. The container name "/descomplicita-backend" is already in use`
 ```bash
 # Solução: Remova containers antigos
 docker-compose down
 docker-compose up --build
 ```
 
-**Problema:** `bidiq-backend exited with code 137` (Out of Memory)
+**Problema:** `descomplicita-backend exited with code 137` (Out of Memory)
 ```bash
 # Solução: Aumente memória do Docker Desktop
 # Settings → Resources → Memory: aumentar para 4GB+

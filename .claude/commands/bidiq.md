@@ -1,8 +1,8 @@
-# /bidiq — BidIQ Development Command Hub
+# /bidiq — Descomplicita Development Command Hub
 
 ## Purpose
 
-Central hub for all BidIQ Uniformes development operations. Provides quick access to squads, commands, and development workflows optimized for the PNCP procurement system.
+Central hub for all Descomplicita development operations. Provides quick access to squads, commands, and development workflows optimized for the PNCP procurement system.
 
 **Status:** MVP v0.1 (Week 1 - Essential features)
 
@@ -48,7 +48,7 @@ Type: /bidiq feature
 | Command | Purpose |
 |---------|---------|
 | `/bidiq status` | Project status dashboard (git, tests, stories, deployment) |
-| `/bidiq help` | Show all BidIQ commands and options |
+| `/bidiq help` | Show all Descomplicita commands and options |
 | `/bidiq guide` | Open development guide with examples |
 
 ### Quick Actions (Coming Week 2)
@@ -70,7 +70,7 @@ Type: /bidiq feature
 You: /bidiq backend
 
 System:
-  ✅ Team BidIQ Backend activated
+  ✅ Team Descomplicita Backend activated
 
   Agents available:
   - @architect     (API design, system architecture)
@@ -86,7 +86,7 @@ System:
 You: /bidiq frontend
 
 System:
-  ✅ Team BidIQ Frontend activated
+  ✅ Team Descomplicita Frontend activated
 
   Agents available:
   - @ux-design-expert  (UI/UX design)
@@ -101,7 +101,7 @@ System:
 You: /bidiq feature
 
 System:
-  ✅ Team BidIQ Feature Complete activated
+  ✅ Team Descomplicita Feature Complete activated
 
   Agents available:
   - @pm              (Story management)
@@ -147,7 +147,7 @@ System:
 
 ## Quality Gates
 
-All BidIQ squads enforce quality gates:
+All Descomplicita squads enforce quality gates:
 
 ### Backend Quality Gates
 - **Pre-commit**: pytest coverage ≥70%, mypy type checking
@@ -168,7 +168,7 @@ Get real-time project status:
 ```
 /bidiq status
 
-📊 BidIQ Project Status
+📊 Descomplicita Project Status
 
 🌿 Git:
   Branch: feature/issue-31-production-deployment
@@ -243,9 +243,9 @@ Automated checks at multiple stages:
 ## MVP Phase (Week 1) ✅
 
 **Completed:**
-- ✅ Team BidIQ Backend squad
-- ✅ Team BidIQ Frontend squad
-- ✅ Team BidIQ Feature Complete squad
+- ✅ Team Descomplicita Backend squad
+- ✅ Team Descomplicita Frontend squad
+- ✅ Team Descomplicita Feature Complete squad
 - ✅ /bidiq meta-command hub
 - ✅ Development guide
 

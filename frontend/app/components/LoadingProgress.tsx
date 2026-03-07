@@ -7,12 +7,49 @@ import { CURIOSIDADES, CATEGORIA_CONFIG, shuffleBalanced } from "./carouselData"
 
 type StageId = "queued" | "fetching" | "filtering" | "summarizing" | "generating_excel";
 
+type IconId = "search" | "download" | "filter" | "ai" | "done";
+
+const ICON_SVG_PATHS: Record<IconId, string> = {
+  search: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
+  download: "M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2m-4-4l-4 4m0 0l-4-4m4 4V4",
+  filter: "M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z",
+  ai: "M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.5 4.5H6.5L5 14.5m14 0H5",
+  done: "M5 13l4 4L19 7",
+};
+
+const CATEGORIA_ICON_SVG_PATHS: Record<string, string> = {
+  scale: "M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l3 9a5.002 5.002 0 006.001 0M18 7l-3 9m3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3",
+  target: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  chart: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
+  bulb: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+};
+
+function CategoriaIcon({ icon, className }: { icon: string; className?: string }) {
+  const path = CATEGORIA_ICON_SVG_PATHS[icon];
+  if (!path) return null;
+  return (
+    <svg className={className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+  );
+}
+
+function StageIcon({ icon, className }: { icon: string; className?: string }) {
+  const path = ICON_SVG_PATHS[icon as IconId];
+  if (!path) return null;
+  return (
+    <svg className={className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+  );
+}
+
 const STAGES: { id: StageId; label: string; icon: string }[] = [
-  { id: "queued", label: "Iniciando busca", icon: "🔍" },
-  { id: "fetching", label: "Buscando licitações", icon: "📥" },
-  { id: "filtering", label: "Filtrando resultados", icon: "🎯" },
-  { id: "summarizing", label: "Gerando resumo IA", icon: "🤖" },
-  { id: "generating_excel", label: "Preparando planilha", icon: "✅" },
+  { id: "queued", label: "Iniciando busca", icon: "search" },
+  { id: "fetching", label: "Buscando licitações", icon: "download" },
+  { id: "filtering", label: "Filtrando resultados", icon: "filter" },
+  { id: "summarizing", label: "Gerando resumo IA", icon: "ai" },
+  { id: "generating_excel", label: "Preparando planilha", icon: "done" },
 ];
 
 interface LoadingProgressProps {
@@ -312,7 +349,7 @@ export function LoadingProgress({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
-                  <span className="text-base" aria-hidden="true">{stage.icon}</span>
+                  <StageIcon icon={stage.icon} className="w-4 h-4" />
                 )}
               </div>
               <div className="flex flex-col hidden sm:block">
@@ -335,7 +372,7 @@ export function LoadingProgress({
       {/* Current Stage Detail (Mobile-friendly) */}
       <div className="sm:hidden mb-4 p-3 bg-surface-0 rounded-lg border border-accent">
         <div className="flex items-center gap-2">
-          <span className="text-xl" aria-hidden="true">{stageConfig.icon}</span>
+          <StageIcon icon={stageConfig.icon} className="w-5 h-5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-ink">{stageConfig.label}</p>
             <p className="text-xs text-ink-muted">{statusMessage}</p>
@@ -349,7 +386,7 @@ export function LoadingProgress({
       >
         <div className="flex items-start gap-3">
           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${categoriaConfig.iconBgClass}`}>
-            <span className="text-base" aria-hidden="true">{categoriaConfig.icon}</span>
+            <CategoriaIcon icon={categoriaConfig.icon} className="w-4 h-4" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">

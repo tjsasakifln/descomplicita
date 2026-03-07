@@ -1,5 +1,5 @@
 bundle:
-  name: Team BidIQ Feature Complete
+  name: Team Descomplicita Feature Complete
   icon: 🚀
   description: End-to-end feature development from story creation through deployment
 
@@ -94,7 +94,7 @@ purpose: |
      - Post-deployment monitoring
 
 feature_types: |
-  This squad handles all BidIQ feature types:
+  This squad handles all Descomplicita feature types:
 
   - **Search Enhancements**: Better filtering, advanced search options
   - **Integration Features**: New API integrations, third-party connections

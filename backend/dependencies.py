@@ -33,9 +33,9 @@ async def init_dependencies() -> None:
         import redis.asyncio as aioredis
         _redis = aioredis.from_url(redis_url, decode_responses=True)
         await _redis.ping()
-        logger.info(f"Redis connected: {redis_url}")
+        logger.info("Redis connected: %s", redis_url)
     except Exception as e:
-        logger.warning(f"Redis unavailable ({e}), using in-memory fallback")
+        logger.warning("Redis unavailable (%s), using in-memory fallback", e)
         _redis = None
 
     # --- Job Store ---

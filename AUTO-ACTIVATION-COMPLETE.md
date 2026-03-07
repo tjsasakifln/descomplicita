@@ -1,4 +1,4 @@
-# ✅ BidIQ Auto-Activation System - COMPLETE
+# ✅ Descomplicita Auto-Activation System - COMPLETE
 
 **Date:** 2026-01-26
 **Status:** Ready to Use
@@ -70,14 +70,14 @@ node .aios-core/development/scripts/bidiq-greeting-system.js
 
 Example output:
 ```
-🐍 BidIQ Development Assistant
+🐍 Descomplicita Development Assistant
 
 📍 Detected: Backend Development
    Modified: 5 backend files
    Branch: feature/issue-31
    Story: story-2-1 (50% complete)
 
-💡 Recommended: Team BidIQ Backend
+💡 Recommended: Team Descomplicita Backend
    Agents: architect, dev, data-engineer, qa
    Confidence: 95%
 
@@ -213,7 +213,7 @@ Adaptive Greeting + Recommendation
 ### Updated Files
 
 - `CLAUDE.md` (added auto-activation section)
-- `.claude/commands/INDEX.md` (added BidIQ section)
+- `.claude/commands/INDEX.md` (added Descomplicita section)
 
 ---
 
@@ -250,7 +250,7 @@ Adaptive Greeting + Recommendation
 
 - Works out of the box
 - Optional customization
-- Smart defaults for BidIQ
+- Smart defaults for Descomplicita
 
 ---
 
@@ -332,7 +332,7 @@ Contains:
 ## 📊 Example Output
 
 ```
-🐍 BidIQ Development Assistant
+🐍 Descomplicita Development Assistant
 
 📍 Detected: Backend Development
    Modified: 5 backend files, 1 frontend
@@ -340,7 +340,7 @@ Contains:
    Story: story-2-1-pncp-pagination (50% complete)
 
 💡 Recommended Squad:
-   🐍 Team BidIQ Backend
+   🐍 Team Descomplicita Backend
    FastAPI development, PNCP client, database work
    Agents: architect, dev, data-engineer, qa
    Confidence: 95%

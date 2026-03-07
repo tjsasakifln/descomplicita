@@ -16,7 +16,7 @@ export const CATEGORIA_CONFIG: Record<
   legislacao: {
     label: "Legislação",
     header: "Você sabia?",
-    icon: "⚖️",
+    icon: "scale",
     bgClass: "bg-blue-50 dark:bg-blue-950/30",
     iconBgClass: "bg-blue-100 dark:bg-blue-900/50",
     iconTextClass: "text-blue-600 dark:text-blue-400",
@@ -24,7 +24,7 @@ export const CATEGORIA_CONFIG: Record<
   estrategia: {
     label: "Estratégia",
     header: "Estratégia",
-    icon: "🎯",
+    icon: "target",
     bgClass: "bg-green-50 dark:bg-green-950/30",
     iconBgClass: "bg-green-100 dark:bg-green-900/50",
     iconTextClass: "text-green-600 dark:text-green-400",
@@ -32,7 +32,7 @@ export const CATEGORIA_CONFIG: Record<
   insight: {
     label: "Insight de Mercado",
     header: "Insight de Mercado",
-    icon: "📊",
+    icon: "chart",
     bgClass: "bg-purple-50 dark:bg-purple-950/30",
     iconBgClass: "bg-purple-100 dark:bg-purple-900/50",
     iconTextClass: "text-purple-600 dark:text-purple-400",
@@ -40,7 +40,7 @@ export const CATEGORIA_CONFIG: Record<
   dica: {
     label: "Dica Descomplicita",
     header: "Dica",
-    icon: "💡",
+    icon: "bulb",
     bgClass: "bg-amber-50 dark:bg-amber-950/30",
     iconBgClass: "bg-amber-100 dark:bg-amber-900/50",
     iconTextClass: "text-amber-600 dark:text-amber-400",

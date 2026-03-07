@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Tuple, Type, List
 import logging
+import os
 import sys
 
 
@@ -58,6 +59,15 @@ MODALIDADE_REDUCTION_UF_THRESHOLD: int = 10
 # PNCP server with concurrent requests, causing cascading timeouts.
 MAX_PAGES_PER_COMBO: int = 10
 
+# PNCP API base URL (TD-018) — configurable via environment variable
+PNCP_BASE_URL: str = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consulta/v1")
+
+# Maximum date range in days (TD-037)
+MAX_DATE_RANGE_DAYS: int = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
+
+# Maximum download size in bytes (TD-036) — default 50MB
+MAX_DOWNLOAD_SIZE: int = int(os.getenv("MAX_DOWNLOAD_SIZE", str(50 * 1024 * 1024)))
+
 
 @dataclass
 class RetryConfig:
@@ -93,7 +103,7 @@ SOURCES_CONFIG = {
     # NOT the HTTP timeout per individual request (see RetryConfig.timeout).
     "pncp": {
         "enabled": True,
-        "base_url": "https://pncp.gov.br/api/consulta/v1",
+        "base_url": PNCP_BASE_URL,
         "auth": None,
         "rate_limit_rps": 10,
         "timeout": 300,  # 7 UFs x 7 modalidades = 49 combos; with max_pages cap, ~120-180s typical
@@ -154,13 +164,16 @@ def setup_logging(level: str = "INFO") -> None:
         >>> logger.info("Application started")
         2026-01-25 23:00:00 | INFO     | __main__ | Application started
     """
+    from middleware.correlation_id import CorrelationIdFilter
+
     formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(correlation_id)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
+    handler.addFilter(CorrelationIdFilter())
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper()))

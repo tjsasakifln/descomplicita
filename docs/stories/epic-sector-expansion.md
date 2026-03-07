@@ -10,7 +10,7 @@
 
 ## 1. Objetivo do Epic
 
-Expandir o BidIQ de **7 setores** para **12 setores** de busca de licitacoes, cobrindo os segmentos de maior volume do mercado de compras publicas brasileiro (R$ 1,18 trilhao/ano).
+Expandir o Descomplicita de **7 setores** para **12 setores** de busca de licitacoes, cobrindo os segmentos de maior volume do mercado de compras publicas brasileiro (R$ 1,18 trilhao/ano).
 
 **Resultado Final:** 5 novos setores com precision >= 80% validada contra editais reais do PNCP.
 
@@ -20,7 +20,7 @@ Expandir o BidIQ de **7 setores** para **12 setores** de busca de licitacoes, co
 
 ### Situacao Atual
 
-BidIQ cobre 7 setores:
+Descomplicita cobre 7 setores:
 - Vestuario e Uniformes
 - Alimentos e Merenda
 - Informatica e Tecnologia
@@ -31,7 +31,7 @@ BidIQ cobre 7 setores:
 
 ### Situacao Desejada
 
-BidIQ cobrira 12 setores (+5 novos):
+Descomplicita cobrira 12 setores (+5 novos):
 - Saude e Medicamentos (R$ 75 bi/ano)
 - Veiculos, Pecas e Combustiveis (R$ 30+ bi/ano)
 - Equipamentos e Material Hospitalar (R$ 20+ bi/ano)

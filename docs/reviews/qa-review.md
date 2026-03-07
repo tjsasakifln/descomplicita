@@ -64,7 +64,7 @@ However, several important qualifications:
 
 3. **Tests heavily use mocks.** The `conftest.py` and `mock_helpers.py` create mock orchestrators. While this is appropriate for unit tests, there is no end-to-end backend pipeline test that exercises POST /buscar -> poll -> result with even partially real components.
 
-4. **Test-to-source naming inconsistency detected.** `test_main.py:24` asserts `app.title == "BidIQ Uniformes API"` but `main.py:59` now sets `title="Descomplicita API"`. This test is **currently failing** or was patched locally. This is a concrete branding debt artifact that the DRAFT should flag more prominently.
+4. **Test-to-source naming inconsistency detected.** `test_main.py:24` asserts `app.title == "Descomplicita API"` but `main.py:59` now sets `title="Descomplicita API"`. This test is **currently failing** or was patched locally. This is a concrete branding debt artifact that the DRAFT should flag more prominently.
 
 5. **Test files also use deprecated patterns.** `test_main.py:124` uses `datetime.utcnow()`, `test_concurrency.py:222` uses `asyncio.get_event_loop()`. When TD-015 and TD-024 are fixed, these test files will also need updates.
 
@@ -80,7 +80,7 @@ However, several important qualifications:
 
 | # | Gap | Area | Risk Level | Recommendation |
 |---|-----|------|------------|----------------|
-| G-01 | **Failing backend test not flagged** -- `test_main.py` asserts `app.title == "BidIQ Uniformes API"` but main.py says `"Descomplicita API"`. At least 2 tests are currently broken. | Code Quality | High | Add as sub-item of TD-016 or new TD item. Fix immediately since it masks CI failures. |
+| G-01 | **Failing backend test not flagged** -- `test_main.py` asserts `app.title == "Descomplicita API"` but main.py says `"Descomplicita API"`. At least 2 tests are currently broken. | Code Quality | High | Add as sub-item of TD-016 or new TD item. Fix immediately since it masks CI failures. |
 | G-02 | **CI coverage check is non-blocking** -- `continue-on-error: true` on the coverage threshold step means coverage regressions pass silently | Maintainability | Medium | Remove `continue-on-error` once coverage stabilizes, or add a separate required status check |
 | G-03 | **No Sentry or APM integration** -- `.env.example` has a SENTRY_DSN placeholder but no actual Sentry SDK is installed in requirements.txt or package.json | Observability | Medium | Add as a new debt item (TD-047). The system-architecture.md mentions it in recommendations but it is missing from the debt inventory. |
 | G-04 | **`termos_busca` input not length-limited** -- while regex injection is mitigated via `re.escape()`, there is no max length validation. A user could submit a megabyte-long string. | Security | Medium | Add length validation to `BuscaRequest.termos_busca` (e.g., `max_length=500`) |
@@ -145,7 +145,7 @@ The DRAFT places them together in Sprint 4, which is correct. The dependency map
 Sprint 2 includes accessibility work but the E2E tests are currently broken (TD-041 references `bg-green-600`). TD-041 should be moved to Sprint 2 or early Sprint 3 as a prerequisite for TD-004. You cannot validate a major refactor against a broken test suite.
 
 **Issue 4: Hidden dependency -- backend test fixes (G-01) block CI.**
-If `test_main.py` is asserting `app.title == "BidIQ Uniformes API"` and the app title is now `"Descomplicita API"`, CI may already be red. This must be fixed before any other work.
+If `test_main.py` is asserting `app.title == "Descomplicita API"` and the app title is now `"Descomplicita API"`, CI may already be red. This must be fixed before any other work.
 
 **Revised Sprint Suggestions:**
 
@@ -290,13 +290,13 @@ The estimates are generally reasonable. The wide ranges on TD-003 (16-40h) and T
 
 ### 8.1 Backend Branding Inconsistency in Tests (NEW -- not in DRAFT)
 
-The following backend test files still reference "BidIQ":
+The following backend test files still reference "Descomplicita":
 - `tests/conftest.py:1` -- docstring
 - `tests/mock_helpers.py:1` -- docstring
 - `tests/__init__.py:1` -- comment
-- `tests/test_main.py:24` -- **functional assertion** `app.title == "BidIQ Uniformes API"`
-- `tests/test_main.py:238` -- **functional assertion** `info["title"] == "BidIQ Uniformes API"`
-- `tests/test_pncp_client.py:75` -- asserts User-Agent header contains "BidIQ"
+- `tests/test_main.py:24` -- **functional assertion** `app.title == "Descomplicita API"`
+- `tests/test_main.py:238` -- **functional assertion** `info["title"] == "Descomplicita API"`
+- `tests/test_pncp_client.py:75` -- asserts User-Agent header contains "Descomplicita"
 
 The first two `test_main.py` assertions are **broken** since `main.py:59` now sets `title="Descomplicita API"`. These are functional test failures, not just cosmetic branding issues.
 

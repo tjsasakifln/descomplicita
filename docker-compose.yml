@@ -1,5 +1,5 @@
 # =============================================================================
-# BidIQ Uniformes POC - Docker Compose Development Environment
+# Descomplicita - Docker Compose Development Environment
 # =============================================================================
 # This file orchestrates backend (FastAPI) and frontend (Next.js placeholder)
 # services for local development with hot-reload capabilities.
@@ -30,7 +30,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - bidiq-network
+      - descomplicita-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -47,7 +47,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    container_name: bidiq-backend
+    container_name: descomplicita-backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -67,6 +67,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
 
       # PNCP Client Configuration
+      - PNCP_BASE_URL=${PNCP_BASE_URL:-https://pncp.gov.br/api/consulta/v1}
       - PNCP_TIMEOUT=${PNCP_TIMEOUT:-30}
       - PNCP_MAX_RETRIES=${PNCP_MAX_RETRIES:-5}
       - PNCP_BACKOFF_BASE=${PNCP_BACKOFF_BASE:-2}
@@ -80,7 +81,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - bidiq-network
+      - descomplicita-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
@@ -97,11 +98,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: bidiq-frontend
+    container_name: descomplicita-frontend
     ports:
       - "3000:3000"
     networks:
-      - bidiq-network
+      - descomplicita-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
@@ -117,9 +118,9 @@ services:
 # Networks
 # =============================================================================
 networks:
-  bidiq-network:
+  descomplicita-network:
     driver: bridge
-    name: bidiq-network
+    name: descomplicita-network
 
 # =============================================================================
 # Volumes (for future use with databases, etc.)

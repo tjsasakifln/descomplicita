@@ -1,6 +1,6 @@
 workflow:
   id: bidiq-api-integration
-  name: BidIQ API Integration - Resilience Pattern
+  name: Descomplicita API Integration - Resilience Pattern
   description: >-
     Workflow para integração de nova API externa seguindo o padrão de resiliência do PNCP client.
     Inclui retry com exponential backoff, rate limiting, circuit breaker e paginação automática.
