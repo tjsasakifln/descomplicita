@@ -2,14 +2,8 @@
  * Type definitions for Descomplicita
  */
 
-/** Brazilian state codes (UFs) */
-export const UFS = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
-  "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
-  "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-] as const;
-
-export type UF = (typeof UFS)[number];
+// Re-export UFS and UF from canonical source (TD-021)
+export { UFS, type UF } from "./constants/ufs";
 
 /** Search parameters for multi-source API */
 export interface SearchParams {

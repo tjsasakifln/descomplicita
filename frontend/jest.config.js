@@ -50,21 +50,14 @@ const customJestConfig = {
     '!**/jest.config.js',
   ],
 
-  // Coverage thresholds (target: 60% per CLAUDE.md, current: 49.45%)
-  // Progress: 31% → 49.45% (+18.45% from test additions)
-  // Next steps to reach 60%:
-  //   - Add LoadingProgress component tests (0% → 70%+)
-  //   - Add RegionSelector component tests (0% → 80%+)
-  //   - Add SavedSearchesDropdown tests (22% → 70%+)
-  //   - Add AnalyticsProvider tests (0% → 60%+)
-  //   - Fix remaining ThemeToggle async tests (3 failing)
-  //   - Add hooks/useAnalytics tests (currently not in coverage report)
+  // Coverage thresholds (target: 65% per Story 2.0, current: 67.93%)
+  // Progress: 49.45% → 67.93% (+18.48% from Story 2.0 decomposition)
   coverageThreshold: {
     global: {
-      branches: 39,   // Current: 39.56%
-      functions: 41,  // Current: 41.98%
-      lines: 50,      // Current: 51.01%
-      statements: 49, // Current: 49.45%
+      branches: 50,   // Current: 52.74%
+      functions: 57,  // Current: 59.89%
+      lines: 65,      // Current: 66.30%
+      statements: 65,  // Current: 67.93%
     },
   },
 

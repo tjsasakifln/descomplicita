@@ -5,6 +5,15 @@ import HomePage from '@/app/page';
 // Mock fetch globally
 global.fetch = jest.fn();
 
+// Mock next/image (used by SearchHeader)
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: (props: any) => {
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...props} />;
+  },
+}));
+
 // Mock child components that aren't relevant to page-level tests
 jest.mock('@/components/ThemeToggle', () => ({
   ThemeToggle: () => <div data-testid="theme-toggle" />,
@@ -12,6 +21,7 @@ jest.mock('@/components/ThemeToggle', () => ({
 
 jest.mock('@/components/RegionSelector', () => ({
   RegionSelector: () => <div data-testid="region-selector" />,
+  REGIONS: {},
 }));
 
 jest.mock('@/components/LoadingProgress', () => ({
@@ -34,6 +44,11 @@ jest.mock('@/components/EmptyState', () => ({
   ),
 }));
 
+jest.mock('@/components/SourceBadges', () => ({
+  SourceBadges: () => <div data-testid="source-badges" />,
+  default: () => <div data-testid="source-badges" />,
+}));
+
 const mockSuccessResponse = {
   resumo: {
     resumo_executivo: 'Encontradas 15 licitações de uniformes totalizando R$ 450.000,00',
@@ -50,7 +65,13 @@ const mockSuccessResponse = {
   download_id: 'uuid-123-456',
   total_raw: 200,
   total_filtrado: 15,
+  total_atas: 0,
+  total_licitacoes: 15,
   filter_stats: null,
+  sources_used: [],
+  source_stats: {},
+  dedup_removed: 0,
+  truncated_combos: 0,
 };
 
 /**
@@ -456,7 +477,7 @@ describe('HomePage - Polling Flow & Results', () => {
       await waitFor(() => {
         const totalElement = screen.getByText('15');
         expect(totalElement).toHaveClass('text-brand-navy');
-        expect(screen.getByText('licitações')).toBeInTheDocument();
+        expect(screen.getByText('oportunidades')).toBeInTheDocument();
       });
     });
 
@@ -546,7 +567,13 @@ describe('HomePage - Polling Flow & Results', () => {
         download_id: 'empty-id',
         total_raw: 0,
         total_filtrado: 0,
+        total_atas: 0,
+        total_licitacoes: 0,
         filter_stats: null,
+        sources_used: [],
+        source_stats: {},
+        dedup_removed: 0,
+        truncated_combos: 0,
       });
 
       await waitFor(() => {
