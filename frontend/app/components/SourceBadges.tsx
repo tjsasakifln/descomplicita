@@ -15,9 +15,10 @@ interface SourceBadgesProps {
   sources: string[];
   stats: Record<string, SourceStats>;
   dedupRemoved: number;
+  truncatedCombos?: number;
 }
 
-export function SourceBadges({ sources, stats, dedupRemoved }: SourceBadgesProps) {
+export function SourceBadges({ sources, stats, dedupRemoved, truncatedCombos = 0 }: SourceBadgesProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!sources || sources.length === 0) return null;
@@ -103,6 +104,11 @@ export function SourceBadges({ sources, stats, dedupRemoved }: SourceBadgesProps
           {dedupRemoved > 0 && (
             <p className="mt-2 pt-2 border-t text-xs text-ink-muted">
               {dedupRemoved} registro{dedupRemoved !== 1 ? "s" : ""} duplicado{dedupRemoved !== 1 ? "s" : ""} removido{dedupRemoved !== 1 ? "s" : ""}
+            </p>
+          )}
+          {truncatedCombos > 0 && (
+            <p className="mt-2 pt-2 border-t text-xs text-amber-600 dark:text-amber-400">
+              Resultados parciais: {truncatedCombos} combinac{truncatedCombos !== 1 ? "oes" : "ao"} UF/modalidade foram limitadas para evitar timeout. Para resultados completos, reduza o numero de estados.
             </p>
           )}
         </div>

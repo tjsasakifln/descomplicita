@@ -26,7 +26,7 @@ MODALIDADES_PNCP = {
     15: "Chamada pública",
 }
 
-# Default modalities for BidIQ search
+# Default modalities for Descomplicita search
 # Competitive procurement + high-volume modalities for uniforms, medicines, food
 DEFAULT_MODALIDADES: List[int] = [
     4,   # Concorrência - Eletrônica
@@ -56,7 +56,7 @@ class RetryConfig:
     max_delay: float = 10.0  # seconds
     exponential_base: int = 2
     jitter: bool = True
-    timeout: int = 25  # HTTP timeout per individual request (seconds)
+    timeout: int = 40  # HTTP timeout per individual request (seconds)
 
     # HTTP status codes that should trigger retry
     retryable_status_codes: Tuple[int, ...] = field(

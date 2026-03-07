@@ -1,5 +1,5 @@
 """
-BidIQ Uniformes POC - Backend API
+Descomplicita POC - Backend API
 
 FastAPI application for searching and analyzing uniform procurement bids
 from Brazil's PNCP (Portal Nacional de Contratações Públicas).
@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application
 app = FastAPI(
-    title="BidIQ Uniformes API",
+    title="Descomplicita API",
     description=(
         "API para busca e análise de licitações de uniformes no PNCP. "
         "Permite filtrar oportunidades por estado, valor e keywords, "
@@ -94,7 +94,7 @@ async def root():
         dict: API information and links to documentation endpoints
     """
     return {
-        "name": "BidIQ Uniformes API",
+        "name": "Descomplicita API",
         "version": "0.2.0",
         "description": "API para busca de licitações de uniformes no PNCP",
         "endpoints": {
@@ -510,6 +510,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                     for k, v in orch_result.source_stats.items()
                 },
                 "dedup_removed": orch_result.dedup_removed,
+                "truncated_combos": orch_result.truncated_combos,
             }
             await _job_store.complete(job_id, result)
             logger.info(
@@ -585,6 +586,7 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                 for k, v in orch_result.source_stats.items()
             },
             "dedup_removed": orch_result.dedup_removed,
+            "truncated_combos": orch_result.truncated_combos,
         }
         await _job_store.complete(job_id, result)
 

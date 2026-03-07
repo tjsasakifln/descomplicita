@@ -93,5 +93,6 @@ export async function GET(request: NextRequest) {
     sources_used: resultData.sources_used || [],
     source_stats: resultData.source_stats || {},
     dedup_removed: resultData.dedup_removed || 0,
+    truncated_combos: resultData.truncated_combos || 0,
   });
 }

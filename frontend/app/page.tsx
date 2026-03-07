@@ -944,6 +944,7 @@ export default function HomePage() {
                   sources={result.sources_used}
                   stats={result.source_stats}
                   dedupRemoved={result.dedup_removed}
+                  truncatedCombos={result.truncated_combos}
                 />
               )}
             </div>

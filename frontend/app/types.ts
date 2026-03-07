@@ -66,6 +66,7 @@ export interface BuscaResult {
   sources_used: string[];
   source_stats: Record<string, SourceStats>;
   dedup_removed: number;
+  truncated_combos: number;
 }
 
 /** Form validation errors */

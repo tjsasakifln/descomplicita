@@ -40,6 +40,7 @@ class OrchestratorResult:
     source_stats: Dict[str, SourceStats] = field(default_factory=dict)
     dedup_removed: int = 0
     sources_used: List[str] = field(default_factory=list)
+    truncated_combos: int = 0
 
 
 def get_enabled_source_names() -> List[str]:
@@ -207,10 +208,20 @@ class MultiSourceOrchestrator:
 
         # Launch all sources in parallel
         tasks = []
+        num_ufs = len(query.ufs) if query.ufs else 1
         for source in sources:
-            timeout = SOURCES_CONFIG.get(
+            base_timeout = SOURCES_CONFIG.get(
                 source.source_name.lower(), {}
             ).get("timeout", self.default_timeout)
+            # Scale timeout for PNCP when many UFs are selected:
+            # base 300s is sized for ~3 UFs; add 10s per extra UF beyond 5
+            timeout = base_timeout
+            if source.source_name.lower() == "pncp" and num_ufs > 5:
+                timeout = base_timeout + (num_ufs - 5) * 10
+                logger.info(
+                    "PNCP timeout scaled %ds → %ds for %d UFs",
+                    base_timeout, timeout, num_ufs,
+                )
             task = asyncio.create_task(
                 self._fetch_with_timeout(source, query, timeout)
             )
@@ -272,9 +283,16 @@ class MultiSourceOrchestrator:
         for name, stats in source_stats.items():
             stats.after_dedup = source_record_counts.get(name, 0)
 
+        # Collect truncation stats from PNCP source
+        truncated = 0
+        for source in sources:
+            if hasattr(source, "truncated_combos"):
+                truncated += source.truncated_combos
+
         logger.info(
-            "Orchestrator complete: %d records from %d sources, %d duplicates removed",
-            len(deduped), len(sources_used), dedup_removed,
+            "Orchestrator complete: %d records from %d sources, %d duplicates removed, "
+            "%d combos truncated",
+            len(deduped), len(sources_used), dedup_removed, truncated,
         )
 
         return OrchestratorResult(
@@ -282,6 +300,7 @@ class MultiSourceOrchestrator:
             source_stats=source_stats,
             dedup_removed=dedup_removed,
             sources_used=sources_used,
+            truncated_combos=truncated,
         )
 
     async def _fetch_with_timeout(

@@ -90,6 +90,15 @@ class PNCPClient:
         # 429 rate limit monitoring
         self._rate_limit_count = 0
         self._total_fetch_count = 0
+        # Circuit breaker: consecutive timeout counter (shared across threads)
+        self._consecutive_timeouts = 0
+        self._circuit_breaker_threshold = 3
+        # Adaptive rate limiting: dynamic interval based on response times
+        self._base_interval = 0.3  # 300ms default
+        self._adaptive_interval = 0.3
+        # Truncation tracking: combos that hit max_pages with more data available
+        self._truncated_combos = 0
+        self._truncated_lock = threading.Lock()
         # Cache layer (SP-001.2)
         self._cache: Dict[str, CacheEntry] = {}
         self._cache_lock = threading.Lock()
@@ -154,6 +163,12 @@ class PNCPClient:
             self._cache_misses = 0
             return count
 
+    @property
+    def truncated_combos(self) -> int:
+        """Number of UF×modalidade combos that were truncated by max_pages."""
+        with self._truncated_lock:
+            return self._truncated_combos
+
     def _create_session(self) -> requests.Session:
         """
         Create HTTP session with automatic retry strategy.
@@ -182,7 +197,7 @@ class PNCPClient:
 
         # Set default headers
         session.headers.update({
-            "User-Agent": "BidIQ/1.0 (procurement-search; contact@bidiq.com.br)",
+            "User-Agent": "Descomplicita/1.0 (procurement-search)",
             "Accept": "application/json",
         })
 
@@ -190,21 +205,37 @@ class PNCPClient:
 
     def _rate_limit(self) -> None:
         """
-        Enforce rate limiting: maximum 10 requests per second (thread-safe).
+        Enforce adaptive rate limiting (thread-safe).
 
-        Sleeps if necessary to maintain minimum interval between requests.
+        Uses a dynamic interval that increases when the PNCP server is slow
+        (avg response > 5s or consecutive timeouts) and decreases back to
+        baseline when the server is responsive.
         """
-        MIN_INTERVAL = 0.3  # 300ms = ~3 requests/second (gentler on PNCP server)
-
         with self._lock:
+            interval = self._adaptive_interval
             elapsed = time.time() - self._last_request_time
-            if elapsed < MIN_INTERVAL:
-                sleep_time = MIN_INTERVAL - elapsed
+            if elapsed < interval:
+                sleep_time = interval - elapsed
                 logger.debug(f"Rate limiting: sleeping {sleep_time:.3f}s")
                 time.sleep(sleep_time)
 
             self._last_request_time = time.time()
             self._request_count += 1
+
+    def _adjust_rate(self, response_time: float, was_timeout: bool = False) -> None:
+        """Adapt rate limit interval based on server responsiveness."""
+        with self._lock:
+            if was_timeout or response_time > 5.0:
+                # Server is struggling — double the interval (max 2s)
+                self._adaptive_interval = min(2.0, self._adaptive_interval * 2)
+                logger.debug(f"Rate limit increased to {self._adaptive_interval:.1f}s")
+            elif response_time < 2.0 and self._adaptive_interval > self._base_interval:
+                # Server is responsive — decay back toward baseline
+                self._adaptive_interval = max(
+                    self._base_interval,
+                    self._adaptive_interval * 0.8,
+                )
+                logger.debug(f"Rate limit decreased to {self._adaptive_interval:.1f}s")
 
     def fetch_page(
         self,
@@ -264,9 +295,16 @@ class PNCPClient:
                     f"{self.config.max_retries + 1}"
                 )
 
+                req_start = time.time()
                 response = self.session.get(
                     url, params=params, timeout=self.config.timeout
                 )
+                req_elapsed = time.time() - req_start
+
+                # Adaptive rate + circuit breaker: reset on success
+                self._adjust_rate(req_elapsed)
+                with self._lock:
+                    self._consecutive_timeouts = 0
 
                 # Track total fetches for 429 monitoring
                 with self._lock:
@@ -341,6 +379,20 @@ class PNCPClient:
                     raise PNCPAPIError(error_msg)
 
             except self.config.retryable_exceptions as e:
+                # Circuit breaker: track consecutive timeouts
+                self._adjust_rate(0, was_timeout=True)
+                with self._lock:
+                    self._consecutive_timeouts += 1
+                    ct = self._consecutive_timeouts
+                if ct >= self._circuit_breaker_threshold:
+                    pause = 15 * (ct // self._circuit_breaker_threshold)
+                    pause = min(pause, 60)
+                    logger.warning(
+                        f"Circuit breaker: {ct} consecutive timeouts, "
+                        f"pausing {pause}s to let PNCP recover"
+                    )
+                    time.sleep(pause)
+
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
@@ -458,6 +510,12 @@ class PNCPClient:
         Yields:
             Dict[str, Any]: Individual procurement record
         """
+        # Reset truncation counter for this search
+        with self._truncated_lock:
+            self._truncated_combos = 0
+            self._consecutive_timeouts = 0
+            self._adaptive_interval = self._base_interval
+
         date_chunks = self._chunk_date_range(data_inicial, data_final)
         if len(date_chunks) > 1:
             logger.info(
@@ -487,9 +545,23 @@ class PNCPClient:
                 else:
                     tasks.append((modalidade, None))
 
+            # Dynamically reduce max_pages when task count is high to cap
+            # total requests at ~600.  This prevents cascading timeouts when
+            # the user selects many UFs (e.g., 27 UFs × 7 mod = 189 combos).
+            # Formula: 600 / num_tasks, clamped to [2, max_pages].
+            effective_max_pages = max_pages
+            if max_pages > 0 and len(tasks) > 0:
+                effective_max_pages = min(max_pages, max(2, 600 // len(tasks)))
+                if effective_max_pages != max_pages:
+                    logger.info(
+                        f"Reduced max_pages {max_pages} → {effective_max_pages} "
+                        f"for {len(tasks)} tasks (cap ~600 total pages)"
+                    )
+
             logger.info(
                 f"Launching {len(tasks)} parallel fetches "
-                f"({len(modalidades_to_fetch)} modalities × {len(ufs or ['ALL'])} UFs)"
+                f"({len(modalidades_to_fetch)} modalities × {len(ufs or ['ALL'])} UFs), "
+                f"max_pages={effective_max_pages}"
             )
 
             # Parallel fetch: each UF×modalidade runs in its own thread.
@@ -502,7 +574,7 @@ class PNCPClient:
                 future_to_task = {
                     executor.submit(
                         self._fetch_uf_modalidade,
-                        chunk_start, chunk_end, modalidade, uf, on_progress, max_pages,
+                        chunk_start, chunk_end, modalidade, uf, on_progress, effective_max_pages,
                     ): (modalidade, uf)
                     for modalidade, uf in tasks
                 }
@@ -633,6 +705,9 @@ class PNCPClient:
                     f"UF={uf or 'ALL'}: {items_fetched} items fetched "
                     f"(total available: {total_registros})"
                 )
+                # Track truncation for user transparency
+                with self._truncated_lock:
+                    self._truncated_combos += 1
                 break
 
             # Move to next page

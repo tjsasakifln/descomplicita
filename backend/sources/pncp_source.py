@@ -126,6 +126,11 @@ class PNCPSource(DataSourceClient):
 
         return [self.normalize(item) for item in collected]
 
+    @property
+    def truncated_combos(self) -> int:
+        """Number of UF×modalidade combos truncated by max_pages."""
+        return self._client.truncated_combos
+
     def is_healthy(self) -> bool:
         """Quick health check — verifies the HTTP session is open."""
         try:
