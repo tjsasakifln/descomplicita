@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     downloadId = `${Date.now()}_${randomUUID()}`;
     const buffer = Buffer.from(resultData.excel_base64, "base64");
     const tmpDir = tmpdir();
-    const filePath = join(tmpDir, `bidiq_${downloadId}.xlsx`);
+    const filePath = join(tmpDir, `descomplicita_${downloadId}.xlsx`);
 
     try {
       await writeFile(filePath, buffer);

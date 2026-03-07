@@ -1,5 +1,5 @@
 /**
- * Type definitions for BidIQ Uniformes POC
+ * Type definitions for Descomplicita
  */
 
 /** Brazilian state codes (UFs) */

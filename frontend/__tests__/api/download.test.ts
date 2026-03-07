@@ -69,7 +69,7 @@ describe.skip("GET /api/download", () => {
       "attachment"
     );
     expect(response.headers.get("Content-Disposition")).toContain(
-      "bidiq_uniformes_"
+      "descomplicita_"
     );
     expect(response.headers.get("Content-Disposition")).toContain(".xlsx");
   });

@@ -225,7 +225,7 @@ describe("Carousel Data — carouselData.ts", () => {
     expect(CATEGORIA_CONFIG.legislacao.label).toBe("Legislação");
     expect(CATEGORIA_CONFIG.estrategia.label).toBe("Estratégia");
     expect(CATEGORIA_CONFIG.insight.label).toBe("Insight de Mercado");
-    expect(CATEGORIA_CONFIG.dica.label).toBe("Dica BidIQ");
+    expect(CATEGORIA_CONFIG.dica.label).toBe("Dica Descomplicita");
   });
 });
 
@@ -302,7 +302,7 @@ describe("Carousel rotation", () => {
     const headerFound = validHeaders.some((h) => screen.queryByText(h));
     expect(headerFound).toBe(true);
 
-    const validLabels = ["Legislação", "Estratégia", "Insight de Mercado", "Dica BidIQ"];
+    const validLabels = ["Legislação", "Estratégia", "Insight de Mercado", "Dica Descomplicita"];
     const labelFound = validLabels.some((l) => screen.queryByText(l));
     expect(labelFound).toBe(true);
 

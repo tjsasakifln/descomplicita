@@ -1,5 +1,5 @@
 # =============================================================================
-# BidIQ Uniformes - Frontend Dockerfile (Production)
+# Descomplicita - Frontend Dockerfile (Production)
 # =============================================================================
 # Multi-stage build for Next.js with standalone output
 # Optimized for Railway deployment

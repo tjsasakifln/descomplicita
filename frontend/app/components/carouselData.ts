@@ -38,7 +38,7 @@ export const CATEGORIA_CONFIG: Record<
     iconTextClass: "text-purple-600 dark:text-purple-400",
   },
   dica: {
-    label: "Dica BidIQ",
+    label: "Dica Descomplicita",
     header: "Dica",
     icon: "💡",
     bgClass: "bg-amber-50 dark:bg-amber-950/30",
@@ -265,69 +265,69 @@ export const CURIOSIDADES: Curiosidade[] = [
   // ═══════════════════════════════════════════
   {
     texto: "Use a busca por termos específicos para encontrar nichos que o filtro por setor pode não cobrir.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Selecione estados onde você tem capacidade logística — licitar para locais que você não atende desperdiça recursos.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Salve suas buscas favoritas para acompanhar novas oportunidades sem refazer a pesquisa toda vez.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Amplie o período de busca para 30 dias quando quiser uma visão mais completa do mercado.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Exporte o Excel e organize por valor estimado para priorizar as melhores oportunidades primeiro.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Busque em múltiplos setores — muitas licitações de uniformes aparecem junto com material de EPI.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
     setores: ["vestuario"],
   },
   {
     texto: "Combine palavras-chave com filtros de estado para encontrar oportunidades regionais mais relevantes para o seu negócio.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Verifique o prazo de abertura das licitações encontradas — oportunidades com prazo curto exigem documentação já preparada.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Use sinônimos na busca: 'camisa polo', 'camiseta', 'uniforme' podem retornar resultados diferentes e complementares.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
     setores: ["vestuario"],
   },
   {
     texto: "Filtre por modalidade de licitação para focar em pregões eletrônicos, que oferecem maior agilidade e transparência.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Consulte o órgão licitante antes de participar — entender o histórico de compras dele ajuda a calibrar sua proposta.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Acompanhe os resultados das licitações que você não venceu — entender o preço vencedor melhora suas futuras propostas.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
   {
     texto: "Configure alertas para receber notificações quando novas licitações do seu interesse forem publicadas.",
-    fonte: "BidIQ",
+    fonte: "Descomplicita",
     categoria: "dica",
   },
 ];

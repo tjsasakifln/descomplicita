@@ -11,11 +11,11 @@ async function cleanupExpiredDownloads() {
     const files = await readdir(dir);
     const now = Date.now();
     for (const file of files) {
-      if (!file.startsWith("bidiq_")) continue;
+      if (!file.startsWith("descomplicita_")) continue;
       const filePath = join(dir, file);
       try {
-        // Try timestamp from filename first (format: bidiq_{timestamp}_{uuid}.xlsx)
-        const tsMatch = file.match(/^bidiq_(\d+)_/);
+        // Try timestamp from filename first (format: descomplicita_{timestamp}_{uuid}.xlsx)
+        const tsMatch = file.match(/^descomplicita_(\d+)_/);
         if (tsMatch) {
           const createdAt = parseInt(tsMatch[1], 10);
           if (now - createdAt > DOWNLOAD_TTL_MS) {
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   // Read from filesystem
   const tmpDir = tmpdir();
-  const filePath = join(tmpDir, `bidiq_${id}.xlsx`);
+  const filePath = join(tmpDir, `descomplicita_${id}.xlsx`);
 
   try {
     const buffer = await readFile(filePath);

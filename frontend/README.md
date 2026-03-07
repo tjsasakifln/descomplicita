@@ -1,6 +1,6 @@
-# BidIQ Uniformes - Frontend
+# Descomplicita - Frontend
 
-Frontend application for BidIQ Uniformes POC.
+Frontend application for Descomplicita.
 
 ## Status
 
