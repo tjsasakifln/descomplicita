@@ -38,6 +38,18 @@ DEFAULT_MODALIDADES: List[int] = [
     15,  # Chamada pública (SE-001.3: agricultura familiar, medicamentos)
 ]
 
+# Reduced modalities for large UF counts (>10 UFs).
+# Pregão Eletrônico alone covers ~80% of procurement volume.
+# Using fewer modalities prevents cascading timeouts when querying many states.
+PRIORITY_MODALIDADES: List[int] = [
+    6,   # Pregão - Eletrônico (dominant modality)
+    4,   # Concorrência - Eletrônica
+    8,   # Dispensa
+]
+
+# Threshold: if UF count exceeds this, use PRIORITY_MODALIDADES
+MODALIDADE_REDUCTION_UF_THRESHOLD: int = 10
+
 # Maximum pages to fetch per UF×modalidade combination.
 # PNCP page size is 50 items, so 10 pages = 500 items per combo.
 # With 3 UFs × 7 modalidades = 21 combos, this yields up to 10,500 raw items

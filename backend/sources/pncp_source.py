@@ -44,6 +44,8 @@ class PNCPSource(DataSourceClient):
 
     def __init__(self, config: RetryConfig | None = None):
         self._client = PNCPClient(config)
+        # Partial results buffer — survives orchestrator timeout/cancellation
+        self._partial_results: List[dict] = []
 
     @property
     def client(self) -> PNCPClient:
@@ -101,10 +103,11 @@ class PNCPSource(DataSourceClient):
         """
         loop = asyncio.get_event_loop()
 
-        # Collect results incrementally so partial data survives any timeout
-        collected: List[dict] = []
+        # Reset partial results buffer (instance variable so orchestrator
+        # can recover data even if asyncio.wait_for cancels our task)
+        self._partial_results = []
 
-        def _fetch() -> List[dict]:
+        def _fetch() -> None:
             for item in self._client.fetch_all(
                 data_inicial=query.data_inicial,
                 data_final=query.data_final,
@@ -113,18 +116,21 @@ class PNCPSource(DataSourceClient):
                 on_progress=on_progress,
                 max_pages=MAX_PAGES_PER_COMBO,
             ):
-                collected.append(item)
-            return collected
+                self._partial_results.append(item)
 
         try:
             await loop.run_in_executor(None, _fetch)
         except Exception as e:
             logger.warning(
                 "PNCP fetch interrupted (%s), returning %d partial results",
-                type(e).__name__, len(collected),
+                type(e).__name__, len(self._partial_results),
             )
 
-        return [self.normalize(item) for item in collected]
+        return [self.normalize(item) for item in self._partial_results]
+
+    def get_partial_results(self) -> List[NormalizedRecord]:
+        """Return whatever was collected so far (for timeout recovery)."""
+        return [self.normalize(item) for item in self._partial_results]
 
     @property
     def truncated_combos(self) -> int:

@@ -13,7 +13,12 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from config import RetryConfig, DEFAULT_MODALIDADES
+from config import (
+    RetryConfig,
+    DEFAULT_MODALIDADES,
+    PRIORITY_MODALIDADES,
+    MODALIDADE_REDUCTION_UF_THRESHOLD,
+)
 from exceptions import PNCPAPIError
 
 # PNCP consulta API max page size is 50 (despite manual claiming 500)
@@ -523,7 +528,20 @@ class PNCPClient:
                 f"{len(date_chunks)} chunks of up to 30 days"
             )
 
-        modalidades_to_fetch = modalidades or DEFAULT_MODALIDADES
+        # Reduce modalidades when many UFs are selected to keep request
+        # count manageable.  With 27 UFs × 7 mod = 189 combos vs
+        # 27 UFs × 3 mod = 81 combos — a 2.3x reduction.
+        num_ufs = len(ufs) if ufs else 1
+        if modalidades:
+            modalidades_to_fetch = modalidades
+        elif num_ufs > MODALIDADE_REDUCTION_UF_THRESHOLD:
+            modalidades_to_fetch = PRIORITY_MODALIDADES
+            logger.info(
+                f"Using {len(modalidades_to_fetch)} priority modalidades "
+                f"(reduced from {len(DEFAULT_MODALIDADES)}) for {num_ufs} UFs"
+            )
+        else:
+            modalidades_to_fetch = DEFAULT_MODALIDADES
         seen_ids: set[str] = set()
 
         for chunk_idx, (chunk_start, chunk_end) in enumerate(date_chunks):

@@ -217,7 +217,7 @@ class MultiSourceOrchestrator:
             # base 300s is sized for ~3 UFs; add 10s per extra UF beyond 5
             timeout = base_timeout
             if source.source_name.lower() == "pncp" and num_ufs > 5:
-                timeout = base_timeout + (num_ufs - 5) * 10
+                timeout = base_timeout + (num_ufs - 5) * 15
                 logger.info(
                     "PNCP timeout scaled %ds → %ds for %d UFs",
                     base_timeout, timeout, num_ufs,
@@ -238,15 +238,36 @@ class MultiSourceOrchestrator:
         sources_used: List[str] = []
         sources_completed = 0
 
+        # Build source lookup for partial result recovery
+        source_by_name = {s.source_name: s for s in sources}
+
         for (name, _), result in zip(tasks, results):
             sources_completed += 1
 
-            if isinstance(result, asyncio.TimeoutError):
-                logger.error("Source %s timed out", name)
-                source_stats[name] = SourceStats(
-                    status="timeout",
-                    error_message=f"Timeout after configured limit",
-                )
+            if isinstance(result, (asyncio.TimeoutError, asyncio.CancelledError)):
+                # Recover partial results from sources that support it
+                source = source_by_name.get(name)
+                partial = []
+                if source and hasattr(source, "get_partial_results"):
+                    partial = source.get_partial_results()
+                if partial:
+                    logger.warning(
+                        "Source %s timed out but recovered %d partial results",
+                        name, len(partial),
+                    )
+                    source_stats[name] = SourceStats(
+                        total_fetched=len(partial),
+                        status="timeout",
+                        error_message=f"Timeout — {len(partial)} partial results recovered",
+                    )
+                    all_records.extend(partial)
+                    sources_used.append(name)
+                else:
+                    logger.error("Source %s timed out with 0 results", name)
+                    source_stats[name] = SourceStats(
+                        status="timeout",
+                        error_message="Timeout after configured limit",
+                    )
             elif isinstance(result, Exception):
                 logger.error("Source %s failed: %s", name, result)
                 source_stats[name] = SourceStats(
