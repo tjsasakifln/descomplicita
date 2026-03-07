@@ -55,7 +55,6 @@ class PNCPSource(DataSourceClient):
         cnpj = raw.get("cnpj", "")
         ano = raw.get("anoCompra", "")
         seq = raw.get("sequencialCompra", "")
-        is_ata = raw.get("_tipo") == "ata_registro_preco"
 
         url_edital = raw.get("linkPncp") or (
             f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seq}"
@@ -64,11 +63,10 @@ class PNCPSource(DataSourceClient):
         )
 
         return NormalizedRecord(
-            id=raw.get("numeroControlePNCP", "") or raw.get("numeroAta", ""),
+            id=raw.get("numeroControlePNCP", ""),
             source="PNCP",
             sources=["PNCP"],
-            tipo="ata_registro_preco" if is_ata else "licitacao",
-            numero_licitacao=raw.get("numeroControlePNCP", "") or raw.get("numeroAta", ""),
+            numero_licitacao=raw.get("numeroControlePNCP", ""),
             objeto=raw.get("objetoCompra", ""),
             orgao=raw.get("nomeOrgao", ""),
             cnpj_orgao=cnpj,
@@ -92,13 +90,17 @@ class PNCPSource(DataSourceClient):
     ) -> List[NormalizedRecord]:
         """Fetch all PNCP records matching the query.
 
-        Fetches both /contratacoes/publicacao and /atas endpoints in parallel,
-        then combines and deduplicates results.
+        Delegates to PNCPClient.fetch_all() (sync, threaded) via
+        run_in_executor to avoid blocking the async event loop.
+
+        NOTE: The PNCP /atas endpoint is disabled — it returns HTTP 500
+        ("Failed to obtain JDBC Connection") as of 2026-03-07. Server-side
+        keyword filtering (palavraChave) is also not supported by the
+        consulta API. Sector filtering is done client-side by filter_batch().
         """
         loop = asyncio.get_event_loop()
 
-        # Fetch contratacoes and atas in parallel
-        contratacoes_future = loop.run_in_executor(
+        raw_items = await loop.run_in_executor(
             None,
             lambda: list(
                 self._client.fetch_all(
@@ -107,46 +109,11 @@ class PNCPSource(DataSourceClient):
                     ufs=query.ufs,
                     modalidades=query.modalidades,
                     on_progress=on_progress,
-                    search_terms=query.search_terms,
                 )
             ),
         )
 
-        atas_future = loop.run_in_executor(
-            None,
-            lambda: list(
-                self._client.fetch_all_atas(
-                    data_inicial=query.data_inicial,
-                    data_final=query.data_final,
-                    ufs=query.ufs,
-                    on_progress=on_progress,
-                    search_terms=query.search_terms,
-                )
-            ),
-        )
-
-        contratacoes_raw, atas_raw = await asyncio.gather(
-            contratacoes_future, atas_future
-        )
-
-        logger.info(
-            f"PNCP fetched {len(contratacoes_raw)} contratacoes + "
-            f"{len(atas_raw)} atas de registro de preco"
-        )
-
-        # Combine and deduplicate by id
-        all_items = contratacoes_raw + atas_raw
-        seen_ids: set[str] = set()
-        unique_items: List[dict] = []
-        for item in all_items:
-            item_id = item.get("numeroControlePNCP", "") or item.get("codigoCompra", "")
-            if item_id and item_id in seen_ids:
-                continue
-            if item_id:
-                seen_ids.add(item_id)
-            unique_items.append(item)
-
-        return [self.normalize(item) for item in unique_items]
+        return [self.normalize(item) for item in raw_items]
 
     def is_healthy(self) -> bool:
         """Quick health check — verifies the HTTP session is open."""
