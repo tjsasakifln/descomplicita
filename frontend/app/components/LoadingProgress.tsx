@@ -23,6 +23,8 @@ interface LoadingProgressProps {
   itemsFiltered: number;
   elapsedSeconds: number;
   onCancel: () => void;
+  selectedUfs?: string[];
+  sectorId?: string;
 }
 
 export function LoadingProgress({
@@ -33,8 +35,25 @@ export function LoadingProgress({
   itemsFiltered,
   elapsedSeconds,
   onCancel,
+  selectedUfs = [],
+  sectorId,
 }: LoadingProgressProps) {
-  const shuffledItems = useMemo(() => shuffleBalanced([...CURIOSIDADES]), []);
+  // Sector-aware curiosidades: prioritize sector-specific items, then generic
+  const shuffledItems = useMemo(() => {
+    if (!sectorId) return shuffleBalanced([...CURIOSIDADES]);
+
+    const sectorItems = CURIOSIDADES.filter(
+      (c) => c.setores && c.setores.includes(sectorId)
+    );
+    const genericItems = CURIOSIDADES.filter((c) => !c.setores);
+
+    // Put sector items first, then generic, both shuffled
+    return [
+      ...shuffleBalanced([...sectorItems]),
+      ...shuffleBalanced([...genericItems]),
+    ];
+  }, [sectorId]);
+
   const [curiosidadeIndex, setCuriosidadeIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const { trackEvent } = useAnalytics();
@@ -90,6 +109,35 @@ export function LoadingProgress({
   };
 
   const progress = calculateProgress();
+
+  // ETA calculation
+  const getETA = (): string | null => {
+    if (phase === "queued") return null;
+
+    if (phase === "fetching" && ufsCompleted > 0 && ufsTotal > 0) {
+      const avgTimePerUf = elapsedSeconds / ufsCompleted;
+      const remainingUfs = ufsTotal - ufsCompleted;
+      const fetchRemaining = remainingUfs * avgTimePerUf;
+      // Estimate post-fetch phases (~20s for filtering + summarizing + excel)
+      const postFetchEstimate = 20;
+      const totalRemaining = Math.max(0, Math.round(fetchRemaining + postFetchEstimate));
+
+      if (totalRemaining <= 0) return null;
+      const mins = Math.floor(totalRemaining / 60);
+      const secs = totalRemaining % 60;
+      return mins > 0
+        ? `~${mins}min ${secs.toString().padStart(2, "0")}s restantes`
+        : `~${secs}s restantes`;
+    }
+
+    if (phase === "filtering") return "~15s restantes";
+    if (phase === "summarizing") return "~10s restantes";
+    if (phase === "generating_excel") return "~5s restantes";
+
+    return null;
+  };
+
+  const eta = getETA();
 
   // Track stage progression (analytics)
   useEffect(() => {
@@ -159,9 +207,14 @@ export function LoadingProgress({
           <span className="text-sm font-medium text-brand-blue">
             {statusMessage}
           </span>
-          <span className="text-sm tabular-nums font-data text-ink-muted">
-            {timeDisplay}
-          </span>
+          <div className="flex items-center gap-3 text-sm tabular-nums font-data text-ink-muted">
+            {eta && (
+              <span className="text-brand-navy dark:text-brand-blue font-medium">
+                {eta}
+              </span>
+            )}
+            <span>{timeDisplay}</span>
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -188,8 +241,45 @@ export function LoadingProgress({
         </div>
       </div>
 
-      {/* UF Progress during fetching phase */}
-      {phase === "fetching" && ufsTotal > 0 && (
+      {/* UF Visual Progress Grid */}
+      {phase === "fetching" && ufsTotal > 0 && selectedUfs.length > 0 && (
+        <div className="mb-4 p-3 bg-surface-0 rounded-lg border border-accent">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span className="font-medium text-ink">
+              Estados processados
+            </span>
+            <span className="tabular-nums font-data text-brand-navy dark:text-brand-blue font-semibold">
+              {ufsCompleted} / {ufsTotal}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedUfs.map((uf, i) => {
+              const isCompleted = i < ufsCompleted;
+              const isCurrent = i === ufsCompleted;
+              return (
+                <span
+                  key={uf}
+                  className={`
+                    inline-flex items-center justify-center w-9 h-7 rounded text-xs font-semibold
+                    transition-all duration-300
+                    ${isCompleted
+                      ? "bg-brand-navy text-white"
+                      : isCurrent
+                        ? "bg-brand-blue text-white animate-pulse"
+                        : "bg-surface-2 text-ink-muted"
+                    }
+                  `}
+                >
+                  {uf}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback: simple counter when no selectedUfs provided */}
+      {phase === "fetching" && ufsTotal > 0 && selectedUfs.length === 0 && (
         <div className="mb-4 p-3 bg-surface-0 rounded-lg border border-accent">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-ink">
@@ -253,7 +343,7 @@ export function LoadingProgress({
         </div>
       </div>
 
-      {/* Curiosity Card — Category-aware */}
+      {/* Curiosity Card — Category-aware, sector-prioritized */}
       <div
         className={`p-4 rounded-card border transition-all duration-300 ${categoriaConfig.bgClass} ${isFading ? "opacity-0" : "opacity-100"}`}
       >
@@ -272,6 +362,38 @@ export function LoadingProgress({
             <p className="text-xs text-ink-muted mt-2">Fonte: {curiosidade.fonte}</p>
           </div>
         </div>
+      </div>
+
+      {/* Skeleton Result Cards — preview of what's coming */}
+      <div className="mt-4 space-y-3">
+        <p className="text-xs font-medium text-ink-muted">Preparando seus resultados...</p>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="p-4 bg-surface-0 rounded-card border"
+            style={{ opacity: 1 - i * 0.2 }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-2.5">
+                {/* Title skeleton */}
+                <div className="h-4 rounded animate-shimmer" style={{ width: `${75 - i * 10}%` }} />
+                {/* Org name skeleton */}
+                <div className="h-3 rounded animate-shimmer" style={{ width: `${50 - i * 5}%` }} />
+                {/* Details row skeleton */}
+                <div className="flex gap-3">
+                  <div className="h-3 w-16 rounded animate-shimmer" />
+                  <div className="h-3 w-20 rounded animate-shimmer" />
+                  <div className="h-3 w-12 rounded animate-shimmer" />
+                </div>
+              </div>
+              {/* Value skeleton */}
+              <div className="flex-shrink-0 text-right space-y-2">
+                <div className="h-5 w-24 rounded animate-shimmer" />
+                <div className="h-3 w-14 rounded animate-shimmer ml-auto" />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Cancel button */}

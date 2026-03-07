@@ -6,6 +6,7 @@ export interface Curiosidade {
   texto: string;
   fonte: string;
   categoria: CuriosidadeCategoria;
+  setores?: string[];
 }
 
 export const CATEGORIA_CONFIG: Record<
@@ -202,6 +203,7 @@ export const CURIOSIDADES: Curiosidade[] = [
     texto: "Uniformes escolares têm pico de licitações entre outubro e fevereiro, antes do início do ano letivo.",
     fonte: "Estimativa de Mercado",
     categoria: "insight",
+    setores: ["vestuario"],
   },
   {
     texto: "Municípios com menos de 50 mil habitantes concentram grande volume de licitações com menor concorrência.",
@@ -222,11 +224,13 @@ export const CURIOSIDADES: Curiosidade[] = [
     texto: "Uniformes escolares movimentam cerca de R$ 2 bilhões por ano em licitações públicas.",
     fonte: "Estimativa de Mercado",
     categoria: "insight",
+    setores: ["vestuario"],
   },
   {
     texto: "Janeiro e fevereiro concentram 35% das licitações de uniformes escolares — planeje-se com antecedência.",
     fonte: "Estimativa de Mercado",
     categoria: "insight",
+    setores: ["vestuario"],
   },
   {
     texto: "O último trimestre do ano fiscal concentra até 30% do orçamento de compras de muitos órgãos públicos, gerando um pico de licitações.",
@@ -237,6 +241,7 @@ export const CURIOSIDADES: Curiosidade[] = [
     texto: "Licitações de tecnologia da informação cresceram mais de 25% nos últimos 3 anos, impulsionadas pela transformação digital do setor público.",
     fonte: "Governo Digital / Ministério da Gestão",
     categoria: "insight",
+    setores: ["informatica"],
   },
   {
     texto: "Mais de 5.500 municípios brasileiros publicam licitações regularmente — a maioria das oportunidades está fora das capitais.",
@@ -247,6 +252,7 @@ export const CURIOSIDADES: Curiosidade[] = [
     texto: "Licitações de alimentação escolar movimentam mais de R$ 4 bilhões por ano pelo PNAE, com preferência para produtores locais.",
     fonte: "FNDE / Governo Federal",
     categoria: "insight",
+    setores: ["alimentos"],
   },
   {
     texto: "Cerca de 30% das licitações de pregão eletrônico terminam com desconto superior a 20% sobre o valor estimado.",
@@ -286,6 +292,7 @@ export const CURIOSIDADES: Curiosidade[] = [
     texto: "Busque em múltiplos setores — muitas licitações de uniformes aparecem junto com material de EPI.",
     fonte: "BidIQ",
     categoria: "dica",
+    setores: ["vestuario"],
   },
   {
     texto: "Combine palavras-chave com filtros de estado para encontrar oportunidades regionais mais relevantes para o seu negócio.",
@@ -301,6 +308,7 @@ export const CURIOSIDADES: Curiosidade[] = [
     texto: "Use sinônimos na busca: 'camisa polo', 'camiseta', 'uniforme' podem retornar resultados diferentes e complementares.",
     fonte: "BidIQ",
     categoria: "dica",
+    setores: ["vestuario"],
   },
   {
     texto: "Filtre por modalidade de licitação para focar em pregões eletrônicos, que oferecem maior agilidade e transparência.",

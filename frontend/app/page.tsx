@@ -84,6 +84,12 @@ export default function HomePage() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const jobIdRef = useRef<string | null>(null);
   const searchStartTimeRef = useRef<number>(0);
+  const originalTitleRef = useRef<string>("");
+
+  // Store original title on mount
+  useEffect(() => {
+    originalTitleRef.current = document.title;
+  }, []);
 
   useEffect(() => {
     fetch("/api/setores")
@@ -192,6 +198,41 @@ export default function HomePage() {
     });
   }, [stopPolling, resetProgressState, trackEvent, searchPhase]);
 
+  // Background notification: title change + Notification API
+  const notifyCompletion = useCallback((totalOps: number) => {
+    // Restore original title and flash completion
+    if (document.hidden) {
+      document.title = `✅ ${totalOps} licitações encontradas — DescompLicita`;
+
+      // Restore title when user returns
+      const handleVisibility = () => {
+        if (!document.hidden) {
+          document.title = originalTitleRef.current;
+          document.removeEventListener("visibilitychange", handleVisibility);
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibility);
+
+      // Browser notification (only if permission granted)
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification("DescompLicita", {
+          body: `Busca concluída! ${totalOps} licitações encontradas.`,
+          icon: "/favicon.ico",
+        });
+      }
+    }
+  }, []);
+
+  // Request notification permission after first successful search
+  const requestNotificationPermission = useCallback(() => {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const fetchResult = useCallback(async (jobId: string) => {
     const response = await fetch(`/api/buscar/result?job_id=${jobId}`);
     if (!response.ok) {
@@ -248,6 +289,11 @@ export default function HomePage() {
               setResult(resultData);
               setRawCount(resultData.total_raw || 0);
 
+              // Background notification
+              const totalOps = resultData.resumo?.total_oportunidades || 0;
+              notifyCompletion(totalOps);
+              requestNotificationPermission();
+
               const timeElapsed = Date.now() - searchStartTimeRef.current;
               trackEvent("search_completed", {
                 time_elapsed_ms: timeElapsed,
@@ -277,7 +323,7 @@ export default function HomePage() {
         // Network error — silently retry next interval
       }
     }, POLL_INTERVAL);
-  }, [stopPolling, resetProgressState, fetchResult, trackEvent]);
+  }, [stopPolling, resetProgressState, fetchResult, trackEvent, notifyCompletion, requestNotificationPermission]);
 
   const buscar = async () => {
     const errors = validateForm();
@@ -804,6 +850,8 @@ export default function HomePage() {
               itemsFiltered={itemsFiltered}
               elapsedSeconds={elapsedSeconds}
               onCancel={handleCancel}
+              selectedUfs={Array.from(ufsSelecionadas)}
+              sectorId={searchMode === "setor" ? setorId : undefined}
             />
           </div>
         )}
