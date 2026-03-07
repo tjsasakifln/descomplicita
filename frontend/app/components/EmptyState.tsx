@@ -121,7 +121,7 @@ export function EmptyState({
       {/* Stats */}
       {stateCount > 0 && (
         <p className="text-xs text-ink-muted mb-4">
-          Pesquisa realizada em {stateCount} estado{stateCount > 1 ? "s" : ""} usando 5 modalidades de contratação
+          Pesquisa realizada em {stateCount} estado{stateCount > 1 ? "s" : ""} usando 7 modalidades de contratação
         </p>
       )}
 

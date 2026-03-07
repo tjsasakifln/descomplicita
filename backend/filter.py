@@ -473,11 +473,13 @@ def filter_licitacao(
     valor = licitacao.get("valorTotalEstimado")
     if valor is None:
         valor = licitacao.get("valor_estimado")
-    if valor is None:
-        return False, "Valor não informado"
 
-    if not (valor_min <= valor <= valor_max):
-        return False, f"Valor R$ {valor:,.2f} fora da faixa"
+    # Many PNCP items (especially "Registro de Preços") have valor=0.0 or null
+    # because the estimated value is determined during bidding. These are
+    # legitimate procurement items — skip the value check for them.
+    if valor is not None and valor > 0:
+        if not (valor_min <= valor <= valor_max):
+            return False, f"Valor R$ {valor:,.2f} fora da faixa"
 
     # 3. Keyword Filter (most expensive - regex matching)
     kw = keywords if keywords is not None else KEYWORDS_UNIFORMES

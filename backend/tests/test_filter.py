@@ -317,12 +317,18 @@ class TestFilterLicitacao:
         assert aprovada is True
         assert motivo is None
 
-    def test_rejects_valor_none(self):
-        """Should reject bid when valorTotalEstimado is missing."""
-        licitacao = {"uf": "SP", "objetoCompra": "Uniformes"}
+    def test_passes_valor_none_to_keyword_check(self):
+        """Items with no value should skip value filter (common in Registro de Preços)."""
+        licitacao = {"uf": "SP", "objetoCompra": "Uniformes escolares"}
         aprovada, motivo = filter_licitacao(licitacao, {"SP"})
-        assert aprovada is False
-        assert "Valor não informado" in motivo
+        # Should reach keyword check, not be rejected by value filter
+        assert aprovada is True or "keyword" in (motivo or "").lower() or "Não contém" in (motivo or "")
+
+    def test_passes_valor_zero_to_keyword_check(self):
+        """Items with valor=0.0 should skip value filter (common in PNCP)."""
+        licitacao = {"uf": "SP", "valorTotalEstimado": 0.0, "objetoCompra": "Uniformes escolares"}
+        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        assert aprovada is True or "Não contém" in (motivo or "")
 
     def test_rejects_valor_below_min(self):
         """Should reject bid when value is below minimum threshold."""
