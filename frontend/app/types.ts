@@ -11,7 +11,7 @@ export const UFS = [
 
 export type UF = (typeof UFS)[number];
 
-/** Search parameters for PNCP API */
+/** Search parameters for multi-source API */
 export interface SearchParams {
   ufs: string[];
   data_inicial: string; // YYYY-MM-DD format
@@ -45,6 +45,15 @@ export interface FilterStats {
   rejeitadas_outros: number;
 }
 
+/** Per-source statistics from orchestrated multi-source search */
+export interface SourceStats {
+  total_fetched: number;
+  after_dedup: number;
+  elapsed_ms: number;
+  status: "success" | "error" | "timeout";
+  error_message: string | null;
+}
+
 /** API response from POST /api/buscar */
 export interface BuscaResult {
   resumo: Resumo;
@@ -52,6 +61,9 @@ export interface BuscaResult {
   total_raw: number;
   total_filtrado: number;
   filter_stats: FilterStats | null;
+  sources_used: string[];
+  source_stats: Record<string, SourceStats>;
+  dedup_removed: number;
 }
 
 /** Form validation errors */

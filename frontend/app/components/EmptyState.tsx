@@ -68,7 +68,7 @@ export function EmptyState({
       {rawCount > 0 && rejectionBreakdown.length > 0 ? (
         <div className="mb-6">
           <p className="text-ink-secondary mb-4">
-            Encontramos {rawCount.toLocaleString("pt-BR")} licitações no PNCP, mas nenhuma passou nos filtros:
+            Encontramos {rawCount.toLocaleString("pt-BR")} licitações nas fontes oficiais, mas nenhuma passou nos filtros:
           </p>
           <div className="text-left max-w-md mx-auto space-y-2">
             {rejectionBreakdown.map((item, i) => (
@@ -86,11 +86,11 @@ export function EmptyState({
         </div>
       ) : rawCount > 0 ? (
         <p className="text-ink-secondary mb-4">
-          Encontramos {rawCount.toLocaleString("pt-BR")} licitações no PNCP, mas nenhuma corresponde ao setor de {sectorName.toLowerCase()}.
+          Encontramos {rawCount.toLocaleString("pt-BR")} licitações nas fontes oficiais, mas nenhuma corresponde ao setor de {sectorName.toLowerCase()}.
         </p>
       ) : (
         <p className="text-ink-secondary mb-4">
-          Não encontramos licitações publicadas no PNCP para o período e estados selecionados.
+          Não encontramos licitações publicadas nas fontes oficiais para o período e estados selecionados.
         </p>
       )}
 

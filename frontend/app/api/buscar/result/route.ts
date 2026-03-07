@@ -88,5 +88,8 @@ export async function GET(request: NextRequest) {
     total_raw: resultData.total_raw || 0,
     total_filtrado: resultData.total_filtrado || 0,
     filter_stats: resultData.filter_stats || null,
+    sources_used: resultData.sources_used || [],
+    source_stats: resultData.source_stats || {},
+    dedup_removed: resultData.dedup_removed || 0,
   });
 }

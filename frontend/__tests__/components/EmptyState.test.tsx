@@ -26,7 +26,7 @@ describe('EmptyState Component', () => {
   it('should display default message when no rawCount', () => {
     render(<EmptyState />);
 
-    const message = screen.getByText(/Não encontramos licitações publicadas no PNCP/i);
+    const message = screen.getByText(/Não encontramos licitações publicadas nas fontes oficiais/i);
     expect(message).toBeInTheDocument();
   });
 

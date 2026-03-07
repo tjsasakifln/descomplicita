@@ -28,6 +28,12 @@ const mockResult = {
   total_raw: 10,
   total_filtrado: 5,
   filter_stats: null,
+  sources_used: ["pncp", "comprasgov"],
+  source_stats: {
+    pncp: { total_fetched: 8, after_dedup: 7, elapsed_ms: 1200, status: "success", error_message: null },
+    comprasgov: { total_fetched: 3, after_dedup: 3, elapsed_ms: 800, status: "success", error_message: null },
+  },
+  dedup_removed: 1,
 };
 
 describe("GET /api/buscar/result", () => {
@@ -57,6 +63,9 @@ describe("GET /api/buscar/result", () => {
     expect(data.download_id).toMatch(/_/);
     expect(data.total_raw).toBe(10);
     expect(data.total_filtrado).toBe(5);
+    expect(data.sources_used).toEqual(["pncp", "comprasgov"]);
+    expect(data.source_stats.pncp.total_fetched).toBe(8);
+    expect(data.dedup_removed).toBe(1);
   });
 
   it("should return 202 when job is still running", async () => {

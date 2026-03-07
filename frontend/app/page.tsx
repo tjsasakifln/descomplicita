@@ -7,6 +7,7 @@ import { EmptyState } from "./components/EmptyState";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { SavedSearchesDropdown } from "./components/SavedSearchesDropdown";
+import { SourceBadges } from "./components/SourceBadges";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import type { SavedSearch } from "../lib/savedSearches";
@@ -504,7 +505,7 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden sm:block text-xs text-ink-muted font-medium">
-              Busca Inteligente PNCP
+              Busca Inteligente de Licitações
             </span>
             <SavedSearchesDropdown
               onLoadSearch={handleLoadSearch}
@@ -522,7 +523,7 @@ export default function HomePage() {
             Busca de Licitações
           </h1>
           <p className="text-ink-secondary mt-1 text-sm sm:text-base">
-            Encontre oportunidades de contratação pública no Portal Nacional (PNCP)
+            Encontre oportunidades de contratação pública em fontes oficiais
           </p>
         </div>
 
@@ -874,6 +875,14 @@ export default function HomePage() {
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {result.sources_used && result.sources_used.length > 0 && (
+                <SourceBadges
+                  sources={result.sources_used}
+                  stats={result.source_stats}
+                  dedupRemoved={result.dedup_removed}
+                />
               )}
             </div>
 

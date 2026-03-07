@@ -24,6 +24,14 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+SOURCE_LABELS = {
+    "pncp": "PNCP",
+    "comprasgov": "Compras.gov",
+    "transparencia": "Transparência",
+    "querido_diario": "Diários Oficiais",
+    "tce_rj": "TCE-RJ",
+}
+
 
 def create_excel(licitacoes: list[dict]) -> BytesIO:
     """
@@ -77,6 +85,7 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
         ("Abertura", 16),
         ("Situação", 15),
         ("Link", 15),
+        ("Fonte", 18),
     ]
 
     for col, (header_name, width) in enumerate(headers, start=1):
@@ -143,8 +152,15 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
         link_cell.hyperlink = link
         link_cell.font = Font(color="0563C1", underline="single")
 
+        # L: Fonte
+        source = lic.get("source", "")
+        sources_list = lic.get("sources", [source]) if source else []
+        source_label = SOURCE_LABELS.get(source, source.upper() if source else "")
+        extra = f" (+{len(sources_list)-1})" if len(sources_list) > 1 else ""
+        ws.cell(row=row_idx, column=12, value=f"{source_label}{extra}")
+
         # Aplicar bordas e alinhamento em todas as células da linha
-        for col in range(1, 12):
+        for col in range(1, 13):
             cell = ws.cell(row=row_idx, column=col)
             cell.border = thin_border
             cell.alignment = cell_alignment

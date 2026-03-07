@@ -320,10 +320,10 @@ describe('HomePage - UF Selection and Date Range', () => {
       expect(logo).toBeInTheDocument();
     });
 
-    it('should display "Busca Inteligente PNCP" text', () => {
+    it('should display "Busca Inteligente de Licitações" text', () => {
       render(<HomePage />);
 
-      expect(screen.getByText('Busca Inteligente PNCP')).toBeInTheDocument();
+      expect(screen.getByText('Busca Inteligente de Licitações')).toBeInTheDocument();
     });
 
     it('should have page title "Busca de Licitações"', () => {
