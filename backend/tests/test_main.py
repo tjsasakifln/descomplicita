@@ -191,13 +191,20 @@ class TestCORSHeaders:
         headers_lower = {k.lower(): v for k, v in response.headers.items()}
         assert "access-control-allow-origin" in headers_lower
 
-    def test_cors_allows_all_origins(self, client):
-        """CORS should allow all origins (POC configuration)."""
-        response = client.get("/health", headers={"Origin": "http://example.com"})
+    def test_cors_rejects_disallowed_origins(self, client):
+        """CORS should reject requests from origins not in the whitelist."""
+        response = client.get("/health", headers={"Origin": "http://evil.com"})
 
         headers_lower = {k.lower(): v for k, v in response.headers.items()}
-        # FastAPI CORS middleware returns the requesting origin or "*"
-        assert "access-control-allow-origin" in headers_lower
+        # Disallowed origin should not get access-control-allow-origin header
+        assert headers_lower.get("access-control-allow-origin") != "http://evil.com"
+
+    def test_cors_allows_whitelisted_origins(self, client):
+        """CORS should allow whitelisted origins."""
+        response = client.get("/health", headers={"Origin": "http://localhost:3000"})
+
+        headers_lower = {k.lower(): v for k, v in response.headers.items()}
+        assert headers_lower.get("access-control-allow-origin") == "http://localhost:3000"
 
     def test_cors_allows_post_method(self, client):
         """CORS should allow POST method."""

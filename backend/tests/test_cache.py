@@ -336,7 +336,8 @@ class TestCacheIntegrationWithFetchAll:
 class TestCacheEndpoints:
     """Test /cache/stats and /cache/clear API endpoints."""
 
-    def test_cache_stats_endpoint(self):
+    def test_cache_stats_endpoint(self, monkeypatch):
+        monkeypatch.setattr("main._debug_enabled", True)
         from fastapi.testclient import TestClient
         from main import app
 
@@ -349,7 +350,8 @@ class TestCacheEndpoints:
         assert "misses" in data
         assert "hit_ratio" in data
 
-    def test_cache_clear_endpoint(self):
+    def test_cache_clear_endpoint(self, monkeypatch):
+        monkeypatch.setattr("main._debug_enabled", True)
         from fastapi.testclient import TestClient
         from main import app
 

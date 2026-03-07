@@ -1,41 +1,46 @@
 # =============================================================================
-# BidIQ Uniformes - Backend Dockerfile
+# Descomplicita - Backend Dockerfile (multi-stage)
 # =============================================================================
 # Production-ready Python FastAPI application for Railway deployment
-# Base: Python 3.11 slim for smaller image size
 
-FROM python:3.11-slim
+# --- Stage 1: Builder ---
+FROM python:3.11-slim AS builder
 
-# CACHE BUST - This label forces Railway to rebuild when changed
-# Update timestamp to invalidate all cached layers: 2026-01-28T12:50:00
-LABEL build.timestamp="2026-01-28T22:00:00"
-ARG CACHEBUST=20260128v6
+WORKDIR /build
 
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies (invalidated by ARG above)
-RUN echo "Build: ${CACHEBUST}" && apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first
 COPY requirements.txt .
 
-# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt --target /build/deps
+
+# --- Stage 2: Production ---
+FROM python:3.11-slim
+
+LABEL build.timestamp="2026-03-07T00:00:00"
+
+WORKDIR /app
+
+# Copy installed dependencies from builder
+COPY --from=builder /build/deps /app/deps
+ENV PYTHONPATH="/app/deps:${PYTHONPATH}"
 
 # Copy application code
 COPY . .
 
-# Expose port (Railway injects PORT env var)
+# Remove dev files from production image
+RUN rm -f requirements-dev.txt && \
+    rm -rf tests/ examples/ __pycache__/ .pytest_cache/
+
+# Create non-root user and switch to it
+RUN adduser --disabled-password --no-create-home appuser
+USER appuser
+
 EXPOSE 8000
 
-# NOTE: Railway handles healthcheck via railway.toml (healthcheckPath = "/health")
-# Do NOT add HEALTHCHECK instruction here - it conflicts with Railway's system
-
 # Run with uvicorn - Railway will inject $PORT
-# Using shell form for guaranteed variable expansion
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

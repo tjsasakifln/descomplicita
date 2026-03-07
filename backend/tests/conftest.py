@@ -1,9 +1,30 @@
 """Shared test fixtures for the Descomplicita backend test suite."""
 
+import os
+import pytest
 from unittest.mock import AsyncMock, Mock
 
 from sources.orchestrator import OrchestratorResult, SourceStats
 from sources.base import NormalizedRecord
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset slowapi rate limiter state between tests."""
+    from main import limiter
+    yield
+    try:
+        limiter.reset()
+    except Exception:
+        # reset() may not exist on all storage backends; clear manually
+        if hasattr(limiter, "_storage") and hasattr(limiter._storage, "storage"):
+            limiter._storage.storage.clear()
+
+
+@pytest.fixture(autouse=True)
+def _disable_auth_for_tests(monkeypatch):
+    """Ensure API_KEY is not set during tests (auth bypassed)."""
+    monkeypatch.delenv("API_KEY", raising=False)
 
 
 def make_mock_orchestrator(raw_records=None, error=None):

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const API_KEY = process.env.BACKEND_API_KEY || "";
 
 export async function GET(request: NextRequest) {
   const job_id = request.nextUrl.searchParams.get("job_id");
@@ -14,7 +15,9 @@ export async function GET(request: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch(`${BACKEND_URL}/buscar/${job_id}/status`);
+    response = await fetch(`${BACKEND_URL}/buscar/${job_id}/status`, {
+      headers: API_KEY ? { "X-API-Key": API_KEY } : {},
+    });
   } catch {
     return NextResponse.json(
       { error: "Backend unavailable" },

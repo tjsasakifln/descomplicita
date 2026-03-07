@@ -18,10 +18,14 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from config import setup_logging
+from middleware.auth import APIKeyMiddleware
 from schemas import (
     BuscaRequest,
     BuscaResponse,
@@ -68,16 +72,36 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Try again later."},
+    )
+
+
 # CORS Configuration
-# NOTE: In production, restrict allow_origins to specific domains
-# Example: allow_origins=["https://bidiq-uniformes.vercel.app"]
+_cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    "https://descomplicita.vercel.app,http://localhost:3000",
+)
+_allowed_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for POC (TODO: restrict in production)
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],  # Only methods we use
-    allow_headers=["*"],  # Allow all headers for development
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
+
+# API key authentication middleware
+app.add_middleware(APIKeyMiddleware)
 
 logger.info(
     "FastAPI application initialized — PORT=%s",
@@ -204,9 +228,14 @@ async def listar_setores():
     return {"setores": list_sectors()}
 
 
+_debug_enabled = os.getenv("ENABLE_DEBUG_ENDPOINTS", "false").lower() == "true"
+
+
 @app.get("/cache/stats")
 async def cache_stats():
     """Return cache statistics: entries, hits, misses, hit ratio."""
+    if not _debug_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
     client = _get_pncp_client()
     return client.cache_stats()
 
@@ -214,6 +243,8 @@ async def cache_stats():
 @app.post("/cache/clear")
 async def cache_clear():
     """Clear all cache entries manually (for debug/deploy)."""
+    if not _debug_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
     client = _get_pncp_client()
     removed = client.cache_clear()
     return {"cleared": removed}
@@ -222,6 +253,8 @@ async def cache_clear():
 @app.get("/debug/pncp-test")
 async def debug_pncp_test():
     """Diagnostic: test if PNCP API is reachable from this server."""
+    if not _debug_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
     import time as t
     from datetime import date, timedelta
 
@@ -260,7 +293,8 @@ async def debug_pncp_test():
 
 
 @app.post("/buscar", response_model=JobCreatedResponse)
-async def buscar_licitacoes(request: BuscaRequest):
+@limiter.limit("10/minute")
+async def buscar_licitacoes(request: Request, body: BuscaRequest):
     """
     Start an asynchronous procurement search job.
 
@@ -297,11 +331,11 @@ async def buscar_licitacoes(request: BuscaRequest):
     await _job_store.create(job_id)
 
     # Launch background task
-    asyncio.create_task(run_search_job(job_id, request))
+    asyncio.create_task(run_search_job(job_id, body))
 
     logger.info(
         "Search job created",
-        extra={"job_id": job_id, "ufs": request.ufs},
+        extra={"job_id": job_id, "ufs": body.ufs},
     )
 
     return JobCreatedResponse(job_id=job_id, status="queued")
@@ -631,7 +665,8 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
 
 
 @app.get("/buscar/{job_id}/status", response_model=JobStatusResponse)
-async def job_status(job_id: str):
+@limiter.limit("30/minute")
+async def job_status(job_id: str, request: Request):
     """Return current status and progress of a search job."""
     job = await _job_store.get(job_id)
     if not job:
@@ -648,7 +683,8 @@ async def job_status(job_id: str):
 
 
 @app.get("/buscar/{job_id}/result")
-async def job_result(job_id: str):
+@limiter.limit("5/minute")
+async def job_result(job_id: str, request: Request):
     """Return the result of a completed (or failed) search job.
 
     Returns HTTP 202 if the job is still in progress.

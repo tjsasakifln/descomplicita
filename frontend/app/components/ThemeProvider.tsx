@@ -51,7 +51,7 @@ function applyTheme(themeId: ThemeId) {
 
   if (config.isDark) {
     root.style.setProperty("--ink-secondary", "#a8b4c0");
-    root.style.setProperty("--ink-muted", "#6b7a8a");
+    root.style.setProperty("--ink-muted", "#8a99a9");
     root.style.setProperty("--ink-faint", "#3a4555");
     root.style.setProperty("--brand-blue-subtle", "rgba(17, 109, 255, 0.12)");
     root.style.setProperty("--surface-0", config.canvas);
@@ -70,7 +70,7 @@ function applyTheme(themeId: ThemeId) {
     root.classList.add("dark");
   } else {
     root.style.setProperty("--ink-secondary", "#3d5975");
-    root.style.setProperty("--ink-muted", "#808f9f");
+    root.style.setProperty("--ink-muted", "#5a6a7a");
     root.style.setProperty("--ink-faint", "#c0d2e5");
     root.style.setProperty("--brand-blue-subtle", config.id === "sepia" ? "#e8e0d4" : "#e8f0ff");
     root.style.setProperty("--surface-0", config.canvas);

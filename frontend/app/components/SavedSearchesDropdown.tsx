@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSavedSearches, type UseSavedSearchesReturn } from '../../hooks/useSavedSearches';
 import type { SavedSearch } from '../../lib/savedSearches';
 
@@ -34,6 +34,22 @@ export function SavedSearchesDropdown({
 
   const [isOpen, setIsOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isOpen) {
+        closeDropdown();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, closeDropdown]);
 
   const handleLoadSearch = (id: string) => {
     const search = loadSearch(id);
@@ -110,6 +126,7 @@ export function SavedSearchesDropdown({
     <div className="relative">
       {/* Dropdown Trigger */}
       <button
+        ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
         type="button"
         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-secondary

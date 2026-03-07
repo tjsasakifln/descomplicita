@@ -136,6 +136,8 @@ def reset_app_state(monkeypatch):
     main_module._pncp_source = None
     main_module._orchestrator = None
     _job_store._jobs.clear()
+    # Enable debug endpoints for cache integration tests
+    monkeypatch.setattr("main._debug_enabled", True)
     # Restrict orchestrator to PNCP only (avoid hitting real external APIs)
     monkeypatch.setattr(
         "sources.orchestrator.get_enabled_source_names",

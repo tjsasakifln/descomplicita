@@ -6,6 +6,7 @@ import { tmpdir } from "os";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 const DOWNLOAD_TTL_MS = parseInt(process.env.DOWNLOAD_TTL_MS || String(60 * 60 * 1000), 10);
+const API_KEY = process.env.BACKEND_API_KEY || "";
 
 export async function GET(request: NextRequest) {
   const job_id = request.nextUrl.searchParams.get("job_id");
@@ -19,7 +20,9 @@ export async function GET(request: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch(`${BACKEND_URL}/buscar/${job_id}/result`);
+    response = await fetch(`${BACKEND_URL}/buscar/${job_id}/result`, {
+      headers: API_KEY ? { "X-API-Key": API_KEY } : {},
+    });
   } catch (error) {
     const message = `Backend indisponível em ${BACKEND_URL}: ${error instanceof Error ? error.message : "conexão recusada"}`;
     console.error(`Erro ao conectar com backend em ${BACKEND_URL}:`, error);

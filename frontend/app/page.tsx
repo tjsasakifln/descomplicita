@@ -562,7 +562,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
+      <main id="main-content" className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
         {/* Page Title */}
         <div className="mb-8 animate-fade-in-up">
           <h1 className="text-2xl sm:text-3xl font-bold font-display text-ink">

@@ -20,12 +20,16 @@ export async function POST(request: NextRequest) {
     }
 
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+    const apiKey = process.env.BACKEND_API_KEY || "";
 
     let jobResponse: Response;
     try {
       jobResponse = await fetch(`${backendUrl}/buscar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey && { "X-API-Key": apiKey }),
+        },
         body: JSON.stringify({
           ufs,
           data_inicial,
