@@ -92,11 +92,11 @@ SOURCES_CONFIG = {
         "priority": 3,
     },
     "querido_diario": {
-        "enabled": False,
+        "enabled": True,
         "base_url": "https://queridodiario.ok.org.br/api/",
         "auth": None,
         "rate_limit_rps": 5,
-        "timeout": 30,
+        "timeout": 20,
         "priority": 4,
     },
     "tce_rj": {
