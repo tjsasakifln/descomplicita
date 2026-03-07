@@ -62,6 +62,54 @@ class RetryConfig:
     )
 
 
+# ---------------------------------------------------------------------------
+# Multi-source configuration (MS-001.1)
+# ---------------------------------------------------------------------------
+
+SOURCES_CONFIG = {
+    "pncp": {
+        "enabled": True,
+        "base_url": "https://pncp.gov.br/api/consulta/v1",
+        "auth": None,
+        "rate_limit_rps": 10,
+        "timeout": 15,
+        "priority": 1,
+    },
+    "comprasgov": {
+        "enabled": False,
+        "base_url": "https://compras.dados.gov.br/",
+        "auth": None,
+        "rate_limit_rps": 5,
+        "timeout": 20,
+        "priority": 2,
+    },
+    "portal_transparencia": {
+        "enabled": False,
+        "base_url": "https://api.portaldatransparencia.gov.br/",
+        "auth": None,
+        "rate_limit_rps": 5,
+        "timeout": 20,
+        "priority": 3,
+    },
+    "querido_diario": {
+        "enabled": False,
+        "base_url": "https://queridodiario.ok.org.br/api/",
+        "auth": None,
+        "rate_limit_rps": 5,
+        "timeout": 30,
+        "priority": 4,
+    },
+    "tce_rj": {
+        "enabled": False,
+        "base_url": "https://www.tce.rj.gov.br/",
+        "auth": None,
+        "rate_limit_rps": 3,
+        "timeout": 30,
+        "priority": 5,
+    },
+}
+
+
 def setup_logging(level: str = "INFO") -> None:
     """Configure structured logging for the application.
 

@@ -469,7 +469,10 @@ def filter_licitacao(
         return False, f"UF '{uf}' não selecionada"
 
     # 2. Value Range Filter
+    # Support both PNCP field name and NormalizedRecord field name
     valor = licitacao.get("valorTotalEstimado")
+    if valor is None:
+        valor = licitacao.get("valor_estimado")
     if valor is None:
         return False, "Valor não informado"
 
@@ -479,7 +482,8 @@ def filter_licitacao(
     # 3. Keyword Filter (most expensive - regex matching)
     kw = keywords if keywords is not None else KEYWORDS_UNIFORMES
     exc = exclusions if exclusions is not None else KEYWORDS_EXCLUSAO
-    objeto = licitacao.get("objetoCompra", "")
+    # Support both PNCP field name and NormalizedRecord field name
+    objeto = licitacao.get("objetoCompra") or licitacao.get("objeto", "")
     match, keywords_found, _score = match_keywords(
         objeto, kw, exc,
         epi_only_keywords=epi_only_keywords,

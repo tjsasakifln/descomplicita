@@ -34,6 +34,8 @@ from schemas import (
 )
 from job_store import JobStore, SearchJob
 from pncp_client import PNCPClient
+from sources.pncp_source import PNCPSource
+from sources.base import SearchQuery
 from exceptions import PNCPAPIError, PNCPRateLimitError
 from filter import filter_batch
 from excel import create_excel
@@ -137,16 +139,22 @@ async def health():
     }
 
 
-# Shared PNCPClient instance for cache persistence across requests
-_pncp_client: PNCPClient | None = None
+# Shared PNCPSource instance for cache persistence across requests
+_pncp_source: PNCPSource | None = None
 
 
+def _get_pncp_source() -> PNCPSource:
+    """Get or create the shared PNCPSource instance."""
+    global _pncp_source
+    if _pncp_source is None:
+        _pncp_source = PNCPSource()
+    return _pncp_source
+
+
+# Backward-compatible alias used by tests and internal endpoints
 def _get_pncp_client() -> PNCPClient:
-    """Get or create the shared PNCPClient instance."""
-    global _pncp_client
-    if _pncp_client is None:
-        _pncp_client = PNCPClient()
-    return _pncp_client
+    """Get the underlying PNCPClient (for cache/debug endpoints)."""
+    return _get_pncp_source().client
 
 
 # Global job store for async search jobs
