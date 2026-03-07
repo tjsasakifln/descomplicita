@@ -202,6 +202,7 @@ class TestPNCPSourceFetchRecords:
                 "sequencialCompra": "1",
             }
         ])
+        source._client.fetch_all_atas.return_value = iter([])
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP"])
         records = await source.fetch_records(query)
@@ -218,6 +219,7 @@ class TestPNCPSourceFetchRecords:
     async def test_fetch_records_passes_query_params(self, source_with_mock_client):
         source = source_with_mock_client
         source._client.fetch_all.return_value = iter([])
+        source._client.fetch_all_atas.return_value = iter([])
 
         query = SearchQuery(
             data_inicial="2025-01-01",
@@ -240,6 +242,7 @@ class TestPNCPSourceFetchRecords:
     async def test_fetch_records_empty_results(self, source_with_mock_client):
         source = source_with_mock_client
         source._client.fetch_all.return_value = iter([])
+        source._client.fetch_all_atas.return_value = iter([])
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31")
         records = await source.fetch_records(query)
@@ -257,6 +260,7 @@ class TestPNCPSourceFetchRecords:
              "municipio": "", "nomeOrgao": "", "valorTotalEstimado": 75000.0,
              "codigoCompra": "002", "cnpj": "", "anoCompra": "", "sequencialCompra": ""},
         ])
+        source._client.fetch_all_atas.return_value = iter([])
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31")
         records = await source.fetch_records(query)
@@ -264,6 +268,30 @@ class TestPNCPSourceFetchRecords:
         assert len(records) == 2
         assert records[0].id == "001"
         assert records[1].id == "002"
+
+    @pytest.mark.asyncio
+    async def test_fetch_records_combines_contratacoes_and_atas(self, source_with_mock_client):
+        """SE-001.5: fetch_records should combine licitacoes and atas."""
+        source = source_with_mock_client
+        source._client.fetch_all.return_value = iter([
+            {"numeroControlePNCP": "LIC-001", "objetoCompra": "Uniformes", "uf": "SP",
+             "municipio": "", "nomeOrgao": "", "valorTotalEstimado": 50000.0,
+             "codigoCompra": "LIC-001", "cnpj": "", "anoCompra": "", "sequencialCompra": ""},
+        ])
+        source._client.fetch_all_atas.return_value = iter([
+            {"numeroControlePNCP": "ATA-001", "objetoCompra": "Medicamentos", "uf": "RJ",
+             "municipio": "", "nomeOrgao": "", "valorTotalEstimado": 75000.0,
+             "codigoCompra": "ATA-001", "cnpj": "", "anoCompra": "", "sequencialCompra": "",
+             "_tipo": "ata_registro_preco"},
+        ])
+
+        query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31")
+        records = await source.fetch_records(query)
+
+        assert len(records) == 2
+        tipos = {r.tipo for r in records}
+        assert "licitacao" in tipos
+        assert "ata_registro_preco" in tipos
 
 
 class TestPNCPSourceCacheDelegation:

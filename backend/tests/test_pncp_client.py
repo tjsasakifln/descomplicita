@@ -800,3 +800,415 @@ class TestDateRangeChunking:
         chunks = PNCPClient._chunk_date_range("2024-06-15", "2024-06-15")
         assert len(chunks) == 1
         assert chunks[0] == ("2024-06-15", "2024-06-15")
+
+
+# =========================================================================
+# SE-001.5: Tests for Atas de Registro de Preco endpoint
+# =========================================================================
+
+
+class TestFetchAtasPage:
+    """Test fetch_atas_page() for /atas endpoint."""
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_success(self, mock_get):
+        """Test successful atas page fetch returns correct data."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [{"numeroAta": "ATA-001"}, {"numeroAta": "ATA-002"}],
+            "totalRegistros": 2,
+            "totalPaginas": 1,
+            "paginaAtual": 1,
+            "paginasRestantes": 0,
+        }
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        result = client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+        assert result["data"] == [{"numeroAta": "ATA-001"}, {"numeroAta": "ATA-002"}]
+        assert result["totalRegistros"] == 2
+        assert mock_get.called
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_uses_atas_endpoint(self, mock_get):
+        """Test fetch_atas_page calls /atas endpoint, not /contratacoes/publicacao."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": []}
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+        call_url = mock_get.call_args[0][0] if mock_get.call_args[0] else mock_get.call_args[1].get("url", "")
+        # URL is passed positionally to session.get(url, ...)
+        assert "/atas" in str(call_url) or "/atas" in str(mock_get.call_args)
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_no_modalidade_param(self, mock_get):
+        """Test fetch_atas_page does NOT send codigoModalidadeContratacao param."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": []}
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+        call_args = mock_get.call_args
+        params = call_args[1]["params"]
+        assert "codigoModalidadeContratacao" not in params
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_with_uf(self, mock_get):
+        """Test fetch_atas_page includes UF parameter when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": []}
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        client.fetch_atas_page("2024-01-01", "2024-01-30", uf="SP")
+
+        call_args = mock_get.call_args
+        assert call_args[1]["params"]["uf"] == "SP"
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_with_palavra_chave(self, mock_get):
+        """Test fetch_atas_page includes palavraChave when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": []}
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        client.fetch_atas_page("2024-01-01", "2024-01-30", palavra_chave="medicamento")
+
+        call_args = mock_get.call_args
+        assert call_args[1]["params"]["palavraChave"] == "medicamento"
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_204_no_content(self, mock_get):
+        """Test 204 returns empty result structure."""
+        mock_get.return_value = Mock(status_code=204)
+
+        client = PNCPClient()
+        result = client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+        assert result["data"] == []
+        assert result["totalRegistros"] == 0
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_atas_page_400_raises_error(self, mock_get):
+        """Test 400 raises PNCPAPIError immediately."""
+        mock_get.return_value = Mock(status_code=400, text="Bad Request")
+
+        client = PNCPClient()
+        with pytest.raises(PNCPAPIError, match="non-retryable status 400"):
+            client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+    @patch("pncp_client.requests.Session.get")
+    @patch("time.sleep")
+    def test_fetch_atas_page_retry_on_500(self, mock_sleep, mock_get):
+        """Test atas endpoint retries on 500 error."""
+        mock_responses = [
+            Mock(status_code=500, text="Internal Server Error"),
+            Mock(status_code=200),
+        ]
+        mock_responses[1].json.return_value = {"data": []}
+        mock_get.side_effect = mock_responses
+
+        config = RetryConfig(max_retries=2)
+        client = PNCPClient(config=config)
+        client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+        assert mock_get.call_count == 2
+
+    @patch("pncp_client.requests.Session.get")
+    @patch("time.sleep")
+    def test_fetch_atas_page_429_rate_limit(self, mock_sleep, mock_get):
+        """Test atas endpoint handles 429 rate limiting."""
+        mock_responses = [
+            Mock(status_code=429, headers={"Retry-After": "5"}),
+            Mock(status_code=200),
+        ]
+        mock_responses[1].json.return_value = {"data": []}
+        mock_get.side_effect = mock_responses
+
+        client = PNCPClient()
+        client.fetch_atas_page("2024-01-01", "2024-01-30")
+
+        sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+        assert 5 in sleep_calls
+
+
+class TestNormalizeAtaItem:
+    """Test _normalize_ata_item() normalization for ata records."""
+
+    def test_normalize_ata_sets_tipo(self):
+        """Test ata normalization sets _tipo to ata_registro_preco."""
+        item = {
+            "numeroControlePNCP": "ATA-001",
+            "objetoCompra": "Medicamentos",
+            "unidadeOrgao": {"ufSigla": "SP", "municipioNome": "Campinas"},
+            "orgaoEntidade": {"razaoSocial": "Hospital X", "cnpj": "12345"},
+        }
+        result = PNCPClient._normalize_ata_item(item)
+
+        assert result["_tipo"] == "ata_registro_preco"
+        assert result["codigoCompra"] == "ATA-001"
+        assert result["uf"] == "SP"
+        assert result["nomeOrgao"] == "Hospital X"
+
+    def test_normalize_ata_fallback_fields(self):
+        """Test ata normalization uses fallback fields when primary are missing."""
+        item = {
+            "numeroAta": "ATA-002",
+            "objeto": "Alimentos hospitalares",
+            "valorTotal": 150000.00,
+            "dataPublicacao": "2024-06-01",
+            "dataVigenciaFim": "2025-06-01",
+        }
+        result = PNCPClient._normalize_ata_item(item)
+
+        assert result["codigoCompra"] == "ATA-002"
+        assert result["objetoCompra"] == "Alimentos hospitalares"
+        assert result["valorTotalEstimado"] == 150000.00
+        assert result["dataPublicacaoPncp"] == "2024-06-01"
+        assert result["dataAberturaProposta"] == "2025-06-01"
+        assert result["_tipo"] == "ata_registro_preco"
+
+    def test_normalize_ata_default_modalidade(self):
+        """Test ata normalization sets default modalidade name."""
+        item = {"numeroControlePNCP": "ATA-003"}
+        result = PNCPClient._normalize_ata_item(item)
+        assert result["modalidadeNome"] == "Ata de Registro de Precos"
+
+
+class TestFetchAllAtas:
+    """Test fetch_all_atas() pagination and deduplication."""
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_all_atas_single_page(self, mock_get):
+        """Test fetch_all_atas returns all items from single page."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {
+            "data": [
+                {"numeroControlePNCP": "ATA-001", "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+                {"numeroControlePNCP": "ATA-002", "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+            ],
+            "totalRegistros": 2,
+            "totalPaginas": 1,
+            "paginasRestantes": 0,
+        }
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        results = list(client.fetch_all_atas("2024-01-01", "2024-01-30", ufs=["SP"]))
+
+        assert len(results) == 2
+        assert all(r["_tipo"] == "ata_registro_preco" for r in results)
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_all_atas_deduplicates(self, mock_get):
+        """Test fetch_all_atas removes duplicate atas."""
+        sp_response = Mock(status_code=200)
+        sp_response.json.return_value = {
+            "data": [
+                {"numeroControlePNCP": "ATA-001", "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+            ],
+            "totalRegistros": 1,
+            "totalPaginas": 1,
+            "paginasRestantes": 0,
+        }
+
+        rj_response = Mock(status_code=200)
+        rj_response.json.return_value = {
+            "data": [
+                {"numeroControlePNCP": "ATA-001", "unidadeOrgao": {"ufSigla": "RJ", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+                {"numeroControlePNCP": "ATA-003", "unidadeOrgao": {"ufSigla": "RJ", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+            ],
+            "totalRegistros": 2,
+            "totalPaginas": 1,
+            "paginasRestantes": 0,
+        }
+
+        mock_get.side_effect = [sp_response, rj_response]
+
+        client = PNCPClient()
+        results = list(client.fetch_all_atas("2024-01-01", "2024-01-30", ufs=["SP", "RJ"]))
+
+        # ATA-001 appears in both UFs but should be deduplicated
+        assert len(results) == 2
+        ids = [r["codigoCompra"] for r in results]
+        assert "ATA-001" in ids
+        assert "ATA-003" in ids
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_all_atas_with_search_terms(self, mock_get):
+        """Test fetch_all_atas passes search terms as palavraChave."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {
+            "data": [
+                {"numeroControlePNCP": "ATA-001", "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+            ],
+            "totalRegistros": 1,
+            "totalPaginas": 1,
+            "paginasRestantes": 0,
+        }
+        mock_get.return_value = mock_response
+
+        client = PNCPClient()
+        results = list(client.fetch_all_atas(
+            "2024-01-01", "2024-01-30",
+            ufs=["SP"],
+            search_terms=["medicamento"],
+        ))
+
+        assert len(results) == 1
+        # Verify palavraChave was sent
+        call_args = mock_get.call_args
+        assert call_args[1]["params"].get("palavraChave") == "medicamento"
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_all_atas_multiple_pages(self, mock_get):
+        """Test fetch_all_atas handles pagination correctly."""
+        page_1 = Mock(status_code=200)
+        page_1.json.return_value = {
+            "data": [{"numeroControlePNCP": "ATA-001"}],
+            "totalRegistros": 2,
+            "totalPaginas": 2,
+            "paginasRestantes": 1,
+        }
+
+        page_2 = Mock(status_code=200)
+        page_2.json.return_value = {
+            "data": [{"numeroControlePNCP": "ATA-002"}],
+            "totalRegistros": 2,
+            "totalPaginas": 2,
+            "paginasRestantes": 0,
+        }
+
+        mock_get.side_effect = [page_1, page_2]
+
+        client = PNCPClient()
+        results = list(client.fetch_all_atas("2024-01-01", "2024-01-30", ufs=["SP"]))
+
+        assert len(results) == 2
+        assert mock_get.call_count == 2
+
+
+class TestPNCPSourceAtasIntegration:
+    """Test PNCPSource integration with atas (SE-001.5 AC#3)."""
+
+    @patch("pncp_client.requests.Session.get")
+    def test_fetch_records_returns_mix_of_licitacoes_and_atas(self, mock_get):
+        """Test fetch_records returns both licitacoes and atas."""
+        import asyncio
+        from sources.pncp_source import PNCPSource
+        from sources.base import SearchQuery
+
+        # Mock responses: contratacoes endpoint returns 1 item, atas returns 1 item
+        contratacoes_response = Mock(status_code=200)
+        contratacoes_response.json.return_value = {
+            "data": [
+                {
+                    "numeroControlePNCP": "LIC-001",
+                    "objetoCompra": "Uniformes escolares",
+                    "unidadeOrgao": {"ufSigla": "SP", "municipioNome": "Campinas"},
+                    "orgaoEntidade": {"razaoSocial": "Prefeitura", "cnpj": "111"},
+                    "modalidadeNome": "Pregao Eletronico",
+                    "codigoModalidadeContratacao": 6,
+                },
+            ],
+            "totalRegistros": 1,
+            "totalPaginas": 1,
+            "paginasRestantes": 0,
+        }
+
+        atas_response = Mock(status_code=200)
+        atas_response.json.return_value = {
+            "data": [
+                {
+                    "numeroControlePNCP": "ATA-001",
+                    "objetoCompra": "Medicamentos diversos",
+                    "unidadeOrgao": {"ufSigla": "RJ", "municipioNome": "Niteroi"},
+                    "orgaoEntidade": {"razaoSocial": "Hospital Federal", "cnpj": "222"},
+                },
+            ],
+            "totalRegistros": 1,
+            "totalPaginas": 1,
+            "paginasRestantes": 0,
+        }
+
+        # fetch_all calls go first (one per default modalidade), then fetch_all_atas
+        contratacoes_responses = [contratacoes_response] * len(
+            __import__("config").DEFAULT_MODALIDADES
+        )
+        mock_get.side_effect = contratacoes_responses + [atas_response]
+
+        source = PNCPSource()
+        query = SearchQuery(
+            data_inicial="2024-01-01",
+            data_final="2024-01-30",
+            ufs=["SP"],
+        )
+
+        records = asyncio.get_event_loop().run_until_complete(
+            source.fetch_records(query)
+        )
+
+        # Should have both types
+        tipos = [r.tipo for r in records]
+        assert "licitacao" in tipos
+        assert "ata_registro_preco" in tipos
+
+        # Verify normalization
+        ata_records = [r for r in records if r.tipo == "ata_registro_preco"]
+        assert len(ata_records) >= 1
+        assert ata_records[0].source == "PNCP"
+        assert ata_records[0].objeto == "Medicamentos diversos"
+
+    @patch("pncp_client.requests.Session.get")
+    def test_normalized_ata_has_correct_tipo(self, mock_get):
+        """Test individual ata normalization sets tipo correctly."""
+        from sources.pncp_source import PNCPSource
+
+        source = PNCPSource()
+
+        raw_ata = {
+            "numeroControlePNCP": "ATA-001",
+            "objetoCompra": "Reagentes laboratoriais",
+            "unidadeOrgao": {"ufSigla": "MG", "municipioNome": "BH"},
+            "orgaoEntidade": {"razaoSocial": "UFMG", "cnpj": "333"},
+            "_tipo": "ata_registro_preco",
+        }
+
+        record = source.normalize(raw_ata)
+
+        assert record.tipo == "ata_registro_preco"
+        assert record.id == "ATA-001"
+        assert record.source == "PNCP"
+
+    @patch("pncp_client.requests.Session.get")
+    def test_normalized_licitacao_has_default_tipo(self, mock_get):
+        """Test regular licitacao normalization has tipo='licitacao'."""
+        from sources.pncp_source import PNCPSource
+
+        source = PNCPSource()
+
+        raw_licitacao = {
+            "numeroControlePNCP": "LIC-001",
+            "objetoCompra": "Uniformes",
+            "unidadeOrgao": {"ufSigla": "SP", "municipioNome": "SP"},
+            "orgaoEntidade": {"razaoSocial": "Prefeitura SP", "cnpj": "444"},
+            "modalidadeNome": "Pregao Eletronico",
+            "codigoModalidadeContratacao": 6,
+        }
+
+        record = source.normalize(raw_licitacao)
+
+        assert record.tipo == "licitacao"
+        assert record.id == "LIC-001"

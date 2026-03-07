@@ -60,6 +60,8 @@ export interface BuscaResult {
   download_id: string;
   total_raw: number;
   total_filtrado: number;
+  total_atas: number;
+  total_licitacoes: number;
   filter_stats: FilterStats | null;
   sources_used: string[];
   source_stats: Record<string, SourceStats>;

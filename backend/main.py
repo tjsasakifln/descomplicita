@@ -470,6 +470,13 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             "rejeitadas_outros": stats.get("rejeitadas_outros", 0),
         }
 
+        # Count atas vs licitacoes for frontend badge
+        total_atas = sum(
+            1 for lic in licitacoes_filtradas
+            if lic.get("tipo") == "ata_registro_preco"
+        )
+        total_licitacoes = len(licitacoes_filtradas) - total_atas
+
         # --- Phase: summarizing ---
         await _job_store.update_progress(
             job_id, phase="summarizing", items_filtered=len(licitacoes_filtradas)
@@ -495,6 +502,8 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
                 "excel_base64": "",
                 "total_raw": len(licitacoes_raw),
                 "total_filtrado": 0,
+                "total_atas": 0,
+                "total_licitacoes": 0,
                 "filter_stats": fs,
                 "sources_used": orch_result.sources_used,
                 "source_stats": {
@@ -568,6 +577,8 @@ async def run_search_job(job_id: str, request: BuscaRequest) -> None:
             "excel_base64": excel_base64,
             "total_raw": len(licitacoes_raw),
             "total_filtrado": len(licitacoes_filtradas),
+            "total_atas": total_atas,
+            "total_licitacoes": total_licitacoes,
             "filter_stats": fs,
             "sources_used": orch_result.sources_used,
             "source_stats": {

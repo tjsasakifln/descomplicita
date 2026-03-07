@@ -41,6 +41,7 @@ class NormalizedRecord:
     data_publicacao: Optional[datetime] = None
     data_abertura: Optional[datetime] = None
     status: Optional[str] = None
+    tipo: str = "licitacao"
     url_edital: Optional[str] = None
     url_fonte: Optional[str] = None
     raw_data: Dict[str, Any] = field(default_factory=dict)
@@ -55,6 +56,7 @@ class NormalizedRecord:
         result = dict(self.raw_data)
         result.update({
             "id": self.id,
+            "tipo": self.tipo,
             "source": self.source,
             "sources": self.sources,
             "numero_licitacao": self.numero_licitacao,

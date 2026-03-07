@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
     download_id: downloadId,
     total_raw: resultData.total_raw || 0,
     total_filtrado: resultData.total_filtrado || 0,
+    total_atas: resultData.total_atas || 0,
+    total_licitacoes: resultData.total_licitacoes || 0,
     filter_stats: resultData.filter_stats || null,
     sources_used: resultData.sources_used || [],
     source_stats: resultData.source_stats || {},

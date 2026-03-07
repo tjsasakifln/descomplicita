@@ -847,7 +847,21 @@ export default function HomePage() {
                   <span className="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue">
                     {result.resumo.total_oportunidades}
                   </span>
-                  <span className="text-sm sm:text-base text-ink-secondary block mt-1">licitações</span>
+                  <span className="text-sm sm:text-base text-ink-secondary block mt-1">oportunidades</span>
+                  {(result.total_atas > 0 || result.total_licitacoes > 0) && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {result.total_licitacoes > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                          {result.total_licitacoes} Licitacoes
+                        </span>
+                      )}
+                      {result.total_atas > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
+                          {result.total_atas} Atas RP
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span className="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue">
