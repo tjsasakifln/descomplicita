@@ -21,7 +21,7 @@ class TestApplicationSetup:
 
     def test_app_title(self):
         """Verify app has correct title."""
-        assert app.title == "BidIQ Uniformes API"
+        assert app.title == "Descomplicita API"
 
     def test_app_version(self):
         """Verify app version matches expected."""
@@ -235,7 +235,7 @@ class TestOpenAPIDocumentation:
         schema = response.json()
 
         info = schema["info"]
-        assert info["title"] == "BidIQ Uniformes API"
+        assert info["title"] == "Descomplicita API"
         assert info["version"] == "0.2.0"
 
     def test_openapi_has_health_endpoint(self, client):

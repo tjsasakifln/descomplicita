@@ -1,4 +1,4 @@
-"""Shared test fixtures for the BidIQ backend test suite."""
+"""Shared test fixtures for the Descomplicita backend test suite."""
 
 from unittest.mock import AsyncMock, Mock
 

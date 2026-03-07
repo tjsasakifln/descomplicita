@@ -72,7 +72,7 @@ class TestPNCPClient:
         """Test session is configured with correct headers."""
         client = PNCPClient()
 
-        assert client.session.headers["User-Agent"] == "BidIQ/1.0 (procurement-search; contact@bidiq.com.br)"
+        assert client.session.headers["User-Agent"] == "Descomplicita/1.0 (procurement-search)"
         assert client.session.headers["Accept"] == "application/json"
 
     def test_context_manager(self):

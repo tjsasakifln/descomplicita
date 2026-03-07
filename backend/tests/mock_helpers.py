@@ -1,4 +1,4 @@
-"""Shared mock helpers for BidIQ backend tests."""
+"""Shared mock helpers for Descomplicita backend tests."""
 
 from unittest.mock import AsyncMock, Mock
 
