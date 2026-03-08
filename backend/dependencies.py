@@ -56,7 +56,7 @@ async def init_dependencies() -> None:
 
     # --- Redis Cache ---
     if _redis:
-        from cache.redis_cache import RedisCache
+        from app_cache.redis_cache import RedisCache
         _redis_cache = RedisCache(redis=_redis)
         logger.info("Using RedisCache for PNCP responses")
     else:

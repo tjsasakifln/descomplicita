@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from cache.redis_cache import RedisCache
+from app_cache.redis_cache import RedisCache
 
 
 class TestRedisCache:

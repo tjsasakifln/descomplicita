@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from config import RetryConfig, MAX_PAGES_PER_COMBO
 from clients.async_pncp_client import AsyncPNCPClient
-from cache.redis_cache import RedisCache
+from app_cache.redis_cache import RedisCache
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 
 logger = logging.getLogger(__name__)
