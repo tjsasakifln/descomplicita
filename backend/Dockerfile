@@ -44,5 +44,5 @@ USER appuser
 
 EXPOSE 8000
 
-# Run with uvicorn - Railway will inject $PORT
-CMD python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run with startup script for crash diagnostics
+CMD ["python", "start.py"]
