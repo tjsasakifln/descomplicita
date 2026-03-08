@@ -1,5 +1,6 @@
 """FastAPI dependency injection providers (TD-013)."""
 
+import asyncio
 import logging
 import os
 from typing import Optional
@@ -31,8 +32,13 @@ async def init_dependencies() -> None:
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     try:
         import redis.asyncio as aioredis
-        _redis = aioredis.from_url(redis_url, decode_responses=True)
-        await _redis.ping()
+        _redis = aioredis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+        )
+        await asyncio.wait_for(_redis.ping(), timeout=10)
         logger.info("Redis connected: %s", redis_url)
     except Exception as e:
         logger.warning("Redis unavailable (%s), using in-memory fallback", e)
