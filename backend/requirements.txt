@@ -2,7 +2,7 @@
 # Core dependencies - PINNED for Railway compatibility
 # =============================================================================
 fastapi==0.135.1
-uvicorn[standard]==0.34.3
+uvicorn==0.34.3
 pydantic==2.11.7
 pydantic-settings==2.13.1
 starlette==0.52.1
@@ -11,7 +11,7 @@ starlette==0.52.1
 httpx==0.28.1
 
 # Redis (async)
-redis[hiredis]==5.2.1
+redis==5.2.1
 
 # Excel generation
 openpyxl==3.1.5

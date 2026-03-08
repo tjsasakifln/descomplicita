@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # --- Stage 2: Production ---
 FROM python:3.11-slim
 
-LABEL build.timestamp="2026-03-07T00:00:00"
+LABEL build.timestamp="2026-03-07T22:30:00"
 
 WORKDIR /app
 
@@ -44,5 +44,5 @@ USER appuser
 
 EXPOSE 8000
 
-# Run with startup script for crash diagnostics
-CMD ["python", "start.py"]
+# Run with shell wrapper to capture segfaults and exit codes
+CMD python start.py 2>&1; echo "[entrypoint] python exited with code $?" >&2
