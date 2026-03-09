@@ -240,7 +240,81 @@ async def test_gerar_resumo_handles_none_values(mock_openai):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. API Error Scenarios (async)
+# 4. Env Var Configuration Tests (TD-M03)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345", "LLM_MODEL": "gpt-4o-mini"})
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_custom_model(mock_openai):
+    """TD-M03: Should use LLM_MODEL env var when set."""
+    mock_resumo = ResumoLicitacoes(
+        resumo_executivo="Resumo OK",
+        total_oportunidades=1,
+        valor_total=100000.0,
+        destaques=[],
+        alerta_urgencia=None,
+    )
+    mock_client = Mock()
+    mock_openai.return_value = mock_client
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme",
+            "nomeOrgao": "Prefeitura",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": "2025-02-15T10:00:00",
+        }
+    ]
+
+    await gerar_resumo(licitacoes)
+
+    call_args = mock_client.beta.chat.completions.parse.call_args
+    assert call_args.kwargs["model"] == "gpt-4o-mini"
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345", "LLM_TEMPERATURE": "0.7", "LLM_MAX_TOKENS": "1000"})
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_custom_temperature_and_tokens(mock_openai):
+    """TD-M03: Should use LLM_TEMPERATURE and LLM_MAX_TOKENS env vars."""
+    mock_resumo = ResumoLicitacoes(
+        resumo_executivo="Resumo OK",
+        total_oportunidades=1,
+        valor_total=100000.0,
+        destaques=[],
+        alerta_urgencia=None,
+    )
+    mock_client = Mock()
+    mock_openai.return_value = mock_client
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme",
+            "nomeOrgao": "Prefeitura",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": "2025-02-15T10:00:00",
+        }
+    ]
+
+    await gerar_resumo(licitacoes)
+
+    call_args = mock_client.beta.chat.completions.parse.call_args
+    assert call_args.kwargs["temperature"] == 0.7
+    assert call_args.kwargs["max_tokens"] == 1000
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. API Error Scenarios (async)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -320,7 +394,7 @@ async def test_gerar_resumo_timeout(mock_openai):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. HTML Formatting Tests
+# 6. HTML Formatting Tests
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -395,7 +469,7 @@ def test_format_resumo_html_no_alerta():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. Integration Tests (with Real Schema Validation)
+# 7. Integration Tests (with Real Schema Validation)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -436,7 +510,7 @@ def test_resumo_schema_validation_negative_values():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. Edge Cases
+# 8. Edge Cases
 # ─────────────────────────────────────────────────────────────────────────────
 
 

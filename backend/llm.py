@@ -1,13 +1,19 @@
 """
 LLM integration module for generating executive summaries of procurement bids.
 
-This module uses OpenAI's GPT-4.1-nano model with structured output to create
-actionable summaries of filtered procurement opportunities. It includes:
+This module uses OpenAI's structured output API to create actionable summaries
+of filtered procurement opportunities. It includes:
 - Token-optimized input preparation (max 50 bids)
 - Structured output using Pydantic schemas
 - Async native client (TD-H03: no run_in_executor)
 - Error handling for API failures
 - Empty input handling
+- Configurable model via environment variables (TD-M03)
+
+Environment variables:
+    LLM_MODEL: OpenAI model name (default: gpt-4.1-nano)
+    LLM_TEMPERATURE: Sampling temperature 0.0-2.0 (default: 0.3)
+    LLM_MAX_TOKENS: Maximum tokens in response (default: 500)
 
 Usage:
     from llm import gerar_resumo
@@ -30,9 +36,11 @@ from excel import parse_datetime
 
 async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uniformes e fardamentos") -> ResumoLicitacoes:
     """
-    Generate AI-powered executive summary of procurement bids using GPT-4.1-nano.
+    Generate AI-powered executive summary of procurement bids.
 
     Uses AsyncOpenAI client natively (TD-H03) — no thread pool executor needed.
+    Model and parameters are configurable via LLM_MODEL, LLM_TEMPERATURE, and
+    LLM_MAX_TOKENS environment variables (TD-M03).
 
     Args:
         licitacoes: List of filtered procurement bid dictionaries from PNCP API.
@@ -103,16 +111,21 @@ REGRAS:
 Data atual: {datetime.now().strftime("%d/%m/%Y")}
 """
 
+    # LLM configuration from environment (TD-M03)
+    model = os.getenv("LLM_MODEL", "gpt-4.1-nano")
+    temperature = float(os.getenv("LLM_TEMPERATURE", "0.3"))
+    max_tokens = int(os.getenv("LLM_MAX_TOKENS", "500"))
+
     # Call OpenAI API with structured output (async)
     response = await client.beta.chat.completions.parse(
-        model="gpt-4.1-nano",
+        model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
         response_format=ResumoLicitacoes,
-        temperature=0.3,
-        max_tokens=500,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
 
     # Extract parsed response

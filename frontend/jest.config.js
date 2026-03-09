@@ -70,11 +70,14 @@ const customJestConfig = {
     '/node_modules/',
     '/.next/',
     '/__tests__/e2e/', // E2E tests run via Playwright, not Jest
+    '/mswHandlers\\.ts$', // MSW handler fixtures — imported by tests, not run directly
   ],
 
-  // Transform node_modules that use ES modules (uuid, etc.)
+  // transformIgnorePatterns is patched after next/jest generates the final config
+  // (see export section below). The raw pattern here is a fallback for the non-Next
+  // code path only.
   transformIgnorePatterns: [
-    'node_modules/(?!(uuid)/)',
+    'node_modules/(?!(uuid|msw|until-async|@bundled-es-modules|is-node-process|outvariant|headers-polyfill|strict-event-emitter|@open-draft)/)',
   ],
 
   // Transform files
@@ -110,10 +113,45 @@ const customJestConfig = {
   restoreMocks: true,
 }
 
+// ESM-only packages that must be transformed by @swc/jest.
+// next/jest generates its own transformIgnorePatterns (based on the "geist" font),
+// so we patch them after generation rather than replacing them outright.
+const ESM_PACKAGES = [
+  'uuid',
+  'msw',
+  'until-async',
+  '@bundled-es-modules',
+  'is-node-process',
+  'outvariant',
+  'headers-polyfill',
+  'strict-event-emitter',
+  '@open-draft',
+].join('|')
+
+/**
+ * Inject ESM package names into every pattern that next/jest produces so that
+ * those packages are transformed instead of excluded.
+ */
+function patchTransformIgnore(config) {
+  config.transformIgnorePatterns = (config.transformIgnorePatterns ?? []).map((p) => {
+    // next/jest patterns look like: /node_modules/(?!.pnpm)(?!(geist)/)
+    // and: /node_modules/.pnpm/(?!(geist)@)
+    // We append ESM_PACKAGES into the existing exclusion group.
+    if (typeof p === 'string' && p.includes('node_modules') && p.includes('geist')) {
+      return p
+        .replace('(geist)', `(geist|${ESM_PACKAGES})`)
+    }
+    return p
+  })
+  return config
+}
+
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config
 // which is async. If Next.js is not yet installed, this will gracefully fallback.
 try {
-  module.exports = createJestConfig(customJestConfig)
+  const baseConfigFn = createJestConfig(customJestConfig)
+  // Wrap the async config function to patch transformIgnorePatterns after next/jest resolves.
+  module.exports = async () => patchTransformIgnore(await baseConfigFn())
 } catch (error) {
   // Fallback for when Next.js is not installed yet (Issue #21 not completed)
   console.warn('⚠️  Next.js not found. Using fallback Jest config.')

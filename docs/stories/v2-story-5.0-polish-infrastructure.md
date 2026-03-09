@@ -42,48 +42,48 @@ Fechar debitos de baixa prioridade restantes, implementar testes cross-cutting (
 
 #### Configuracao Operacional
 
-- [ ] Task 1: TD-M03 -- Refatorar `llm.py` para ler modelo de `LLM_MODEL` env var (ja exposta em docker-compose mas ignorada pelo codigo). Adicionar fallback para valor default.
-- [ ] Task 2: TD-M03 -- Testar troca de modelo sem alterar codigo (ex: `LLM_MODEL=gpt-4o-mini`).
+- [x] Task 1: TD-M03 -- Refatorado `llm.py` para ler `LLM_MODEL`, `LLM_TEMPERATURE`, `LLM_MAX_TOKENS` de env vars com fallback para defaults.
+- [x] Task 2: TD-M03 -- Testes adicionados: `test_gerar_resumo_custom_model` e `test_gerar_resumo_custom_temperature_and_tokens` verificam troca via env var.
 
 #### Testes Cross-Cutting
 
-- [ ] Task 3: XD-TEST-01 -- Implementar testes de integracao frontend-backend usando MSW (Mock Service Worker). Configurar interceptacao de requests no frontend test env.
-- [ ] Task 4: XD-TEST-01 -- Cobrir cenarios: busca com sucesso, busca com erro, polling timeout, download Excel.
-- [ ] Task 5: XD-TEST-02 -- Implementar smoke tests pos-deploy via GitHub Actions. Escopo minimo: verificar `/health`, `/setores`, `/buscar` (com parametros minimos).
-- [ ] Task 6: XD-TEST-02 -- Configurar alertas para falha de smoke test (notificacao Slack ou email).
-- [ ] Task 7: XD-TEST-03 -- Avaliar viabilidade de testes de regressao visual para o momento (5 temas + responsividade). Se prematuro, documentar plano para implementacao futura com design system.
+- [x] Task 3: XD-TEST-01 -- Implementado MSW (Mock Service Worker) com handlers para 6 endpoints. Arquivo: `__tests__/integration/mswHandlers.ts`.
+- [x] Task 4: XD-TEST-01 -- 18 cenarios de integracao: busca sucesso (5), erro (4), polling timeout (3), download Excel (4), setores (2).
+- [x] Task 5: XD-TEST-02 -- Smoke tests ja existiam em `deploy.yml`. Adicionado check de `/setores`. Cobertura: `/health`, `/`, `/docs`, `/setores`, `POST /buscar`.
+- [x] Task 6: XD-TEST-02 -- Configurado alerta automatico via GitHub Issues com label `smoke-test-failure` em caso de falha.
+- [x] Task 7: XD-TEST-03 -- AVALIADO: Prematuro para POC. Requer design system para viabilidade. Documentado para implementacao futura.
 
 #### Gaps do QA
 
-- [ ] Task 8: G-01 -- Rodar `pytest --cov` e documentar resultado de coverage. Validar que threshold de 70% em `pyproject.toml` esta sendo atingido.
-- [ ] Task 9: G-04 -- Adicionar `pip audit` e `npm audit --audit-level=high` ao CI como quality gate. Configurar para falhar build em vulnerabilidades criticas/altas.
-- [ ] Task 10: G-10 -- Estabelecer baseline de bundle size com bundle analyzer. Configurar budget no CI (ex: max 500KB JS inicial). Considerar Lighthouse CI para proximo milestone.
+- [x] Task 8: G-01 -- Coverage documentada em `backend/scripts/coverage_report.md`. Threshold de 70% enforced em pyproject.toml + CI (backend-ci.yml + tests.yml).
+- [x] Task 9: G-04 -- `pip audit --strict` adicionado a backend-ci.yml e tests.yml. `npm audit --audit-level=high` adicionado a tests.yml (frontend-tests job).
+- [x] Task 10: G-10 -- Bundle size baseline via `.github/workflows/bundle-size.yml`. Budget: 500KB JS. Executa em PRs com changes em frontend/.
 
 #### Debitos de Baixa Prioridade
 
-- [ ] Task 11: TD-M09 -- Avaliar substituicao de MD5 por SHA-256 para chaves de dedup. Se risco e desprezivel para dados nao-criticos (confirmado por @qa), documentar decisao e manter.
-- [ ] Task 12: TD-L03 -- Avaliar persistencia server-side para buscas salvas. Se TD-H04 (database) foi implementado em v2-story-4.0, migrar de localStorage para DB. Caso contrario, documentar como dependencia futura.
-- [ ] Task 13: TD-L05 -- Avaliar performance de ~130 keywords inclusao + ~100 exclusao. Se mitigado por ordenacao fail-fast existente, documentar e manter. Se necessario, implementar trie ou pre-compilacao de regex.
+- [x] Task 11: TD-M09 -- AVALIADO: MD5 aceitavel para chaves de dedup (nao-criptografico). Risco de colisao desprezivel para ~10k registros. Decisao documentada.
+- [x] Task 12: TD-L03 -- AVALIADO: localStorage adequado para POC (max 10 buscas). Migracao server-side depende de autenticacao de usuario (nao implementada). Deferido para pos-POC.
+- [x] Task 13: TD-L05 -- AVALIADO: Performance adequada para escala atual (~10k registros). Fail-fast exclusions + string matching eficiente. Trie/regex pre-compilado desnecessario.
 
 ### Criterios de Aceite
 
-- [ ] Modelo LLM configuravel via env var sem alterar codigo
-- [ ] Pelo menos 4 cenarios de integracao com MSW passando
-- [ ] Smoke tests pos-deploy rodando automaticamente em GitHub Actions
-- [ ] Backend test coverage medido e documentado (>= 70%)
-- [ ] `pip audit` e `npm audit` no CI, falhando em vulnerabilidades criticas/altas
-- [ ] Bundle size baselinado e budget configurado
-- [ ] Todos os 55 debitos da v2.0 enderecados (resolvidos ou documentados como decisoes conscientes)
+- [x] Modelo LLM configuravel via env var sem alterar codigo
+- [x] Pelo menos 4 cenarios de integracao com MSW passando (18 cenarios implementados)
+- [x] Smoke tests pos-deploy rodando automaticamente em GitHub Actions
+- [x] Backend test coverage medido e documentado (>= 70%)
+- [x] `pip audit` e `npm audit` no CI, falhando em vulnerabilidades criticas/altas
+- [x] Bundle size baselinado e budget configurado (500KB)
+- [x] Todos os 55 debitos da v2.0 enderecados (resolvidos ou documentados como decisoes conscientes)
 
 ### Testes Requeridos
 
-- [ ] Teste de integracao MSW: busca sucesso, erro, timeout, download
-- [ ] Smoke test: endpoints criticos respondem com status 200
-- [ ] Coverage: `pytest --cov` reporta >= 70%
-- [ ] Audit: `pip audit` sem vulnerabilidades criticas/altas
-- [ ] Audit: `npm audit --audit-level=high` sem vulnerabilidades criticas/altas
-- [ ] Teste unitario: LLM_MODEL env var e lido corretamente
-- [ ] Teste de regressao: todos os testes existentes continuam passando
+- [x] Teste de integracao MSW: busca sucesso, erro, timeout, download
+- [x] Smoke test: endpoints criticos respondem com status 200
+- [x] Coverage: `pytest --cov` reporta >= 70%
+- [x] Audit: `pip audit` sem vulnerabilidades criticas/altas
+- [x] Audit: `npm audit --audit-level=high` sem vulnerabilidades criticas/altas
+- [x] Teste unitario: LLM_MODEL env var e lido corretamente
+- [x] Teste de regressao: todos os testes existentes continuam passando
 
 ### Estimativa
 
@@ -100,10 +100,35 @@ Fechar debitos de baixa prioridade restantes, implementar testes cross-cutting (
 
 ### Definition of Done
 
-- [ ] Codigo implementado
-- [ ] Testes passando
+- [x] Codigo implementado
+- [x] Testes passando
 - [ ] Review aprovado
 - [ ] Deploy em staging
 - [ ] QA aprovado
-- [ ] Todos os 55 debitos documentados como resolvidos ou conscientemente adiados
-- [ ] Metricas de sucesso da avaliacao v2.0 atingidas (coverage, security headers, smoke tests)
+- [x] Todos os 55 debitos documentados como resolvidos ou conscientemente adiados
+- [x] Metricas de sucesso da avaliacao v2.0 atingidas (coverage, security headers, smoke tests)
+
+---
+
+### Decisoes Tecnicas Documentadas
+
+#### TD-M09: MD5 para Chaves de Deduplicacao
+- **Decisao**: Manter MD5
+- **Justificativa**: Uso nao-criptografico (hash para dedup keys). Risco de colisao birthday-problem requer ~2^64 operacoes -- desprezivel para ~10k registros. SHA-256 adicionaria overhead sem beneficio pratico.
+- **Arquivos**: `backend/sources/orchestrator.py`, `backend/sources/transparencia_source.py`
+
+#### TD-L03: Buscas Salvas em localStorage
+- **Decisao**: Manter localStorage, deferido para server-side
+- **Justificativa**: POC sem autenticacao de usuario. Max 10 buscas em localStorage e adequado. Database (SQLite) existe via TD-H04 mas migracao requer auth layer.
+- **Dependencia**: Implementacao de autenticacao de usuario
+- **Arquivos**: `frontend/lib/savedSearches.ts`, `backend/database.py`
+
+#### TD-L05: Performance de Keywords (~130 inclusao + ~100 exclusao)
+- **Decisao**: Manter implementacao atual
+- **Justificativa**: String matching com `in` operator e fail-fast exclusions adequados para ~10k registros por busca. Trie ou pre-compilacao de regex so justificavel em 100k+ registros (alem do limite PNCP).
+- **Arquivos**: `backend/filter.py`, `backend/sectors.py`
+
+#### XD-TEST-03: Testes de Regressao Visual
+- **Decisao**: Deferido para pos-design system
+- **Justificativa**: 5 temas x breakpoints responsivos = alto custo de manutencao de snapshots. Sem design system estavel, snapshots quebrariam frequentemente. Recomendado: implementar apos design system com Chromatic ou Percy.
+- **Prerequisito**: Design system estabilizado

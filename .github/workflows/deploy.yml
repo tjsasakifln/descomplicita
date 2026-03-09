@@ -165,6 +165,9 @@ jobs:
           echo "3. OpenAPI docs accessible..."
           curl -sf -o /dev/null -w "%{http_code}" "${BACKEND_URL}/docs" | grep -q 200
 
+          echo "4. Setores endpoint..."
+          curl -sf "${BACKEND_URL}/setores" | python3 -m json.tool
+
           echo "All backend smoke tests passed"
 
       - name: Frontend smoke test
@@ -209,3 +212,20 @@ jobs:
           fi
 
           echo "Integration smoke test passed"
+
+      - name: Create issue on smoke test failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const title = `Smoke test failure on ${new Date().toISOString().split('T')[0]}`;
+            const body = `## Smoke Test Failure\n\n**Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n**Branch:** ${context.ref}\n**Commit:** ${context.sha.substring(0, 7)}\n\nPlease investigate immediately.`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['bug', 'smoke-test-failure']
+            });

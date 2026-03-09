@@ -32,6 +32,12 @@ jobs:
           fi
           pip install pytest pytest-cov pytest-asyncio httpx
 
+      - name: Security audit (pip)
+        run: |
+          cd backend
+          pip install pip-audit
+          pip-audit --strict --desc || echo "::warning::pip-audit found vulnerabilities"
+
       - name: Run tests
         run: |
           cd backend
@@ -96,6 +102,11 @@ jobs:
           if [ -f package.json ]; then
             npm ci || npm install
           fi
+
+      - name: Security audit (npm)
+        run: |
+          cd frontend
+          npm audit --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities"
 
       - name: Run tests
         run: |

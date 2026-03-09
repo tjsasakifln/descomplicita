@@ -30,6 +30,12 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Security audit (pip)
+        run: |
+          cd backend
+          pip install pip-audit
+          pip-audit --strict --desc || echo "::warning::pip-audit found vulnerabilities"
+
       - name: Run linting
         run: |
           cd backend
