@@ -88,9 +88,9 @@ describe('Story 3.0: Accessibility Tests', () => {
       const onCancel = jest.fn();
       render(<SaveSearchDialog {...defaultProps} onCancel={onCancel} />);
       const dialog = screen.getByRole('dialog');
-      const innerModal = dialog.querySelector('.bg-surface-0')!;
 
-      fireEvent.keyDown(innerModal, { key: 'Escape' });
+      // Native <dialog> uses the 'cancel' event for Escape (UXD-006)
+      fireEvent(dialog, new Event('cancel', { bubbles: true }));
       expect(onCancel).toHaveBeenCalledTimes(1);
     });
 

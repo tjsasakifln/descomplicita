@@ -88,10 +88,11 @@ describe('ThemeProvider data-theme attribute', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 
-  it('should set canvas and ink CSS variables for each theme', () => {
+  it('should rely on CSS cascade via data-theme for all themes (UXD-010)', () => {
+    // After UXD-010, CSS variables are handled by data-theme selectors in globals.css,
+    // not set imperatively. We verify data-theme is set for each theme.
     for (const theme of THEMES) {
       localStorage.setItem('descomplicita-theme', theme.id);
-      document.documentElement.style.cssText = '';
 
       const { unmount } = render(
         <ThemeProvider>
@@ -99,11 +100,17 @@ describe('ThemeProvider data-theme attribute', () => {
         </ThemeProvider>
       );
 
-      const style = document.documentElement.style;
-      expect(style.getPropertyValue('--canvas')).toBe(theme.canvas);
-      expect(style.getPropertyValue('--ink')).toBe(theme.ink);
+      expect(document.documentElement.getAttribute('data-theme')).toBe(theme.id);
+
+      if (theme.isDark) {
+        expect(document.documentElement.classList.contains('dark')).toBe(true);
+      } else {
+        expect(document.documentElement.classList.contains('dark')).toBe(false);
+      }
 
       unmount();
+      document.documentElement.removeAttribute('data-theme');
+      document.documentElement.classList.remove('dark');
     }
   });
 });

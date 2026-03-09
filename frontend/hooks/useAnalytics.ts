@@ -1,59 +1,49 @@
-import mixpanel from 'mixpanel-browser';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mixpanelInstance: any = null;
+let mixpanelLoading: Promise<void> | null = null;
 
-/**
- * Analytics hook for tracking user events with Mixpanel
- *
- * @example
- * const { trackEvent } = useAnalytics();
- * trackEvent('search_started', { ufs: ['SC', 'PR'], setor: 'vestuario' });
- */
+function loadMixpanel(): Promise<void> {
+  if (mixpanelLoading) return mixpanelLoading;
+  if (!process.env.NEXT_PUBLIC_MIXPANEL_TOKEN) return Promise.resolve();
+
+  mixpanelLoading = import('mixpanel-browser').then(mod => {
+    mixpanelInstance = mod.default || mod;
+  }).catch(() => {
+    // Silently fail — analytics should never break the app
+  });
+  return mixpanelLoading;
+}
+
 export const useAnalytics = () => {
-  /**
-   * Track an event with optional properties
-   *
-   * @param eventName - Name of the event (e.g., 'search_started')
-   * @param properties - Additional event properties
-   */
-  const trackEvent = (eventName: string, properties?: Record<string, any>) => {
-    // Only track if Mixpanel is initialized (token exists)
-    if (process.env.NEXT_PUBLIC_MIXPANEL_TOKEN) {
+  const trackEvent = (eventName: string, properties?: Record<string, unknown>) => {
+    if (!process.env.NEXT_PUBLIC_MIXPANEL_TOKEN) return;
+    loadMixpanel().then(() => {
       try {
-        mixpanel.track(eventName, {
+        mixpanelInstance?.track(eventName, {
           ...properties,
           timestamp: new Date().toISOString(),
           environment: process.env.NODE_ENV || 'development',
         });
-      } catch (error) {
-        // Silently fail - analytics should never break the app
-        console.warn('Analytics tracking failed:', error);
+      } catch {
+        // Silently fail
       }
-    }
+    });
   };
 
-  /**
-   * Identify a user (for future use when auth is implemented)
-   *
-   * @param userId - Unique user identifier
-   * @param properties - User properties
-   */
-  const identifyUser = (userId: string, properties?: Record<string, any>) => {
-    if (process.env.NEXT_PUBLIC_MIXPANEL_TOKEN) {
+  const identifyUser = (userId: string, properties?: Record<string, unknown>) => {
+    if (!process.env.NEXT_PUBLIC_MIXPANEL_TOKEN) return;
+    loadMixpanel().then(() => {
       try {
-        mixpanel.identify(userId);
+        mixpanelInstance?.identify(userId);
         if (properties) {
-          mixpanel.people.set(properties);
+          mixpanelInstance?.people.set(properties);
         }
-      } catch (error) {
-        console.warn('User identification failed:', error);
+      } catch {
+        // Silently fail
       }
-    }
+    });
   };
 
-  /**
-   * Track page view
-   *
-   * @param pageName - Name of the page
-   */
   const trackPageView = (pageName: string) => {
     trackEvent('page_view', { page: pageName });
   };

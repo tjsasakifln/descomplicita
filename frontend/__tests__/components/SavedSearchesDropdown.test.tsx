@@ -69,7 +69,7 @@ describe('SavedSearchesDropdown', () => {
 
     const trigger = screen.getByRole('button', { name: /Buscas salvas/i });
     expect(trigger).toBeInTheDocument();
-    expect(trigger).toHaveAttribute('aria-haspopup', 'true');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
     // Count badge
@@ -99,10 +99,10 @@ describe('SavedSearchesDropdown', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
 
-    // The search name is inside a button - click it
+    // The search name is inside a role="option" div - click it
     const searchNameEl = screen.getByText('Uniformes Sul');
-    const searchButton = searchNameEl.closest('button');
-    fireEvent.click(searchButton!);
+    const optionEl = searchNameEl.closest('[role="option"]');
+    fireEvent.click(optionEl!);
 
     expect(mockLoadSearch).toHaveBeenCalledWith('search-1');
   });

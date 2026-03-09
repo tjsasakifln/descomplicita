@@ -43,49 +43,49 @@ Completar compliance WCAG AA, melhorar qualidade de UX com indicadores de rede e
 
 #### Acessibilidade Media Prioridade
 
-- [ ] Task 1: UXD-005 -- Refatorar SavedSearchesDropdown para usar semantica `role="listbox"` com `role="option"` nos itens. Adicionar navegacao por setas e selecao com Enter.
-- [ ] Task 2: UXD-002 -- Adicionar loading state (spinner ou skeleton) ao dropdown de setores durante fetch. Utilizar FALLBACK_SETORES como placeholder ate dados carregarem.
+- [x] Task 1: UXD-005 -- Refatorar SavedSearchesDropdown para usar semantica `role="listbox"` com `role="option"` nos itens. Adicionar navegacao por setas e selecao com Enter.
+- [x] Task 2: UXD-002 -- Adicionar loading state (spinner ou skeleton) ao dropdown de setores durante fetch. Utilizar FALLBACK_SETORES como placeholder ate dados carregarem.
 
 #### Qualidade Visual e UX
 
-- [ ] Task 3: UXD-011 -- Alinhar script inline de prevencao de FOUC com ThemeProvider. Expandir script para cobrir tokens de surface/border (Sepia/Paperwhite). Nota: pode ser parcialmente resolvido por TD-M10 em v2-story-2.0.
-- [ ] Task 4: UXD-012 -- Implementar indicador de status de rede. Detectar `navigator.onLine` + evento `offline`/`online`. Mostrar banner dismissivel quando offline, com mensagem contextual em vez de erro generico.
-- [ ] Task 5: UXD-019 -- Substituir cores Tailwind hardcoded em carouselData por tokens de tema semanticos (mesma abordagem de UXD-018 em v2-story-0.0).
+- [x] Task 3: UXD-011 -- Alinhar script inline de prevencao de FOUC com ThemeProvider. Expandir script para cobrir tokens de surface/border (Sepia/Paperwhite). Nota: pode ser parcialmente resolvido por TD-M10 em v2-story-2.0.
+- [x] Task 4: UXD-012 -- Implementar indicador de status de rede. Detectar `navigator.onLine` + evento `offline`/`online`. Mostrar banner dismissivel quando offline, com mensagem contextual em vez de erro generico.
+- [x] Task 5: UXD-019 -- Substituir cores Tailwind hardcoded em carouselData por tokens de tema semanticos (mesma abordagem de UXD-018 em v2-story-0.0).
 
 #### Decomposicao de Componente
 
-- [ ] Task 6: UXD-016 -- Decompor LoadingProgress (450+ linhas) em sub-componentes: ProgressBar, StageList, UfGrid, Carousel, Skeleton.
-- [ ] Task 7: UXD-016 -- Cada sub-componente deve ter teste unitario co-localizado.
-- [ ] Task 8: UXD-016 -- LoadingProgress principal deve orquestrar sub-componentes (< 100 linhas).
+- [x] Task 6: UXD-016 -- Decompor LoadingProgress (450+ linhas) em sub-componentes: ProgressBar, StageList, UfGrid, Carousel, Skeleton.
+- [x] Task 7: UXD-016 -- Cada sub-componente deve ter teste unitario co-localizado.
+- [x] Task 8: UXD-016 -- LoadingProgress principal deve orquestrar sub-componentes (< 100 linhas).
 
 #### Itens de Baixa Prioridade
 
-- [ ] Task 9: UXD-003 -- Criar `not-found.tsx` para pagina 404 (app tem rota unica, mas necessario para URLs invalidas).
-- [ ] Task 10: UXD-004 -- Adicionar atalho de teclado para submeter busca (ex: Ctrl+Enter ou dedicar Enter no input para submissao em vez de criacao de token).
-- [ ] Task 11: UXD-006 -- Migrar SaveSearchDialog de `div[role="dialog"]` para elemento `<dialog>` nativo. Manter focus trap existente.
-- [ ] Task 12: UXD-008 -- Converter import do Mixpanel para dynamic import (`next/dynamic` ou `import()` lazy). Reducao estimada: ~40KB do bundle inicial.
-- [ ] Task 13: UXD-010 -- Refatorar ThemeProvider de abordagem imperativa (30+ CSS custom properties) para sistema baseado em CSS variables com cascata. Nota: esforco alto (8h), pode ser dividido em sub-tasks.
-- [ ] Task 14: UXD-013 -- Adicionar links uteis ao footer (ex: termos de uso, contato, versao do sistema).
-- [ ] Task 15: UXD-017 -- Mover setores fallback para arquivo de configuracao ou buscar de endpoint mesmo quando offline.
+- [x] Task 9: UXD-003 -- Criar `not-found.tsx` para pagina 404 (app tem rota unica, mas necessario para URLs invalidas).
+- [x] Task 10: UXD-004 -- Adicionar atalho de teclado para submeter busca (ex: Ctrl+Enter ou dedicar Enter no input para submissao em vez de criacao de token).
+- [x] Task 11: UXD-006 -- Migrar SaveSearchDialog de `div[role="dialog"]` para elemento `<dialog>` nativo. Manter focus trap existente.
+- [x] Task 12: UXD-008 -- Converter import do Mixpanel para dynamic import (`next/dynamic` ou `import()` lazy). Reducao estimada: ~40KB do bundle inicial.
+- [x] Task 13: UXD-010 -- Refatorar ThemeProvider de abordagem imperativa (30+ CSS custom properties) para sistema baseado em CSS variables com cascata. Nota: esforco alto (8h), pode ser dividido em sub-tasks.
+- [x] Task 14: UXD-013 -- Adicionar links uteis ao footer (ex: termos de uso, contato, versao do sistema).
+- [x] Task 15: UXD-017 -- Mover setores fallback para arquivo de configuracao ou buscar de endpoint mesmo quando offline.
 
 ### Criterios de Aceite
 
-- [ ] SavedSearchesDropdown implementa semantica listbox completa (verificar com axe-core)
-- [ ] Dropdown de setores mostra loading state durante fetch
-- [ ] Script FOUC alinhado com ThemeProvider (sem flash em Sepia/Paperwhite)
-- [ ] Indicador offline visivel quando rede cai (testar com DevTools Network offline)
-- [ ] carouselData renderiza corretamente em todos os 5 temas
-- [ ] LoadingProgress decomposto: nenhum sub-componente > 200 linhas
-- [ ] Pagina 404 existe e renderiza para URLs invalidas
-- [ ] Mixpanel carregado via dynamic import (verificar bundle analyzer)
-- [ ] Cada sub-componente de LoadingProgress tem teste unitario
+- [x] SavedSearchesDropdown implementa semantica listbox completa (verificar com axe-core)
+- [x] Dropdown de setores mostra loading state durante fetch
+- [x] Script FOUC alinhado com ThemeProvider (sem flash em Sepia/Paperwhite)
+- [x] Indicador offline visivel quando rede cai (testar com DevTools Network offline)
+- [x] carouselData renderiza corretamente em todos os 5 temas
+- [x] LoadingProgress decomposto: nenhum sub-componente > 200 linhas
+- [x] Pagina 404 existe e renderiza para URLs invalidas
+- [x] Mixpanel carregado via dynamic import (verificar bundle analyzer)
+- [x] Cada sub-componente de LoadingProgress tem teste unitario
 
 ### Testes Requeridos
 
-- [ ] Teste unitario: SavedSearchesDropdown com ARIA listbox -- navegacao por setas, selecao
-- [ ] Teste unitario: loading state do dropdown de setores
-- [ ] Teste unitario: cada sub-componente de LoadingProgress
-- [ ] Teste unitario: indicador offline -- detecta mudanca de estado de rede
+- [x] Teste unitario: SavedSearchesDropdown com ARIA listbox -- navegacao por setas, selecao
+- [x] Teste unitario: loading state do dropdown de setores
+- [x] Teste unitario: cada sub-componente de LoadingProgress
+- [x] Teste unitario: indicador offline -- detecta mudanca de estado de rede
 - [ ] Teste E2E: navegacao para URL invalida mostra 404
 - [ ] Teste E2E: axe-core -- zero violacoes criticas/serias
 - [ ] Teste visual: carouselData em todos os 5 temas
@@ -106,8 +106,8 @@ Completar compliance WCAG AA, melhorar qualidade de UX com indicadores de rede e
 
 ### Definition of Done
 
-- [ ] Codigo implementado
-- [ ] Testes passando
+- [x] Codigo implementado
+- [x] Testes passando
 - [ ] Review aprovado
 - [ ] Deploy em staging
 - [ ] QA aprovado

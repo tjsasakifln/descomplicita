@@ -6,6 +6,7 @@ interface SearchFormProps {
   searchMode: "setor" | "termos";
   onSearchModeChange: (mode: "setor" | "termos") => void;
   setores: Setor[];
+  setoresLoading?: boolean;
   setorId: string;
   onSetorIdChange: (id: string) => void;
   termosArray: string[];
@@ -19,6 +20,7 @@ export function SearchForm({
   searchMode,
   onSearchModeChange,
   setores,
+  setoresLoading,
   setorId,
   onSetorIdChange,
   termosArray,
@@ -58,20 +60,31 @@ export function SearchForm({
       </div>
 
       {searchMode === "setor" && (
-        <div>
-          <select
-            id="setor"
-            value={setorId}
-            onChange={e => onSetorIdChange(e.target.value)}
-            className="w-full border border-strong rounded-input px-4 py-3 text-base
-                       bg-surface-0 text-ink
-                       focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue
-                       transition-colors"
-          >
-            {setores.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+        <div className="relative">
+          {setoresLoading ? (
+            <div className="w-full border border-strong rounded-input px-4 py-3 bg-surface-0 flex items-center gap-2"
+                 aria-busy="true" aria-label="Carregando setores">
+              <svg className="w-4 h-4 animate-spin text-brand-blue" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-sm text-ink-muted">Carregando setores...</span>
+            </div>
+          ) : (
+            <select
+              id="setor"
+              value={setorId}
+              onChange={e => onSetorIdChange(e.target.value)}
+              className="w-full border border-strong rounded-input px-4 py-3 text-base
+                         bg-surface-0 text-ink
+                         focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue
+                         transition-colors"
+            >
+              {setores.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 

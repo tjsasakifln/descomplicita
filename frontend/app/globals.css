@@ -52,18 +52,70 @@
 
   /* Focus */
   --ring: #116dff;
+
+  /* Category tokens (carousel/curiosidades) */
+  --cat-legislacao-bg: #eff6ff;
+  --cat-legislacao-icon-bg: #dbeafe;
+  --cat-legislacao-text: #2563eb;
+  --cat-estrategia-bg: #f0fdf4;
+  --cat-estrategia-icon-bg: #dcfce7;
+  --cat-estrategia-text: #16a34a;
+  --cat-insight-bg: #faf5ff;
+  --cat-insight-icon-bg: #f3e8ff;
+  --cat-insight-text: #9333ea;
+  --cat-dica-bg: #fffbeb;
+  --cat-dica-icon-bg: #fef3c7;
+  --cat-dica-text: #d97706;
 }
 
-/* Theme FOUC prevention via data-theme attribute (TD-M10) */
+/* Theme FOUC prevention via data-theme attribute (TD-M10, UXD-010) */
 html[data-theme="dark"],
 html[data-theme="dim"] {
   color-scheme: dark;
 }
 
-html[data-theme="paperwhite"] { --canvas: #F5F0E8; }
-html[data-theme="sepia"] { --canvas: #EDE0CC; }
-html[data-theme="dim"] { --canvas: #2A2A2E; --ink: #e0e0e0; }
-html[data-theme="dark"] { --canvas: #121212; --ink: #e0e0e0; }
+/* Paperwhite theme — warm off-white paper tone */
+html[data-theme="paperwhite"] {
+  --canvas: #F5F0E8;
+  --ink-muted: #526272;
+  --surface-0: #F5F0E8;
+  --surface-1: #efe9e0;
+  --surface-2: #e8e2d8;
+  --surface-elevated: #F5F0E8;
+  --status-success-bg: #ecfdf5;
+  --status-warning-bg: #fffbeb;
+}
+
+/* Sepia theme — warm parchment tone */
+html[data-theme="sepia"] {
+  --canvas: #EDE0CC;
+  --ink: #2c1810;
+  --ink-secondary: #35495c;
+  --ink-muted: #4a5968;
+  --brand-blue-subtle: #e8e0d4;
+  --surface-0: #EDE0CC;
+  --surface-1: #e8dcc8;
+  --surface-2: #e0d4be;
+  --surface-elevated: #EDE0CC;
+  --success-subtle: #e8f5e9;
+  --error-subtle: #fce4ec;
+  --warning-subtle: #fff8e1;
+  --status-success-bg: #e8f5e9;
+  --status-warning-bg: #fff8e1;
+  --status-error-bg: #fce4ec;
+}
+
+/* Dim theme — softer dark with elevated canvas */
+html[data-theme="dim"] {
+  --canvas: #2A2A2E;
+  --surface-0: #2A2A2E;
+}
+
+/* Dark theme — deep dark */
+html[data-theme="dark"] {
+  --canvas: #121212;
+  --surface-0: #121212;
+}
 
 /* Dark mode overrides */
 .dark {
@@ -106,6 +158,20 @@ html[data-theme="dark"] { --canvas: #121212; --ink: #e0e0e0; }
   --border-accent: rgba(17, 109, 255, 0.4);
 
   --ring: #3b8bff;
+
+  /* Category tokens (dark) */
+  --cat-legislacao-bg: rgba(37, 99, 235, 0.12);
+  --cat-legislacao-icon-bg: rgba(37, 99, 235, 0.2);
+  --cat-legislacao-text: #60a5fa;
+  --cat-estrategia-bg: rgba(22, 163, 74, 0.12);
+  --cat-estrategia-icon-bg: rgba(22, 163, 74, 0.2);
+  --cat-estrategia-text: #4ade80;
+  --cat-insight-bg: rgba(147, 51, 234, 0.12);
+  --cat-insight-icon-bg: rgba(147, 51, 234, 0.2);
+  --cat-insight-text: #c084fc;
+  --cat-dica-bg: rgba(217, 119, 6, 0.12);
+  --cat-dica-icon-bg: rgba(217, 119, 6, 0.2);
+  --cat-dica-text: #fbbf24;
 }
 
 body {

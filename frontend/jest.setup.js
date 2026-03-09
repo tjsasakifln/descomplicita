@@ -51,6 +51,17 @@ try {
   // Next.js not installed yet (Issue #21)
 }
 
+// Polyfill HTMLDialogElement methods for jsdom (UXD-006)
+if (typeof globalThis.HTMLDialogElement !== 'undefined') {
+  HTMLDialogElement.prototype.showModal = HTMLDialogElement.prototype.showModal || function () { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = HTMLDialogElement.prototype.close || function () { this.removeAttribute('open'); };
+}
+
+// Ensure all elements have scrollIntoView (jsdom limitation)
+if (typeof globalThis.Element !== 'undefined') {
+  Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || function () {};
+}
+
 // Global test timeout (default: 5000ms)
 jest.setTimeout(10000)
 

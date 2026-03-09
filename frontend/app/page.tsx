@@ -75,6 +75,18 @@ export default function HomePage() {
     });
   }, [job, form.ufsSelecionadas, form.dataInicial, form.dataFinal, form.searchMode, form.setorId, form.termosArray]);
 
+  // UXD-004: Ctrl+Enter keyboard shortcut to submit search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && form.canSearch && !job.loading) {
+        e.preventDefault();
+        handleBuscar();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleBuscar, form.canSearch, job.loading]);
+
   const handleDownload = useCallback(async () => {
     if (!job.result?.download_id) return;
     await job.handleDownload({
@@ -111,7 +123,7 @@ export default function HomePage() {
 
         <h2 className="sr-only">Formulário de Busca</h2>
         <SearchForm searchMode={form.searchMode} onSearchModeChange={form.setSearchMode} setores={form.setores}
-          setorId={form.setorId} onSetorIdChange={form.setSetorId} termosArray={form.termosArray}
+          setoresLoading={form.setoresLoading} setorId={form.setorId} onSetorIdChange={form.setSetorId} termosArray={form.termosArray}
           onTermosArrayChange={form.setTermosArray} termoInput={form.termoInput}
           onTermoInputChange={form.setTermoInput} onFormChange={job.clearResult} />
 
@@ -182,8 +194,15 @@ export default function HomePage() {
           onConfirm={save.confirmSaveSearch} onCancel={save.cancelSaveDialog} saveError={save.saveError} />
       )}
 
-      <footer className="border-t mt-12 py-6 text-center text-xs text-ink-muted">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">DescompLicita &mdash; Licitações e Contratos de Forma Descomplicada</div>
+      <footer className="border-t mt-12 py-6 text-xs text-ink-muted">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>DescompLicita &mdash; Licitações e Contratos de Forma Descomplicada</span>
+          <nav aria-label="Links do rodapé" className="flex items-center gap-4">
+            <a href="mailto:contato@descomplicita.com.br" className="hover:text-ink transition-colors">Contato</a>
+            <a href="/termos" className="hover:text-ink transition-colors">Termos de Uso</a>
+            <span className="tabular-nums font-data">v2.0</span>
+          </nav>
+        </div>
       </footer>
     </div>
   );

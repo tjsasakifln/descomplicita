@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AnalyticsProvider } from "./components/AnalyticsProvider";
+import { NetworkIndicator } from "./components/NetworkIndicator";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -50,7 +51,10 @@ export default function RootLayout({
           Pular para o conteúdo principal
         </a>
         <AnalyticsProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <NetworkIndicator />
+            {children}
+          </ThemeProvider>
         </AnalyticsProvider>
       </body>
     </html>

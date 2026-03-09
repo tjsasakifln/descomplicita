@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Setor, ValidationErrors } from "../types";
-import { UFS } from "../constants/ufs";
-import { DEFAULT_UFS } from "../constants/ufs";
+import { UFS, DEFAULT_UFS } from "../constants/ufs";
+import { FALLBACK_SETORES } from "../constants/fallback-setores";
 
 function getDefaultDate(daysAgo: number): string {
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
@@ -11,6 +11,7 @@ function getDefaultDate(daysAgo: number): string {
 
 export interface UseSearchFormReturn {
   setores: Setor[];
+  setoresLoading: boolean;
   setorId: string;
   setSetorId: (id: string) => void;
   searchMode: "setor" | "termos";
@@ -42,18 +43,9 @@ export interface UseSearchFormReturn {
   }) => void;
 }
 
-const FALLBACK_SETORES: Setor[] = [
-  { id: "vestuario", name: "Vestuário e Uniformes", description: "" },
-  { id: "alimentos", name: "Alimentos e Merenda", description: "" },
-  { id: "informatica", name: "Informática e Tecnologia", description: "" },
-  { id: "limpeza", name: "Produtos de Limpeza", description: "" },
-  { id: "mobiliario", name: "Mobiliário", description: "" },
-  { id: "papelaria", name: "Papelaria e Material de Escritório", description: "" },
-  { id: "engenharia", name: "Engenharia e Construção", description: "" },
-];
-
 export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
   const [setores, setSetores] = useState<Setor[]>([]);
+  const [setoresLoading, setSetoresLoading] = useState(true);
   const [setorId, setSetorIdState] = useState("vestuario");
   const [searchMode, setSearchModeState] = useState<"setor" | "termos">("setor");
   const [termosArray, setTermosArray] = useState<string[]>([]);
@@ -64,13 +56,18 @@ export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   useEffect(() => {
+    setSetoresLoading(true);
     fetch("/api/setores")
       .then(res => res.json())
       .then(data => {
         if (data.setores) setSetores(data.setores);
+        else setSetores(FALLBACK_SETORES);
       })
       .catch(() => {
         setSetores(FALLBACK_SETORES);
+      })
+      .finally(() => {
+        setSetoresLoading(false);
       });
   }, []);
 
@@ -186,6 +183,7 @@ export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
 
   return {
     setores,
+    setoresLoading,
     setorId,
     setSetorId,
     searchMode,

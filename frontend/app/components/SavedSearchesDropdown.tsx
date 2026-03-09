@@ -9,17 +9,6 @@ interface SavedSearchesDropdownProps {
   onAnalyticsEvent?: (eventName: string, properties?: Record<string, any>) => void;
 }
 
-/**
- * Dropdown component for managing and loading saved searches
- *
- * Features:
- * - Display up to 10 saved searches
- * - Sort by most recently used
- * - Delete individual searches
- * - Clear all searches
- * - Visual feedback for empty state
- * - Analytics tracking
- */
 export function SavedSearchesDropdown({
   onLoadSearch,
   onAnalyticsEvent,
@@ -35,32 +24,70 @@ export function SavedSearchesDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const closeDropdown = useCallback(() => {
     setIsOpen(false);
     setDeleteConfirmId(null);
     setClearConfirm(false);
+    setActiveIndex(-1);
     triggerRef.current?.focus();
   }, []);
 
   useEffect(() => {
+    if (isOpen && searches.length > 0) {
+      setActiveIndex(0);
+    }
+  }, [isOpen, searches.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         closeDropdown();
+        return;
+      }
+
+      if (searches.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex(prev => (prev + 1) % searches.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex(prev => (prev - 1 + searches.length) % searches.length);
+      } else if (e.key === "Enter" && activeIndex >= 0 && activeIndex < searches.length) {
+        e.preventDefault();
+        handleLoadSearch(searches[activeIndex].id);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setActiveIndex(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setActiveIndex(searches.length - 1);
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, closeDropdown]);
+  }, [isOpen, closeDropdown, searches, activeIndex]);
+
+  // Scroll active option into view
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    const activeEl = listRef.current.querySelector(`[data-index="${activeIndex}"]`);
+    activeEl?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex]);
 
   const handleLoadSearch = (id: string) => {
     const search = loadSearch(id);
     if (search) {
       onLoadSearch(search);
       setIsOpen(false);
+      setActiveIndex(-1);
 
-      // Track analytics
       onAnalyticsEvent?.('saved_search_loaded', {
         search_id: id,
         search_name: search.name,
@@ -76,12 +103,10 @@ export function SavedSearchesDropdown({
 
   const handleDeleteSearch = (id: string, name: string) => {
     if (deleteConfirmId === id) {
-      // Confirmed - delete
       const success = deleteSearch(id);
       setDeleteConfirmId(null);
 
       if (success) {
-        // Track analytics
         onAnalyticsEvent?.('saved_search_deleted', {
           search_id: id,
           search_name: name,
@@ -89,7 +114,6 @@ export function SavedSearchesDropdown({
         });
       }
     } else {
-      // First click - show confirmation; stays until user confirms, cancels, or closes dropdown
       setDeleteConfirmId(id);
     }
   };
@@ -120,8 +144,13 @@ export function SavedSearchesDropdown({
   };
 
   if (loading) {
-    return null; // Don't show anything while loading
+    return null;
   }
+
+  const listboxId = "saved-searches-listbox";
+  const activeDescendant = activeIndex >= 0 && searches[activeIndex]
+    ? `saved-search-option-${searches[activeIndex].id}`
+    : undefined;
 
   return (
     <div className="relative">
@@ -135,7 +164,9 @@ export function SavedSearchesDropdown({
                    border border-strong"
         aria-label="Buscas salvas"
         aria-expanded={isOpen}
-        aria-haspopup="true"
+        aria-haspopup="listbox"
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-activedescendant={isOpen ? activeDescendant : undefined}
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -168,8 +199,7 @@ export function SavedSearchesDropdown({
           <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-0 border border-strong
                           rounded-card shadow-lg z-20 max-h-[400px] overflow-y-auto">
             {searches.length === 0 ? (
-              // Empty State
-              <div className="p-6 text-center">
+              <div className="p-6 text-center" role="status">
                 <svg className="mx-auto w-12 h-12 text-ink-faint mb-3" fill="none"
                      viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -195,7 +225,6 @@ export function SavedSearchesDropdown({
                           setClearConfirm(false);
                           setIsOpen(false);
                         } else {
-                          // Show confirmation; stays until user confirms, cancels, or closes dropdown
                           setClearConfirm(true);
                         }
                       }}
@@ -211,21 +240,33 @@ export function SavedSearchesDropdown({
                   )}
                 </div>
 
-                {/* Search List */}
-                <div className="py-2">
-                  {searches.map((search) => (
+                {/* Search List — ARIA listbox */}
+                <div
+                  ref={listRef}
+                  id={listboxId}
+                  role="listbox"
+                  aria-label="Buscas salvas"
+                  className="py-2"
+                >
+                  {searches.map((search, index) => (
                     <div
                       key={search.id}
-                      className="px-4 py-3 hover:bg-surface-1 transition-colors border-b border-strong last:border-b-0"
+                      id={`saved-search-option-${search.id}`}
+                      role="option"
+                      aria-selected={activeIndex === index}
+                      data-index={index}
+                      className={`px-4 py-3 transition-colors border-b border-strong last:border-b-0 cursor-pointer ${
+                        activeIndex === index ? 'bg-surface-1' : 'hover:bg-surface-1'
+                      }`}
+                      onClick={() => handleLoadSearch(search.id)}
+                      onMouseEnter={() => setActiveIndex(index)}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <button
-                          onClick={() => handleLoadSearch(search.id)}
-                          className="flex-1 text-left group"
-                          type="button"
-                        >
+                        <div className="flex-1 text-left group">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-ink group-hover:text-brand-blue transition-colors">
+                            <span className={`text-sm font-medium transition-colors ${
+                              activeIndex === index ? 'text-brand-blue' : 'text-ink group-hover:text-brand-blue'
+                            }`}>
                               {search.name}
                             </span>
                           </div>
@@ -244,10 +285,10 @@ export function SavedSearchesDropdown({
                               <span>{formatDate(search.lastUsedAt)}</span>
                             </div>
                           </div>
-                        </button>
+                        </div>
 
                         {/* Delete Button / Confirm + Cancel */}
-                        <div className="flex-shrink-0 flex items-center gap-1">
+                        <div className="flex-shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
                           {deleteConfirmId === search.id && (
                             <button
                               onClick={() => setDeleteConfirmId(null)}
