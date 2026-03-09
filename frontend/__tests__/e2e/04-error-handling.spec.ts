@@ -99,7 +99,7 @@ test.describe('Error Handling Scenarios', () => {
       await route.abort('timedout');
     });
 
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     // Wait for error alert to appear (uses role="alert" + bg-error-subtle in page.tsx)
@@ -121,7 +121,7 @@ test.describe('Error Handling Scenarios', () => {
     });
 
     await page.getByRole('button', { name: 'RJ', exact: true }).click();
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     // Wait for error message
@@ -147,7 +147,7 @@ test.describe('Error Handling Scenarios', () => {
       },
     });
 
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     await expect(page.getByText(/Resumo Executivo/i)).toBeVisible({ timeout: 15000 });
@@ -181,7 +181,7 @@ test.describe('Error Handling Scenarios', () => {
     });
 
     await page.getByRole('button', { name: 'SP', exact: true }).click();
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     // Wait for error
@@ -215,7 +215,7 @@ test.describe('Error Handling Scenarios', () => {
       });
     });
 
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     // Verify search button shows loading state ("Buscando...")
@@ -228,7 +228,7 @@ test.describe('Error Handling Scenarios', () => {
     });
 
     await page.getByRole('button', { name: 'SC', exact: true }).click();
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     // Should show error (verify the alert div appears)
@@ -255,7 +255,7 @@ test.describe('Error Handling Scenarios', () => {
     });
 
     await page.getByRole('button', { name: 'SP', exact: true }).click();
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
 
     // Wait for error to appear
     const errorAlert = page.locator('.bg-error-subtle[role="alert"]');

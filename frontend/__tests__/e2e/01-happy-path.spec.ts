@@ -132,7 +132,7 @@ test.describe('Happy Path User Journey', () => {
     await expect(dataFinal).toBeVisible();
 
     // Verify search button
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeVisible();
   });
 
@@ -199,7 +199,7 @@ test.describe('Happy Path User Journey', () => {
     await page.getByRole('button', { name: 'PR', exact: true }).click();
 
     // Wait for search button to be enabled
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeEnabled();
 
     // Click search button
@@ -237,7 +237,7 @@ test.describe('Happy Path User Journey', () => {
     await page.getByRole('button', { name: 'RJ', exact: true }).click();
 
     // Submit search
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
 
     // Wait for results (should be fast with mock)
     await page.waitForSelector('text=/Resumo Executivo/i', {
@@ -292,7 +292,7 @@ test.describe('Happy Path User Journey', () => {
     await page.getByRole('button', { name: 'SC', exact: true }).click();
 
     // Submit search
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
 
     // Wait for results (should be fast with mock)
     await page.waitForSelector('text=/Resumo Executivo/i', {
@@ -348,7 +348,7 @@ test.describe('Happy Path User Journey', () => {
 
     // Full user journey
     await page.getByRole('button', { name: 'SC', exact: true }).click();
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
     await page.waitForSelector('text=/Resumo Executivo/i', {
       timeout: 15000
     });

@@ -106,7 +106,7 @@ test.describe('LLM Fallback Scenario', () => {
 
     await page.getByRole('button', { name: 'SC', exact: true }).click();
 
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await searchButton.click();
 
     await page.waitForSelector('text=/Resumo Executivo/i', { timeout: 15000 });
@@ -136,7 +136,7 @@ test.describe('LLM Fallback Scenario', () => {
     }
 
     await page.getByRole('button', { name: 'SP', exact: true }).click();
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
 
     await page.waitForSelector('text=/Resumo Executivo/i', { timeout: 15000 });
 
@@ -174,7 +174,7 @@ test.describe('LLM Fallback Scenario', () => {
     }
 
     await page.getByRole('button', { name: 'SC', exact: true }).click();
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
 
     await page.waitForSelector('text=/Resumo Executivo/i', { timeout: 15000 });
 
@@ -210,7 +210,7 @@ test.describe('LLM Fallback Scenario', () => {
     await page.getByLabel(/Data inicial/i).fill(yesterdayStr);
     await page.getByLabel(/Data final/i).fill(yesterdayStr);
 
-    await page.getByRole('button', { name: /Buscar Licitações/i }).click();
+    await page.getByRole('button', { name: /^Buscar\b/i }).click();
 
     // Wait for results or empty state (zero results shows EmptyState component)
     await page.waitForTimeout(5000);
@@ -218,7 +218,7 @@ test.describe('LLM Fallback Scenario', () => {
     const bodyText = await page.textContent('body');
     expect(bodyText).toBeTruthy();
 
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeVisible();
   });
 });

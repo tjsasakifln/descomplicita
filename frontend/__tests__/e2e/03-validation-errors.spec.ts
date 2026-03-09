@@ -26,7 +26,7 @@ test.describe('Form Validation Errors', () => {
     const errorMessage = page.getByText(/Selecione pelo menos um estado/i);
     await expect(errorMessage).toBeVisible();
 
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeDisabled();
   });
 
@@ -54,7 +54,7 @@ test.describe('Form Validation Errors', () => {
     await expect(errorMessage).toBeVisible();
 
     // Verify search button is disabled
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeDisabled();
   });
 
@@ -82,7 +82,7 @@ test.describe('Form Validation Errors', () => {
     await expect(errorMessage).toBeVisible();
 
     // Verify search button is disabled
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeDisabled();
   });
 
@@ -106,7 +106,7 @@ test.describe('Form Validation Errors', () => {
     await expect(errorMessage).not.toBeVisible();
 
     // Verify search button is enabled
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeEnabled();
   });
 
@@ -140,7 +140,7 @@ test.describe('Form Validation Errors', () => {
     await expect(dateError).toBeVisible();
 
     // Search button should remain disabled
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeDisabled();
   });
 
@@ -154,7 +154,7 @@ test.describe('Form Validation Errors', () => {
     }
 
     // Try to submit (button should be disabled)
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
 
     // Button should be disabled
     await expect(searchButton).toBeDisabled();
@@ -186,7 +186,7 @@ test.describe('Form Validation Errors', () => {
     await expect(errorMessage).not.toBeVisible();
 
     // Search button should be enabled
-    const searchButton = page.getByRole('button', { name: /Buscar Licitações/i });
+    const searchButton = page.getByRole('button', { name: /^Buscar\b/i });
     await expect(searchButton).toBeEnabled();
   });
 });
