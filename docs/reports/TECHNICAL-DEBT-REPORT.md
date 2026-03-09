@@ -1,312 +1,325 @@
-# Relatorio de Debito Tecnico -- Descomplicita
+# Relatorio de Debito Tecnico
 
-**Projeto:** Descomplicita
-**Data:** 2026-03-07
-**Versao:** 1.0
-**Preparado por:** @analyst (Sage), Business Analyst
-**Fonte:** Assessment tecnico validado por @architect, @ux-design-expert, @qa
+**Projeto:** Descomplicita POC v0.2
+**Data:** 2026-03-09
+**Versao:** 2.0 (atualizacao do assessment de Janeiro 2026)
+**Preparado por:** @analyst (Ada), Business Analyst
+**Fonte:** Assessment tecnico FINAL validado por @architect (Atlas), @ux-design-expert (Vera), @qa (Quinn)
 
 ---
 
-## 1. Resumo Executivo
+## Executive Summary
 
 ### Situacao Atual
 
-O Descomplicita e uma plataforma de busca de licitacoes publicas que agrega dados do Portal Nacional de Contratacoes Publicas (PNCP) e os apresenta de forma simplificada para empresas que vendem uniformes ao governo. A plataforma funciona e entrega valor -- usuarios conseguem pesquisar licitacoes por estado, setor e palavras-chave, visualizar resultados e exportar para Excel. A interface passou por um rebrand recente (de Descomplicita para Descomplicita) e conta com 5 temas visuais, busca por 27 estados e exportacao de dados.
+O Descomplicita e uma plataforma de busca e analise de licitacoes publicas de uniformes no Portal Nacional de Contratacoes Publicas (PNCP). O produto funciona e entrega valor: usuarios pesquisam licitacoes por estado, setor e palavras-chave, visualizam resultados com resumos gerados por inteligencia artificial e exportam dados para Excel. A plataforma opera com 5 temas visuais, cobertura de 27 estados e duas fontes de dados ativas (PNCP e BEC-SP).
 
-No entanto, uma auditoria tecnica completa revelou **57 debitos tecnicos** que representam riscos concretos ao negocio. O mais grave: a plataforma **nao possui autenticacao** -- qualquer pessoa na internet pode consumir todos os recursos do sistema, fazer requisicoes ilimitadas a API do governo e ate limpar o cache do sistema. Alem disso, a base de testes esta parcialmente quebrada, o que significa que alteracoes futuras podem introduzir defeitos sem deteccao.
+Uma auditoria tecnica completa, conduzida por tres especialistas independentes (arquitetura, UX e qualidade), identificou **55 debitos tecnicos** que representam riscos concretos ao negocio. Os mais graves dizem respeito a seguranca: a plataforma opera com uma unica chave de API compartilhada por todos os usuarios, sem identificacao individual, sem trilha de auditoria e sem limite de uso por pessoa. Se a chave nao estiver configurada, o sistema fica totalmente exposto na internet. Alem disso, o sistema armazena dados temporarios apenas em memoria, perdendo tudo a cada atualizacao ou reinicializacao.
 
-A plataforma tambem apresenta lacunas significativas em acessibilidade digital. Com 13 problemas identificados nessa area, o sistema nao atende aos requisitos da Lei Brasileira de Inclusao (Lei 13.146/2015), o que representa risco juridico para uma ferramenta que interage com o setor publico. A boa noticia: o plano de resolucao e viavel -- 10 semanas de trabalho estruturado em 6 sprints eliminam os riscos criticos e posicionam o produto para crescimento sustentavel.
+A boa noticia: comparado ao assessment anterior (versao 1.0, marco 2026), o cenario melhorou significativamente. O numero total de debitos caiu de 57 para 55, a severidade de varios itens foi reavaliada com mais precisao, e o esforco estimado diminuiu de 206-388 horas para 155-232 horas -- uma reducao de 25-40%. O plano de resolucao e viavel: 4 sprints em 5-6 semanas eliminam os riscos criticos e posicionam o produto para crescimento sustentavel.
 
 ### Numeros Chave
 
 | Metrica | Valor |
 |---------|-------|
-| Total de Debitos Identificados | 57 |
-| Debitos Criticos (acao imediata) | 5 |
-| Debitos de Alta Prioridade | 13 |
-| Debitos de Media Prioridade | 22 |
+| Total de Debitos | 55 |
+| Debitos Criticos (acao imediata) | 3 |
+| Debitos de Alta Prioridade | 10 |
+| Debitos de Media Prioridade | 25 |
 | Debitos de Baixa Prioridade | 17 |
-| Esforco Total Estimado | 206 - 388 horas |
-| Esforco Programado (sem backlog) | 173 - 287 horas |
-| Custo Estimado (programado) | R$ 25.950 - R$ 43.050 |
-| Custo Estimado (total com backlog) | R$ 30.900 - R$ 58.200 |
-| Prazo de Execucao | ~10 semanas (6 sprints) |
+| Esforco Total Estimado | 155 - 232 horas |
+| Custo Estimado (minimo) | R$ 23.250 |
+| Custo Estimado (maximo) | R$ 34.800 |
+| Timeline de Execucao | 5-6 semanas (4 sprints) |
 
 ### Recomendacao
 
-Recomendamos **aprovar imediatamente o orcamento para os Sprints 0 e 1** (R$ 3.750 - R$ 6.900), que corrigem testes quebrados e fecham vulnerabilidades de seguranca criticas. O lancamento publico ou qualquer acao de marketing **nao deve ocorrer** antes da conclusao do Sprint 1. O plano completo de 10 semanas deve ser aprovado como investimento estrategico -- o custo de nao agir (estimado em R$ 250.000 - R$ 750.000 em cenarios de risco) supera em ate 13x o investimento necessario.
+Recomendamos aprovar o plano de resolucao em 4 sprints, priorizando os Quick Wins (Sprint 1, R$ 1.200) que podem ser executados em 1-2 dias, seguidos imediatamente pelo Sprint 2 de correcoes criticas (R$ 6.600 - R$ 10.350). O lancamento publico ou qualquer acao de marketing **nao deve ocorrer** antes da conclusao do Sprint 2, que endereca as vulnerabilidades de seguranca e os bloqueadores funcionais. O investimento total de R$ 23.250 - R$ 34.800 evita riscos estimados em R$ 150.000 - R$ 450.000, representando um ROI de 5:1 a 13:1.
 
 ---
 
-## 2. Analise de Custos
+## Analise de Custos
 
 ### Custo de RESOLVER
 
-| Categoria | Itens | Horas (min-max) | Custo Min (R$150/h) | Custo Max (R$150/h) |
-|-----------|-------|-----------------|---------------------|---------------------|
-| Seguranca (CORS, auth, rate limit, debug endpoints, input) | 7 | 14 - 28 | R$ 2.100 | R$ 4.200 |
-| Arquitetura Frontend (decomposicao do componente monolito) | 4 | 31 - 45 | R$ 4.650 | R$ 6.750 |
-| Qualidade Frontend e Acessibilidade | 18 | 36 - 58 | R$ 5.400 | R$ 8.700 |
-| Arquitetura Backend (Redis, async, injecao de dependencia) | 7 | 58 - 96 | R$ 8.700 | R$ 14.400 |
-| Infraestrutura e Polimento (logs, observabilidade, branding) | 15 | 30 - 53 | R$ 4.500 | R$ 7.950 |
-| Correcoes de Emergencia (testes quebrados) | 2 | 3 - 5 | R$ 450 | R$ 750 |
-| Backlog (nao programado) | 5 | 22 - 52 | R$ 3.300 | R$ 7.800 |
-| **TOTAL PROGRAMADO** | **53** | **173 - 287** | **R$ 25.950** | **R$ 43.050** |
-| **TOTAL COM BACKLOG** | **57** | **206 - 388** | **R$ 30.900** | **R$ 58.200** |
+| Categoria | Horas (min) | Horas (max) | Custo Min (R$150/h) | Custo Max (R$150/h) |
+|-----------|-------------|-------------|----------------------|----------------------|
+| Sistema (Backend) | 78 | 124 | R$ 11.700 | R$ 18.600 |
+| Frontend/UX | 43 | 58 | R$ 6.450 | R$ 8.700 |
+| Cross-cutting | 34 | 50 | R$ 5.100 | R$ 7.500 |
+| **TOTAL** | **155** | **232** | **R$ 23.250** | **R$ 34.800** |
 
 ### Custo de NAO RESOLVER (Risco Acumulado)
 
-| Risco | Probabilidade | Impacto Financeiro | Custo Potencial |
-|-------|---------------|-------------------|-----------------|
-| Abuso da API (sem autenticacao): atacante consome todos os 10 slots de processamento, causando indisponibilidade total para usuarios reais | Alta (70%) | Perda de usuarios + custo de recuperacao | R$ 15.000 - R$ 50.000 |
-| Bloqueio pela API do PNCP: requisicoes abusivas via nossa plataforma resultam em bloqueio do nosso acesso ao portal do governo | Media (40%) | Produto para de funcionar completamente | R$ 50.000 - R$ 150.000 |
-| Penalidade por inacessibilidade (LBI 13.146/2015): ferramenta voltada ao setor publico sem conformidade WCAG AA | Baixa (15%) | Multa administrativa + processo civil | R$ 20.000 - R$ 100.000 |
-| Vazamento de dados via CORS aberto: terceiros acessam dados de buscas e resultados de outros usuarios | Media (30%) | Dano reputacional + notificacao LGPD | R$ 30.000 - R$ 100.000 |
-| Exploracoes via container rodando como root | Baixa (10%) | Comprometimento do servidor + dados | R$ 50.000 - R$ 200.000 |
-| Incapacidade de escalar: arquitetura in-memory perde dados a cada deploy, impossibilita multiplas instancias | Alta (80%) | Teto de crescimento, perda de oportunidade | R$ 50.000 - R$ 150.000 |
-| Velocidade de desenvolvimento estagnada: componente monolito de 1.071 linhas impede novas funcionalidades | Alta (90%) | Atraso em features, custo de manutencao elevado | R$ 30.000 - R$ 80.000 |
+| Risco | Probabilidade | Impacto | Custo Potencial |
+|-------|---------------|---------|-----------------|
+| **Abuso da API sem autenticacao:** qualquer pessoa na internet pode consumir todos os recursos do sistema, derrubar o servico ou fazer requisicoes ilimitadas ao PNCP | Alta (70%) | Indisponibilidade total + bloqueio pelo PNCP | R$ 30.000 - R$ 100.000 |
+| **Perda de dados em cada deploy:** buscas em andamento, cache de resultados e arquivos sao armazenados apenas em memoria e perdidos a cada atualizacao | Alta (80%) | Usuarios perdem trabalho, experiencia degradada | R$ 20.000 - R$ 60.000 |
+| **Falhas de download para arquivos grandes:** limite de 10 segundos no Vercel combinado com bufferizacao tripla em memoria pode impedir exportacoes Excel | Media (50%) | Funcionalidade core quebrada | R$ 15.000 - R$ 40.000 |
+| **Penalidade por inacessibilidade (LBI 13.146/2015):** ferramenta voltada ao setor publico sem conformidade WCAG AA em contraste de cores e campos de formulario | Baixa (15%) | Multa administrativa + processo civil | R$ 20.000 - R$ 100.000 |
+| **Busca com funcionalidade quebrada:** usuarios nao conseguem pesquisar termos como "camisa polo" (espaco cria tokens separados em vez de manter a expressao) | Alta (90%) | Resultados incorretos, abandono do produto | R$ 25.000 - R$ 75.000 |
+| **Esgotamento do sistema sob carga:** chamadas de IA sem timeout + threads compartilhadas podem travar o sistema inteiro quando multiplos usuarios buscam simultaneamente | Media (40%) | Sistema para de responder | R$ 15.000 - R$ 50.000 |
+| **Incapacidade de escalar:** arquitetura in-memory limita a uma unica instancia do servidor | Alta (80%) | Teto de crescimento, perda de oportunidade | R$ 30.000 - R$ 80.000 |
 
-**Custo potencial ponderado de nao agir: R$ 115.000 - R$ 365.000**
+**Custo potencial ponderado de nao agir: R$ 95.000 - R$ 305.000**
 
-**Cenario pessimista (multiplos riscos simultaneos): R$ 250.000 - R$ 750.000**
-
----
-
-## 3. Impacto no Negocio
-
-### 3.1 Seguranca -- Risco Imediato
-
-A plataforma esta operando **sem nenhuma camada de protecao**. Especificamente:
-
-- **Qualquer site na internet** pode fazer requisicoes ao nosso backend (CORS aberto para todas as origens)
-- **Nao existe autenticacao** -- nenhuma chave de API, nenhum login, nenhuma identificacao de usuario
-- **Endpoints de debug estao expostos** -- qualquer pessoa pode limpar o cache do sistema ou acessar informacoes internas
-- **Nao ha limite de requisicoes** -- um unico usuario pode consumir todos os recursos do sistema
-- **O container roda com privilegios de administrador** -- em caso de invasao, o atacante tem controle total
-
-**Traducao para o negocio:** Antes de qualquer acao de marketing ou divulgacao publica, estas vulnerabilidades precisam ser corrigidas. Um concorrente, bot ou agente malicioso pode facilmente derrubar o servico ou abusar do acesso ao PNCP.
-
-### 3.2 Performance e Experiencia do Usuario
-
-- **Usuarios moveis nao veem resultados apos a busca** -- o formulario ocupa a tela inteira e nao ha redirecionamento automatico para os resultados. Usuarios podem abandonar o produto pensando que a busca falhou.
-- **Contraste de cores insuficiente** -- textos secundarios nao atendem ao padrao minimo de legibilidade (WCAG AA 4.5:1), dificultando a leitura em ambiente externo ou por usuarios com baixa visao.
-- **Dados perdidos a cada atualizacao do sistema** -- buscas em andamento, cache de resultados e arquivos de download sao armazenados apenas em memoria. Cada deploy zera tudo.
-- **Arquivos Excel trafegam como texto dentro de respostas JSON** -- metodo ineficiente que consome mais banda e memoria do que necessario, impactando usuarios com conexoes lentas.
-
-### 3.3 Acessibilidade -- Risco Juridico
-
-A Lei Brasileira de Inclusao (Lei 13.146/2015) exige acessibilidade digital, especialmente em ferramentas que interagem com o setor publico. Foram identificados **13 problemas de acessibilidade**:
-
-- Dialogos modais sem "armadilha de foco" (usuarios de teclado ficam presos)
-- Menus dropdown nao fecham com a tecla Escape
-- Nao existe link "pular para o conteudo" para usuarios de leitor de tela
-- Hierarquia de titulos ausente (dificulta navegacao por leitor de tela)
-- Botoes sem rotulos descritivos para tecnologias assistivas
-
-### 3.4 Velocidade de Desenvolvimento
-
-O maior gargalo tecnico e um unico arquivo de 1.071 linhas (`page.tsx`) que contem **toda** a interface do usuario -- formularios, logica de negocio, animacoes, downloads e buscas salvas. Isso significa:
-
-- **Qualquer mudanca na interface corre risco de quebrar funcionalidades nao relacionadas**
-- **Dois desenvolvedores nao conseguem trabalhar simultaneamente** na interface
-- **Testes sao praticamente impossiveis** -- a cobertura real e de 49%, nao os 91.5% reportados anteriormente
-- **Novas funcionalidades levam 3-5x mais tempo** para implementar neste formato
+**Cenario pessimista (multiplos riscos simultaneos): R$ 150.000 - R$ 450.000**
 
 ---
 
-## 4. Timeline Recomendado
+## Impacto no Negocio
 
-### Sprint 0: Correcoes de Emergencia (Semana 1, Dias 1-2)
+### Seguranca
 
-**O que:** Corrigir testes automatizados quebrados (2 testes de backend referenciam nome antigo "Descomplicita"; 1 teste E2E referencia cores desatualizadas).
+O sistema opera com protecao minima. As vulnerabilidades mais relevantes para o negocio:
 
-**Por que:** Sem testes funcionando, nao ha rede de seguranca para as mudancas seguintes. Prerequisito absoluto.
+- **Sem identificacao de usuarios** -- todos compartilham a mesma chave de acesso. Nao e possivel saber quem faz o que, nem responsabilizar usos indevidos. Se a chave nao estiver configurada, qualquer pessoa na internet acessa tudo.
+- **Headers de seguranca ausentes** -- protecoes padrao da web (CSP, HSTS) nao estao implementadas, deixando o sistema mais vulneravel a ataques comuns como injecao de scripts maliciosos.
+- **Configuracao de CORS permissiva** -- aceita qualquer tipo de requisicao de qualquer origem, embora as origens permitidas estejam corretamente restritas.
+- **Risco de compliance com LGPD** -- sem trilha de auditoria e sem avaliacao de informacoes pessoais em logs, ha risco de nao conformidade com a lei de protecao de dados.
 
-| Esforco | Custo |
-|---------|-------|
-| 3 - 5 horas | R$ 450 - R$ 750 |
+### Performance
 
----
+Os problemas de performance impactam diretamente a experiencia do usuario e a viabilidade de crescimento:
 
-### Sprint 1: Seguranca + Ganhos Rapidos (Semanas 1-2)
+- **Arquivos Excel duplicados em memoria** -- o mesmo arquivo e armazenado 3 vezes simultaneamente (no processamento, no cache Redis e na resposta ao usuario), triplicando o consumo de memoria.
+- **Sem paginacao** -- todos os resultados de uma busca sao retornados de uma vez. Com muitas licitacoes, o tempo de resposta aumenta e o consumo de memoria cresce.
+- **Limite de 10 segundos no servidor** -- a plataforma de hospedagem (Vercel) impoe um limite de 10 segundos por requisicao. Downloads de arquivos grandes podem falhar.
+- **Requisicoes desnecessarias** -- o sistema faz entre 60 e 300 requisicoes extras por busca para verificar o progresso, sem otimizacao. Isso gera carga desnecessaria no servidor.
 
-**O que:** Restringir CORS, implementar autenticacao por chave de API, adicionar limite de requisicoes, proteger container, bloquear endpoints de debug, corrigir contraste de cores, adicionar atalhos de teclado.
+### Experiencia do Usuario
 
-**Por que:** Fechar a superficie de ataque antes de qualquer exposicao publica. Os ganhos rapidos de acessibilidade (contraste, tecla Escape, link de pular navegacao) sao correcoes de poucas linhas com alto impacto na experiencia.
+Problemas que afetam diretamente a adocao e retencao de usuarios:
 
-| Esforco | Custo |
-|---------|-------|
-| 22 - 41 horas | R$ 3.300 - R$ 6.150 |
+- **Busca por termos compostos nao funciona** -- pesquisar "camisa polo" cria dois filtros separados ("camisa" e "polo") em vez de buscar a expressao completa. Este e um bloqueador funcional critico para o caso de uso principal do produto.
+- **Licitacoes vencidas nos resultados** -- o filtro de prazo esta desabilitado, mostrando licitacoes que ja encerraram o periodo de propostas. Usuarios perdem tempo analisando oportunidades que nao existem mais.
+- **Problemas de contraste visual** -- alguns temas visuais (Sepia, Paperwhite) nao atendem ao padrao minimo de legibilidade, dificultando a leitura para usuarios com baixa visao ou em ambientes com muita luz.
+- **Campos obrigatorios nao sinalizados para leitores de tela** -- usuarios com deficiencia visual que usam tecnologias assistivas nao sabem quais campos precisam preencher.
+- **Buscas salvas apenas no navegador** -- se o usuario trocar de dispositivo ou limpar o navegador, perde todas as buscas salvas.
 
-**Marco:** Apos Sprint 1, a plataforma pode ser divulgada com seguranca basica.
+### Manutenibilidade
 
----
+Problemas que afetam a velocidade de entrega de novas funcionalidades:
 
-### Sprint 2: Arquitetura Frontend (Semanas 3-4)
-
-**O que:** Decompor o componente monolito de 1.071 linhas em 8-10 componentes menores e 2 hooks reutilizaveis. Meta: arquivo principal com menos de 150 linhas.
-
-**Por que:** Desbloquear desenvolvimento paralelo, possibilitar testes adequados e reduzir risco de regressao em todas as mudancas futuras da interface.
-
-| Esforco | Custo |
-|---------|-------|
-| 31 - 45 horas | R$ 4.650 - R$ 6.750 |
-
-**Marco:** Interface modular, testavel e pronta para receber novas funcionalidades.
-
----
-
-### Sprint 3: Qualidade Frontend + Acessibilidade (Semanas 5-6)
-
-**O que:** Corrigir todos os 13 problemas de acessibilidade (foco em dialogos, ARIA roles, hierarquia de titulos), alinhar sistema de design com os 5 temas, implementar code splitting.
-
-**Por que:** Conformidade com a Lei 13.146/2015, melhoria da experiencia para todos os usuarios (inclusive os que usam apenas teclado ou leitores de tela), reducao do tempo de carregamento.
-
-| Esforco | Custo |
-|---------|-------|
-| 29 - 47 horas | R$ 4.350 - R$ 7.050 |
-
-**Marco:** Zero violacoes criticas de acessibilidade (WCAG AA).
+- **Velocidade de desenvolvimento atual** -- a base de codigo tem acoplamentos que dificultam mudancas isoladas. Um componente de interface com mais de 450 linhas precisa ser decomposto para permitir evolucao mais rapida.
+- **Risco de regressao** -- sem testes de integracao entre frontend e backend, e sem testes de regressao visual, cada mudanca pode introduzir defeitos nao detectados.
+- **Codigo morto** -- 3 das 5 fontes de dados originais estao desabilitadas mas o codigo permanece na base, aumentando a complexidade de manutencao.
+- **Custo de novas features** -- sem banco de dados, sem versionamento de API e sem testes de contrato, cada funcionalidade nova exige mais cuidado e tempo para implementar com seguranca.
 
 ---
 
-### Sprint 4: Arquitetura Backend (Semanas 7-8)
+## Evolucao desde Janeiro 2026
 
-**O que:** Migrar armazenamento de memoria para Redis (buscas e cache), modernizar cliente HTTP para operacao assincrona, implementar entrega de arquivos Excel via streaming.
+Este relatorio atualiza a versao 1.0 publicada em 07/03/2026, incorporando revisoes de dois especialistas adicionais (UX e QA). Principais mudancas:
 
-**Por que:** Atualmente, cada deploy do sistema perde todos os dados em andamento. A arquitetura atual suporta apenas uma instancia -- impossivel escalar. Este e o maior investimento, mas e o que permite crescimento.
+### O que melhorou
 
-| Esforco | Custo |
-|---------|-------|
-| 58 - 96 horas | R$ 8.700 - R$ 14.400 |
+| Aspecto | Antes (v1.0) | Agora (v2.0) |
+|---------|--------------|--------------|
+| Total de debitos | 57 | 55 (-2) |
+| Debitos criticos | 5 | 3 (-2) |
+| Esforco estimado | 206-388 horas | 155-232 horas (-25 a -40%) |
+| Custo estimado | R$ 30.900 - R$ 58.200 | R$ 23.250 - R$ 34.800 (-25 a -40%) |
+| Timeline | 10 semanas (6 sprints) | 5-6 semanas (4 sprints) |
+| Especialistas envolvidos | 1 (arquiteto) | 3 (arquiteto + UX + QA) |
 
-**Marco:** Sistema resiliente a deploys, escalavel horizontalmente, pronto para crescimento de usuarios.
+### O que mudou
+
+- **Severidades recalibradas** -- 9 itens tiveram severidade ajustada com base em risco real, nao teorico. Por exemplo: codigo morto de fontes desabilitadas foi rebaixado de Critico para Alto (o sistema funciona bem com 2 fontes), e problemas de contraste foram promovidos de Medio para Alto (obrigacao legal).
+- **Plano mais compacto** -- o assessment anterior incluia sprints separados para decomposicao de componentes frontend e infraestrutura. A reavaliacao consolidou o trabalho em 4 sprints focados em impacto.
+- **Custos mais precisos** -- faixas de estimativa mais estreitas (155-232h vs 206-388h) gracas a validacao cruzada por 3 especialistas.
+
+### O que e novo
+
+- **3 novos debitos de acessibilidade** identificados pela revisao UX: cores hardcoded que nao respeitam temas, campos sem sinalizacao para leitores de tela, e timeout de confirmacao inacessivel.
+- **Cadeia de falhas em cascata** documentada: chamadas de IA sem timeout podem travar o sistema inteiro quando combinadas com compartilhamento de threads.
+- **Grafo de dependencias** entre debitos, permitindo planejamento mais inteligente da ordem de resolucao.
+
+### O que permanece
+
+- **Autenticacao** continua sendo o debito mais critico (P0), sem resolucao desde a identificacao.
+- **Dados em memoria** continuam sendo perdidos a cada deploy.
+- **Busca por termos compostos** continua quebrada.
 
 ---
 
-### Sprint 5: Polimento + Infraestrutura (Semanas 9-10)
+## Timeline Recomendado
 
-**O que:** Implementar monitoramento de erros em producao (Sentry), logs estruturados com rastreabilidade, completar migracoes de APIs depreciadas, finalizar rebrand, implementar desligamento gracioso.
+### Sprint 1: Quick Wins (1-2 dias)
 
-**Por que:** Sem monitoramento, erros em producao passam despercebidos. Sem logs estruturados, investigar problemas e como "procurar agulha em palheiro". O rebrand incompleto causa confusao e testes quebrados.
+Correcoes rapidas que geram resultado imediato e constroem confianca na equipe.
 
-| Esforco | Custo |
-|---------|-------|
-| 30 - 53 horas | R$ 4.500 - R$ 7.950 |
+| Item | Descricao em linguagem de negocio | Horas |
+|------|-----------------------------------|-------|
+| Acentos em badges | Corrigir texto sem acentuacao visivel para usuarios | 0.25h |
+| Formulario com submissao nativa | Melhorar experiencia em dispositivos moveis (botao "Enviar" no teclado) | 2.1h |
+| Campos obrigatorios sinalizados | Usuarios de leitores de tela sabem o que preencher | 0.5h |
+| Prevencao de perda de busca | Aviso antes de sair da pagina durante busca ativa | 0.5h |
+| Limpeza de arquivo de teste vazio | Higiene de codigo (5 minutos) | 0.1h |
+| Versao centralizada | Evitar inconsistencias na identificacao da versao do sistema | 1h |
+| Restricao de headers | Fechar permissividade desnecessaria na API | 1h |
+| Cores corrigidas para temas | Corrigir elementos visuais quebrados nos temas Sepia e Paperwhite | 1.5h |
+| Protecao contra travamento de IA | Adicionar limite de tempo nas chamadas de inteligencia artificial | 2h |
 
-**Marco:** Produto com observabilidade completa, marca consistente, codigo limpo.
+- **Custo:** R$ 1.350 (~9 horas)
+- **ROI:** Imediato -- melhoria de qualidade perceptivel + prevencao de travamento do sistema
+
+### Sprint 2: Correcoes Criticas (1 semana)
+
+Itens que bloqueiam o lancamento publico e a evolucao do produto.
+
+| Item | Descricao em linguagem de negocio | Horas |
+|------|-----------------------------------|-------|
+| Autenticacao de usuarios | Cada usuario tera acesso individual, com rastreabilidade e limites de uso | 8-16h |
+| Busca por termos compostos | Usuarios poderao pesquisar "camisa polo" como uma expressao unica | 3h |
+| Otimizacao de memoria e downloads | Eliminar triplicacao de dados em memoria e resolver falhas de download | 8-16h |
+| Sistema de filas duravel | Buscas em andamento sobrevivem a atualizacoes do sistema | 12-20h |
+| Remocao de codigo morto | Limpar 3 fontes de dados desabilitadas, reduzindo complexidade | 8-16h |
+| Auditoria de contraste visual | Garantir legibilidade em todos os 5 temas (obrigacao legal) | 4h |
+
+- **Custo:** R$ 6.450 - R$ 11.250 (~43-75 horas)
+- **ROI:** Seguranca + estabilidade -- habilita lancamento publico
+
+### Sprint 3: Fundacao Tecnica (1-2 semanas)
+
+Fortalecimento da base tecnica para suportar crescimento.
+
+| Item | Descricao em linguagem de negocio | Horas |
+|------|-----------------------------------|-------|
+| Modernizacao de chamadas de IA | Sistema nao trava mais quando multiplos usuarios buscam ao mesmo tempo | 4-8h |
+| Downloads sem limite de tempo | Arquivos grandes nao falham por timeout do servidor | 4-8h |
+| Paginacao de resultados | Resultados carregam mais rapido, consumindo menos dados | 8-16h |
+| Headers de seguranca | Protecoes padrao da web implementadas (CSP, HSTS) | 4-8h |
+| Timeout acessivel | Usuarios com deficiencia tem tempo suficiente para confirmar acoes | 1h |
+| Reducao de requisicoes | Sistema inteligente que reduz carga no servidor em 80% | 2-4h |
+| Teste automatico pos-atualizacao | Sistema verifica automaticamente se esta funcionando apos cada deploy | 2-4h |
+| Filtro de prazo | Usuarios veem apenas licitacoes com prazo aberto | 4-8h |
+
+- **Custo:** R$ 4.350 - R$ 8.550 (~29-57 horas)
+- **ROI:** Performance + velocidade de desenvolvimento
+
+### Sprint 4: Polimento e Evolucao (1-2 semanas)
+
+Itens que habilitam a proxima fase de crescimento do produto.
+
+| Item | Descricao em linguagem de negocio | Horas |
+|------|-----------------------------------|-------|
+| Banco de dados | Habilita historico de buscas, preferencias e funcionalidades que exigem persistencia | 8-16h |
+| Versionamento de API | Atualizacoes no backend nao quebram a interface do usuario | 4-8h |
+| Testes de contrato | Backend e frontend validados automaticamente um contra o outro | 4-8h |
+| Componentes de interface acessiveis | Menus e dialogos funcionam corretamente com leitores de tela | 3h |
+| Alinhamento visual de temas | Eliminacao de flash visual ao trocar de tema | 3h |
+| Indicador de conexao | Usuarios sabem quando estao sem internet (em vez de erros genericos) | 4h |
+| Simplificacao de componente grande | Componente de 450+ linhas dividido em partes menores e testaveis | 6h |
+| Testes de integracao | Frontend e backend testados juntos automaticamente no CI | 4-8h |
+
+- **Custo:** R$ 5.400 - R$ 8.400 (~36-56 horas)
+- **ROI:** Experiencia do usuario + velocidade de entrega de novas funcionalidades
 
 ---
 
-## 5. ROI da Resolucao
-
-### Investimento vs. Retorno
+## ROI da Resolucao
 
 | Dimensao | Investimento | Retorno Esperado |
 |----------|--------------|------------------|
-| Financeiro | R$ 25.950 - R$ 43.050 (programado) | R$ 115.000 - R$ 365.000 em riscos evitados |
-| Tempo | 173 - 287 horas de desenvolvimento | Reducao de 40-60% no tempo de implementacao de novas features |
-| Prazo | ~10 semanas de execucao | Produto sustentavel, escalavel e conforme a legislacao |
-| Seguranca | R$ 5.550 - R$ 10.350 (Sprints 0+1) | Protecao contra indisponibilidade, bloqueio de API e vazamentos |
-| Velocidade | R$ 4.650 - R$ 6.750 (Sprint 2) | Desenvolvimento 3-5x mais rapido na interface apos decomposicao |
-| Escalabilidade | R$ 8.700 - R$ 14.400 (Sprint 4) | Capacidade de escalar para milhares de usuarios simultaneos |
+| Financeiro | R$ 23.250 - R$ 34.800 | R$ 95.000 - R$ 305.000 em riscos evitados |
+| Tempo | 155 - 232 horas | Reducao de 40-60% no tempo para novas funcionalidades |
+| Prazo | 5-6 semanas | Produto seguro, estavel e pronto para escalar |
+| Seguranca | R$ 7.800 - R$ 12.600 (Sprints 1+2) | Protecao contra indisponibilidade, abuso e bloqueio pelo PNCP |
+| Performance | R$ 4.350 - R$ 8.550 (Sprint 3) | Downloads confiaveis, busca rapida, servidor estavel |
+| Escalabilidade | R$ 5.400 - R$ 8.400 (Sprint 4) | Banco de dados + API versionada = fundacao para crescer |
 
 ### Calculo de ROI
 
-**Cenario conservador (custos minimos, riscos medianos):**
+**Cenario conservador:**
 
-- Investimento: R$ 25.950
-- Riscos evitados (ponderados por probabilidade): R$ 115.000
-- **ROI: 3,4:1** -- cada R$ 1 investido evita R$ 3,40 em perdas potenciais
+- Investimento: R$ 23.250
+- Riscos evitados (ponderados por probabilidade): R$ 95.000
+- **ROI: 4:1** -- cada R$ 1 investido evita R$ 4 em perdas potenciais
 
-**Cenario pessimista (custos maximos, riscos altos):**
+**Cenario moderado:**
 
-- Investimento: R$ 43.050
-- Riscos evitados: R$ 365.000
-- **ROI: 7,5:1** -- cada R$ 1 investido evita R$ 7,50 em perdas potenciais
+- Investimento: R$ 29.000 (ponto medio)
+- Riscos evitados: R$ 200.000
+- **ROI: 7:1** -- cada R$ 1 investido evita R$ 7 em perdas potenciais
 
-**Cenario de crise (multiplos riscos simultaneos):**
+**Cenario pessimista (multiplos riscos simultaneos):**
 
-- Investimento: R$ 43.050
-- Perdas potenciais evitadas: R$ 750.000
-- **ROI: 16,4:1**
+- Investimento: R$ 34.800
+- Perdas potenciais evitadas: R$ 450.000
+- **ROI: 13:1**
 
 ### Beneficios Nao Quantificaveis
 
-- Conformidade com LBI 13.146/2015 (acessibilidade)
+- Conformidade com a Lei Brasileira de Inclusao (Lei 13.146/2015)
 - Conformidade com LGPD (protecao de dados)
-- Confianca do mercado em ferramenta que interage com o governo
+- Confianca do mercado em ferramenta que interage com governo
 - Capacidade de atrair investimento com base tecnica solida
-- Reducao de rotatividade de desenvolvedores (codigo limpo = equipe motivada)
+- Base de codigo limpa atrai e retem desenvolvedores talentosos
 
 ---
 
-## 6. Proximos Passos
+## Proximos Passos
 
-### Acoes Imediatas (esta semana)
-
-1. [ ] **Aprovar orcamento emergencial:** R$ 3.750 - R$ 6.900 para Sprints 0 e 1 (seguranca e testes)
-2. [ ] **Suspender divulgacao publica** ate conclusao do Sprint 1 (2 semanas)
-3. [ ] **Alocar 1 desenvolvedor backend** para Sprint 0 (2 dias) + Sprint 1 seguranca (1 semana)
-4. [ ] **Iniciar Sprint 0** imediatamente -- corrigir testes quebrados
-
-### Acoes de Curto Prazo (semanas 2-4)
-
-5. [ ] **Aprovar orcamento completo:** R$ 25.950 - R$ 43.050 para o plano de 10 semanas
-6. [ ] **Alocar 1 desenvolvedor frontend** para Sprint 1 acessibilidade + Sprint 2 decomposicao
-7. [ ] **Definir infraestrutura Redis** (Railway, AWS ElastiCache ou similar) para Sprint 4
-
-### Acoes de Medio Prazo (semanas 5-10)
-
-8. [ ] **Executar Sprints 3-5** conforme cronograma
-9. [ ] **Configurar Sentry** para monitoramento de producao (Sprint 5)
-10. [ ] **Validar conformidade WCAG AA** com ferramenta automatizada (axe-core)
+1. [ ] Aprovar orcamento de R$ 23.250 - R$ 34.800 para o plano completo (4 sprints, 5-6 semanas)
+2. [ ] Iniciar Sprint 1 (Quick Wins) imediatamente -- R$ 1.350, retorno em 1-2 dias
+3. [ ] Alocar desenvolvedor backend para Sprint 2 (autenticacao + filas)
+4. [ ] Alocar desenvolvedor frontend para Sprint 2 (busca + acessibilidade)
+5. [ ] Suspender divulgacao publica ate conclusao do Sprint 2
+6. [ ] Medir cobertura de testes do backend (`pytest --cov`) -- acao pendente pre-execucao
+7. [ ] Definir provedor Redis e infraestrutura para Sprint 3
+8. [ ] Review semanal de progresso a cada sprint
 
 ### Decisoes Necessarias
 
 | Decisao | Responsavel | Prazo |
 |---------|-------------|-------|
-| Aprovar orcamento Sprint 0+1 | Diretor de Produto | Imediato |
-| Aprovar orcamento completo (10 semanas) | Diretor Financeiro | Semana 2 |
-| Escolher provedor Redis (Railway/AWS/outro) | CTO / DevOps | Semana 6 |
-| Escolher storage para Excel (S3/R2/Supabase) | CTO / DevOps | Semana 6 |
-| Definir modelo de autenticacao futuro (JWT) | Diretor de Produto + CTO | Semana 4 |
+| Aprovar orcamento do plano completo | Diretor de Produto | Imediato |
+| Modelo de autenticacao (JWT stateless vs outro) | CTO + Produto | Antes do Sprint 2 |
+| Provedor de infraestrutura Redis | CTO / DevOps | Antes do Sprint 3 |
+| Banco de dados para persistencia (Sprint 4) | CTO / DevOps | Semana 4 |
+| Politica de rotacao de secrets e credenciais | DevOps + Seguranca | Sprint 2 |
 
 ---
 
-## 7. Anexos
+## Anexos
 
 ### Documentos de Referencia
 
 | Documento | Localizacao |
 |-----------|-------------|
-| Assessment Tecnico Completo (57 debitos detalhados) | `docs/prd/technical-debt-assessment.md` |
-| Arquitetura do Sistema | `docs/architecture/system-architecture.md` |
-| Especificacao Frontend | `docs/frontend/frontend-spec.md` |
+| Assessment Tecnico Completo (55 debitos detalhados) | [technical-debt-assessment.md](../prd/technical-debt-assessment.md) |
+| Arquitetura do Sistema | [system-architecture.md](../architecture/system-architecture.md) |
+| Especificacao Frontend | [frontend-spec.md](../frontend/frontend-spec.md) |
+| Review QA | [qa-review.md](../reviews/qa-review.md) |
+| Review UX Specialist | [ux-specialist-review.md](../reviews/ux-specialist-review.md) |
 
 ### Glossario para Stakeholders
 
 | Termo | Significado |
 |-------|-------------|
-| CORS | Mecanismo de seguranca que controla quais sites podem acessar nossa API |
-| WCAG AA | Padrao internacional de acessibilidade digital (nivel intermediario) |
-| Redis | Banco de dados em memoria usado para cache e filas (substitui armazenamento temporario) |
-| Sprint | Ciclo de trabalho com duracao definida e entregas especificas |
-| Debito tecnico | "Atalhos" no codigo que funcionam hoje mas criam problemas futuros |
 | PNCP | Portal Nacional de Contratacoes Publicas -- fonte dos dados de licitacoes |
+| WCAG AA | Padrao internacional de acessibilidade digital (nivel intermediario) |
 | LBI | Lei Brasileira de Inclusao (Lei 13.146/2015) -- exige acessibilidade digital |
 | LGPD | Lei Geral de Protecao de Dados -- regulamenta tratamento de dados pessoais |
+| Sprint | Ciclo de trabalho com duracao e entregas definidas |
+| Debito tecnico | Decisoes de implementacao que funcionam hoje mas criam riscos ou custos futuros |
+| JWT | Token de autenticacao que identifica usuarios sem precisar de banco de dados |
+| Redis | Banco de dados em memoria usado para cache e filas de processamento |
+| CSP / HSTS | Protecoes padrao da web que previnem ataques comuns |
+| ROI | Retorno sobre investimento -- quanto cada real investido gera em valor ou economia |
 
-### Metodologia de Estimativa de Custos
+### Metodologia
 
 - **Taxa base:** R$ 150/hora (desenvolvedor mid-senior)
-- **Faixas:** Horas minimas e maximas por item, validadas por 3 especialistas (arquiteto, UX, QA)
+- **Faixas de estimativa:** Horas minimas e maximas por item, validadas por 3 especialistas (arquiteto, UX, QA)
 - **Riscos financeiros:** Estimados com base em benchmarks de mercado para empresas SaaS B2G (Business-to-Government)
 - **ROI:** Calculado como (riscos evitados ponderados por probabilidade) / (investimento em resolucao)
+- **Evolucao:** Comparacao direta com assessment v1.0 (07/03/2026)
 
 ---
 
-*Relatorio preparado em 2026-03-07*
-*Baseado no Assessment Tecnico v1.0 (commit 9fbd54d0)*
-*Para duvidas, contate @analyst (Sage)*
+*Relatorio preparado em 2026-03-09*
+*Baseado no Assessment Tecnico FINAL v2.0 (Brownfield Discovery Fases 1, 3, 4, 6, 7)*
+*Validado por: @architect (Atlas), @ux-design-expert (Vera), @qa (Quinn)*
+*Para duvidas, contate @analyst (Ada)*

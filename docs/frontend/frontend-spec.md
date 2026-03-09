@@ -1,392 +1,331 @@
-# Frontend Specification -- Descomplicita
+# DescompLicita Frontend Specification
 
-**Project:** Descomplicita (formerly Descomplicita) -- Brazilian Procurement Search Platform
-**Date:** March 2026
-**Version:** 2.0
-**Status:** MVP -- Production-ready single-page application
-**Documented by:** @ux-design-expert (Pixel)
-**Audit scope:** Complete frontend codebase analysis
+**Document Version:** 3.0
+**Date:** 2026-03-09
+**Author:** @ux-design-expert (Vera)
+**Phase:** Brownfield Discovery Phase 3 - Frontend/UX Audit
+**Previous Version:** 2.0 (by Pixel)
 
 ---
 
-## 1. Overview
+## 1. Executive Summary
 
-### Purpose and User-Facing Features
-
-Descomplicita (DescompLicita) is a procurement opportunity discovery platform for Brazil. It searches official government procurement portals (PNCP, Compras.gov, Transparencia, Diarios Oficiais, TCE-RJ) and returns AI-summarized results with an Excel download.
-
-**Core user workflow:**
-1. Select search mode (Sector or Custom Terms)
-2. Choose Brazilian states (UFs) from a visual grid
-3. Set date range
-4. Submit search -> background job with real-time progress polling
-5. View AI-generated executive summary with highlights
-6. Download filtered results as Excel spreadsheet
-7. Optionally save search for later re-use
-
-**Additional features:**
-- 5-theme system (Light, Paperwhite, Sepia, Dim, Dark)
-- Saved searches (up to 10, persisted in localStorage)
-- Real-time loading progress with 5-stage pipeline visualization
-- Curiosity carousel during loading (52 items across 4 categories)
-- Background browser notifications on search completion
-- Source transparency badges showing per-source statistics
-- Empty state with filter rejection breakdown and actionable suggestions
-- Mixpanel analytics integration
-
-### Target Audience
-
-Brazilian businesses and procurement professionals who participate in public tenders (licitacoes). Primary use case: companies that supply goods/services to government entities searching for new opportunities across multiple states.
+DescompLicita is a single-page application for searching and analyzing public procurement bids (licitacoes) from Brazil's official sources (PNCP, Compras.gov, Transparencia, Diarios Oficiais, TCE-RJ). The frontend is built with **Next.js 16 + React 18 + TypeScript** and uses the App Router. It provides a search-oriented workflow where users select sectors or custom terms, choose Brazilian states (UFs), pick a date range, and receive AI-summarized results with Excel download capability.
 
 ### Current State
 
-**MVP** -- Single-page application with full search-to-download flow. Production-deployed with Docker standalone output. The app is functional but operates as a monolithic single page with all UI in `page.tsx` (1,071 lines).
+Since the v2.0 spec, significant refactoring has been completed:
+
+- **Component decomposition is done.** The former 1,071-line `page.tsx` "god component" has been broken into 14 focused components and 5 custom hooks. The page is now 185 lines (orchestration only).
+- **Accessibility improvements are in place.** Skip navigation, focus traps, ARIA dialog roles, Escape key handlers, screen reader announcements, keyboard menu navigation, `aria-pressed`/`aria-expanded`/`aria-describedby` throughout.
+- **Dynamic imports** for heavy components (SaveSearchDialog, LoadingProgress, EmptyState).
+- **UF constants centralized** in `app/constants/ufs.ts` (single source of truth).
+- **Error boundary uses design tokens** via CSS custom properties (inline style fallbacks).
+- **Logo self-hosted** from `public/logo-descomplicita.png` via Next.js `<Image>`.
+- **Test coverage improved** to ~68% statements (up from ~49%).
+
+### What Remains
+
+- Single `"use client"` page (no SSR for main content)
+- Term input tokenization prevents multi-word terms (space triggers token creation)
+- ThemeProvider imperatively sets 30+ CSS custom properties
+- LoadingProgress still 450+ lines (complex but functional)
+- No Storybook, no documented design system beyond code
+- Some hardcoded Tailwind colors in SearchSummary type badges and carouselData
 
 ---
 
 ## 2. Technology Stack
 
-### Framework Versions
-| Technology | Version | Purpose |
-|---|---|---|
-| Next.js | ^16.1.4 | React meta-framework with App Router |
-| React | ^18.3.1 | UI library |
-| TypeScript | ^5.9.3 | Type safety |
-| TailwindCSS | ^3.4.19 | Utility-first CSS |
-| PostCSS | ^8.5.6 | CSS processing |
-| Autoprefixer | ^10.4.23 | CSS vendor prefixing |
+### Runtime Dependencies
 
-### Key Dependencies
-| Package | Version | Purpose |
+| Dependency | Version | Purpose |
 |---|---|---|
-| mixpanel-browser | ^2.74.0 | Analytics event tracking |
+| next | ^16.1.4 | React framework (App Router, SSR, API routes) |
+| react | ^18.3.1 | UI library |
+| react-dom | ^18.3.1 | DOM rendering |
+| @sentry/nextjs | ^10.42.0 | Error monitoring and performance tracing |
+| mixpanel-browser | ^2.74.0 | Product analytics and user event tracking |
 | uuid | ^13.0.0 | Unique ID generation for saved searches |
-| @types/uuid | ^10.0.0 | TypeScript types for uuid |
 
 ### Dev Dependencies
-| Package | Version | Purpose |
+
+| Dependency | Version | Purpose |
 |---|---|---|
+| typescript | ^5.9.3 | Type safety |
+| tailwindcss | ^3.4.19 | Utility-first CSS framework |
+| postcss | ^8.5.6 | CSS processing pipeline |
+| autoprefixer | ^10.4.23 | CSS vendor prefixing |
 | jest | ^29.7.0 | Unit test runner |
-| @swc/jest | ^0.2.29 | SWC-based Jest transformer |
+| @swc/jest | ^0.2.29 | Fast TypeScript/JSX transform for Jest |
 | jest-environment-jsdom | ^29.7.0 | Browser environment simulation |
-| @testing-library/react | ^14.1.2 | React component testing |
-| @testing-library/jest-dom | ^6.1.5 | Custom DOM matchers |
+| @testing-library/react | ^14.1.2 | Component testing utilities |
+| @testing-library/jest-dom | ^6.1.5 | Custom Jest DOM matchers |
 | @testing-library/user-event | ^14.5.1 | User interaction simulation |
-| @playwright/test | ^1.58.0 | E2E browser testing |
-| @axe-core/playwright | ^4.11.0 | Accessibility testing in E2E |
+| @playwright/test | ^1.58.0 | End-to-end testing |
+| @axe-core/playwright | ^4.11.0 | Automated accessibility testing in E2E |
+
+### Fonts
+
+- **DM Sans** (body text) -- `--font-body`
+- **Fahkwang** (display/headings) -- `--font-display`
+- **DM Mono** (data/numbers) -- `--font-data`
+
+All loaded via `next/font/google` with `display: "swap"` to prevent FOIT.
 
 ### Build Configuration
-- **Output:** `standalone` (Docker-optimized)
-- **Strict mode:** Enabled (`reactStrictMode: true`)
-- **Dark mode:** Class-based (`darkMode: "class"`)
-- **Node.js requirement:** >=20.9.0
+
+- `reactStrictMode: true`
+- `output: 'standalone'` (Docker-optimized)
+- Sentry webpack plugin with `hideSourceMaps: true`
+- Node.js requirement: >=20.9.0
+- Deployed on Railway
 
 ---
 
-## 3. Application Architecture
-
-### App Router Structure
+## 3. Project Structure
 
 ```
 frontend/
   app/
-    layout.tsx          -- Root layout (fonts, metadata, providers)
-    page.tsx            -- Main (and only) page -- entire UI
-    error.tsx           -- Error boundary
-    globals.css         -- Design system tokens + animations
-    types.ts            -- Shared TypeScript interfaces
-    icon.svg            -- Favicon (still shows "B" from Descomplicita era)
+    layout.tsx              # Root layout (Server Component: fonts, metadata, providers)
+    page.tsx                # Home page (Client Component: search orchestration, 185 lines)
+    error.tsx               # Error boundary with Sentry reporting
+    globals.css             # Design tokens, animations, base styles (209 lines)
+    types.ts                # Shared TypeScript type definitions
+    icon.svg                # App favicon
+    constants/
+      ufs.ts                # Brazilian states data (27 UFs, names, defaults)
+    components/
+      AnalyticsProvider.tsx  # Mixpanel initialization and page tracking
+      carouselData.ts        # Loading screen curiosity/tip content (52 items, 4 categories)
+      DateRangeSelector.tsx  # Date range picker (start/end date inputs)
+      EmptyState.tsx         # Zero-results feedback with suggestions
+      LoadingProgress.tsx    # Multi-phase loading indicator with ETA (452 lines)
+      RegionSelector.tsx     # Geographic region toggle buttons (5 regions)
+      SavedSearchesDropdown.tsx  # Saved searches management dropdown
+      SaveSearchDialog.tsx   # Modal dialog for naming saved searches
+      SearchActions.tsx      # Download + save buttons after results
+      SearchForm.tsx         # Search mode toggle + sector/terms input
+      SearchHeader.tsx       # Sticky header with logo, nav, theme toggle
+      SearchSummary.tsx      # AI-generated results summary display
+      SourceBadges.tsx       # Data source status indicators
+      ThemeProvider.tsx      # Theme context (5 themes, localStorage persistence)
+      ThemeToggle.tsx        # Theme picker dropdown with keyboard nav
+      UfSelector.tsx         # State (UF) selection grid (27 buttons)
+    hooks/
+      useSaveDialog.ts       # Save search dialog state management
+      useSearchForm.ts       # Form state, validation, sector fetching
+      useSearchJob.ts        # Search execution, polling, download, notifications
     api/
       buscar/
-        route.ts        -- POST: Submit search job
-        status/
-          route.ts      -- GET: Poll job status
-        result/
-          route.ts      -- GET: Fetch completed result
-      download/
-        route.ts        -- GET: Serve Excel file
-      setores/
-        route.ts        -- GET: Fetch available sectors
-    components/
-      AnalyticsProvider.tsx
-      carouselData.ts
-      EmptyState.tsx
-      LoadingProgress.tsx
-      RegionSelector.tsx
-      SavedSearchesDropdown.tsx
-      SourceBadges.tsx
-      ThemeProvider.tsx
-      ThemeToggle.tsx
+        route.ts             # POST /api/buscar - Submit search job
+        status/route.ts      # GET /api/buscar/status - Poll job status
+        result/route.ts      # GET /api/buscar/result - Fetch results
+      download/route.ts      # GET /api/download - Proxy Excel download
+      setores/route.ts       # GET /api/setores - Fetch available sectors
   hooks/
-    useAnalytics.ts
-    useSavedSearches.ts
+    useAnalytics.ts          # Mixpanel event tracking hook
+    useSavedSearches.ts      # Saved searches CRUD with localStorage
   lib/
-    savedSearches.ts
-  public/
-    .gitkeep
-    logo-descomplicita.png
+    savedSearches.ts         # Saved searches storage logic (max 10, uuid IDs)
+  __tests__/                 # Jest unit tests (22 test files)
+  __mocks__/                 # Jest mocks (@sentry/nextjs)
+  public/                    # Static assets (logo-descomplicita.png)
+  sentry.client.config.ts   # Sentry client config (DSN, 10% trace sampling)
+  sentry.server.config.ts   # Sentry server config
 ```
-
-### Component Tree / Hierarchy
-
-```
-RootLayout (layout.tsx)
-  AnalyticsProvider
-    ThemeProvider
-      HomePage (page.tsx) -- "use client"
-        header
-          img (logo)
-          SavedSearchesDropdown
-          ThemeToggle
-        main
-          [Search Mode Toggle]
-          [Sector Select / Terms Input]
-          RegionSelector
-          [UF Grid]
-          [Date Range Inputs]
-          [Search Button]
-          [Save Search Button]
-          LoadingProgress (conditional)
-          [Error Display] (conditional)
-          EmptyState (conditional)
-          [Result Display] (conditional)
-            SourceBadges
-            [Download Button]
-        footer
-        [Save Search Dialog Modal] (conditional)
-```
-
-### Data Flow Patterns
-
-1. **Search initiation:** `page.tsx` -> POST `/api/buscar` -> backend `/buscar` -> returns `job_id`
-2. **Status polling:** `setInterval` (2s) -> GET `/api/buscar/status?job_id=` -> updates progress state
-3. **Result fetch:** On status=completed -> GET `/api/buscar/result?job_id=` -> sets result state
-4. **Download:** Click -> GET `/api/download?id=` -> blob -> programmatic anchor click
-5. **Sectors:** On mount -> GET `/api/setores` -> fallback hardcoded list on failure
-
-All API routes in `/api/*` are **proxy routes** that forward requests to the Python backend (`BACKEND_URL` env var, default `http://localhost:8000`).
-
-### State Management Approach
-
-**Pure React state** -- no external state management library. All state lives in `HomePage` component via `useState` hooks. The component manages 20+ state variables including:
-- Form state (UFs, dates, search mode, terms)
-- Loading/error state
-- Polling state (phase, UFs completed, items fetched, elapsed time)
-- Result state
-- Download state
-- Save search dialog state
-
-Refs are used for:
-- Polling interval (`pollingRef`)
-- Current job ID (`jobIdRef`)
-- Search start time (`searchStartTimeRef`)
-- Original document title (`originalTitleRef`)
 
 ---
 
-## 4. Component Inventory
+## 4. Pages and Routes
 
-### HomePage (page.tsx)
-- **Path:** `frontend/app/page.tsx`
-- **Purpose:** Entire application UI -- search form, results display, download, save search
-- **Lines:** 1,071
-- **Props:** None (root page component)
-- **Dependencies:** All other components, both hooks, types
-- **Responsive:** Yes -- grid adjustments at `sm:` breakpoint, responsive typography
-- **Accessibility:** aria-pressed on UF buttons, aria-busy on search button, role="alert" on errors, aria-live="polite" on loading
-- **Issues:** God component -- 1,071 lines with 20+ state variables, all business logic, and UI rendering in one file
-
-### LoadingProgress
-- **Path:** `frontend/app/components/LoadingProgress.tsx`
-- **Purpose:** Multi-stage loading visualization with progress bar, UF grid, curiosity carousel, skeleton cards
-- **Lines:** 415
-- **Props Interface:**
-  ```typescript
-  interface LoadingProgressProps {
-    phase: SearchPhase;
-    ufsCompleted: number;
-    ufsTotal: number;
-    itemsFetched: number;
-    itemsFiltered: number;
-    elapsedSeconds: number;
-    onCancel: () => void;
-    selectedUfs?: string[];
-    sectorId?: string;
-  }
-  ```
-- **Dependencies:** useAnalytics hook, carouselData, types
-- **Responsive:** Stage labels hidden on mobile (`hidden sm:block`), mobile-specific detail card (`sm:hidden`)
-- **Accessibility:** `role="progressbar"` with `aria-valuenow/min/max`, `aria-hidden` on decorative icons
-
-### carouselData
-- **Path:** `frontend/app/components/carouselData.ts`
-- **Purpose:** Pure data module with 52 curiosity items across 4 categories, category config, and balanced shuffle algorithm
-- **Lines:** 368
-- **No React -- pure TypeScript data**
-- **Exports:** `CURIOSIDADES`, `CATEGORIA_CONFIG`, `shuffleBalanced`, types
-
-### SavedSearchesDropdown
-- **Path:** `frontend/app/components/SavedSearchesDropdown.tsx`
-- **Purpose:** Dropdown for managing saved searches -- load, delete, clear
-- **Lines:** 250
-- **Props Interface:**
-  ```typescript
-  interface SavedSearchesDropdownProps {
-    onLoadSearch: (search: SavedSearch) => void;
-    onAnalyticsEvent?: (eventName: string, properties?: Record<string, any>) => void;
-  }
-  ```
-- **Dependencies:** useSavedSearches hook, SavedSearch type
-- **Responsive:** "Buscas Salvas" label hidden on small screens (`hidden sm:inline`), dropdown width responsive (`w-80 sm:w-96`)
-- **Accessibility:** `aria-label`, `aria-expanded`, `aria-hidden` on backdrop
-
-### EmptyState
-- **Path:** `frontend/app/components/EmptyState.tsx`
-- **Purpose:** Informative empty state when search returns 0 results, with filter rejection breakdown and suggestions
-- **Lines:** 140
-- **Props Interface:**
-  ```typescript
-  interface EmptyStateProps {
-    onAdjustSearch?: () => void;
-    rawCount?: number;
-    stateCount?: number;
-    filterStats?: FilterStats | null;
-    sectorName?: string;
-  }
-  ```
-- **Dependencies:** FilterStats type
-- **Responsive:** No specific responsive adjustments (relies on parent container)
-- **Accessibility:** No explicit ARIA attributes
-
-### ThemeProvider
-- **Path:** `frontend/app/components/ThemeProvider.tsx`
-- **Purpose:** Context provider for 5-theme system. Manages theme persistence in localStorage and applies CSS custom properties
-- **Lines:** 122
-- **Exports:** `ThemeProvider` component, `useTheme` hook, `THEMES` constant, `ThemeId` type
-- **Dependencies:** None (pure React context)
-- **Approach:** Imperatively sets CSS custom properties on `document.documentElement` via `applyTheme()` function
-
-### SourceBadges
-- **Path:** `frontend/app/components/SourceBadges.tsx`
-- **Purpose:** Displays per-source search statistics with colored badges and expandable detail view
-- **Lines:** 120
-- **Props Interface:**
-  ```typescript
-  interface SourceBadgesProps {
-    sources: string[];
-    stats: Record<string, SourceStats>;
-    dedupRemoved: number;
-    truncatedCombos?: number;
-  }
-  ```
-- **Responsive:** Margin adjustments (`mt-4 sm:mt-6`)
-- **Accessibility:** No ARIA attributes on expandable section
-
-### AnalyticsProvider
-- **Path:** `frontend/app/components/AnalyticsProvider.tsx`
-- **Purpose:** Initializes Mixpanel and tracks page_load/page_exit events
-- **Lines:** 74
-- **Dependencies:** mixpanel-browser, next/navigation
-- **Issues:** Uses deprecated `performance.timing.navigationStart` API
-
-### ThemeToggle
-- **Path:** `frontend/app/components/ThemeToggle.tsx`
-- **Purpose:** Dropdown button to switch between 5 themes
-- **Lines:** 73
-- **Dependencies:** ThemeProvider (useTheme, THEMES)
-- **Responsive:** Theme label hidden on small screens (`hidden sm:inline`)
-- **Accessibility:** `aria-label`, `aria-expanded`
-
-### RegionSelector
-- **Path:** `frontend/app/components/RegionSelector.tsx`
-- **Purpose:** Quick-select buttons for Brazilian geographic regions (Norte, Nordeste, Centro-Oeste, Sudeste, Sul)
-- **Lines:** 53
-- **Props Interface:**
-  ```typescript
-  interface RegionSelectorProps {
-    selected: Set<string>;
-    onToggleRegion: (ufs: string[]) => void;
-  }
-  ```
-- **Accessibility:** `aria-label` on each region button
-
-### useAnalytics (Hook)
-- **Path:** `frontend/hooks/useAnalytics.ts`
-- **Purpose:** Wraps Mixpanel tracking with error handling. Provides trackEvent, identifyUser, trackPageView
-- **Lines:** 66
-- **Dependencies:** mixpanel-browser
-
-### useSavedSearches (Hook)
-- **Path:** `frontend/hooks/useSavedSearches.ts`
-- **Purpose:** React hook wrapping localStorage-based saved searches with CRUD operations
-- **Lines:** 148
-- **Dependencies:** lib/savedSearches
-
-### savedSearches (Library)
-- **Path:** `frontend/lib/savedSearches.ts`
-- **Purpose:** Pure localStorage CRUD operations for saved searches (max 10, sorted by lastUsedAt)
-- **Lines:** 99
-- **Dependencies:** uuid
-
----
-
-## 5. Design System Analysis
-
-### Documented Design System
-
-The project has a well-documented design system at `frontend/.interface-design/system.md` with clear rationale for decisions.
-
-### Color Palette
-
-**Brand Colors:**
-| Token | Light | Dark | Purpose |
+| Route | File | Type | Purpose |
 |---|---|---|---|
-| `--brand-navy` | #0a1e3f | #0a1e3f | Primary action, authority |
-| `--brand-blue` | #116dff | #116dff | Interactive accent |
-| `--brand-blue-hover` | #0d5ad4 | #0d5ad4 | Hover state |
-| `--brand-blue-subtle` | #e8f0ff | rgba(17,109,255,0.12) | Highlight backgrounds |
+| `/` | `app/page.tsx` | Client Component | Main search interface |
+| `/api/buscar` | `app/api/buscar/route.ts` | API Route (POST) | Proxy search job submission to backend |
+| `/api/buscar/status` | `app/api/buscar/status/route.ts` | API Route (GET) | Proxy job status polling |
+| `/api/buscar/result` | `app/api/buscar/result/route.ts` | API Route (GET) | Proxy completed job results |
+| `/api/download` | `app/api/download/route.ts` | API Route (GET) | Proxy Excel file download (binary stream) |
+| `/api/setores` | `app/api/setores/route.ts` | API Route (GET) | Proxy available sectors list |
 
-**Canvas & Ink:**
-| Token | Light | Dark |
-|---|---|---|
-| `--canvas` | #ffffff | #121212 |
-| `--ink` | #1e2d3b | #e8eaed |
-| `--ink-secondary` | #3d5975 | #a8b4c0 |
-| `--ink-muted` | #808f9f | #6b7a8a |
-| `--ink-faint` | #c0d2e5 | #3a4555 |
+The root layout (`layout.tsx`) is a Server Component providing metadata (`lang="pt-BR"`, title, description), font CSS variables, and wrapping children in `AnalyticsProvider > ThemeProvider`. The home page is the only user-facing route. All API routes act as a BFF (Backend for Frontend) proxy to the Python/FastAPI backend.
 
-**Surfaces:**
-| Token | Light | Dark |
-|---|---|---|
-| `--surface-0` | #ffffff | #121212 |
-| `--surface-1` | #f7f8fa | #1a1d22 |
-| `--surface-2` | #f0f2f5 | #242830 |
-| `--surface-elevated` | #ffffff | #1e2128 |
+---
 
-**Semantic:**
-| Token | Light | Dark |
+## 5. Component Inventory
+
+### 5.1 Page Orchestrator
+
+**HomePage** (`app/page.tsx`, 185 lines)
+- Composes all components via props (controlled component pattern)
+- Manages search submission, download, saved search loading
+- Uses `useCallback` for all handler functions
+- Focus management: auto-focuses results heading after search completes
+- Screen reader: `aria-live="polite"` region announces result count
+- Dynamic imports: `SaveSearchDialog` (ssr: false), `LoadingProgress` (with skeleton fallback), `EmptyState`
+
+### 5.2 Component Details
+
+| Component | File | Lines | Props Count | Dependencies |
+|---|---|---|---|---|
+| SearchHeader | `SearchHeader.tsx` | 40 | 2 | SavedSearchesDropdown, ThemeToggle, next/image |
+| SearchForm | `SearchForm.tsx` | 156 | 10 | None (pure presentational) |
+| UfSelector | `UfSelector.tsx` | 80 | 6 | RegionSelector, UFS/UF_NAMES constants |
+| RegionSelector | `RegionSelector.tsx` | 53 | 2 | None |
+| DateRangeSelector | `DateRangeSelector.tsx` | 62 | 5 | None |
+| LoadingProgress | `LoadingProgress.tsx` | 452 | 9 | carouselData, useAnalytics |
+| SearchSummary | `SearchSummary.tsx` | 76 | 1 | SourceBadges |
+| SearchActions | `SearchActions.tsx` | 93 | 8 | None |
+| EmptyState | `EmptyState.tsx` | 140 | 5 | None |
+| SaveSearchDialog | `SaveSearchDialog.tsx` | 122 | 5 | None |
+| SavedSearchesDropdown | `SavedSearchesDropdown.tsx` | 277 | 2 | useSavedSearches hook |
+| SourceBadges | `SourceBadges.tsx` | 121 | 4 | None |
+| ThemeProvider | `ThemeProvider.tsx` | 161 | 1 (children) | None (React Context) |
+| ThemeToggle | `ThemeToggle.tsx` | 141 | 0 (uses useTheme) | ThemeProvider |
+| AnalyticsProvider | `AnalyticsProvider.tsx` | 74 | 1 (children) | mixpanel-browser |
+
+### 5.3 Props Interfaces
+
+**SearchForm:** `searchMode`, `onSearchModeChange`, `setores: Setor[]`, `setorId`, `onSetorIdChange`, `termosArray: string[]`, `onTermosArrayChange`, `termoInput`, `onTermoInputChange`, `onFormChange`
+
+**UfSelector:** `ufsSelecionadas: Set<string>`, `onToggleUf`, `onToggleRegion`, `onSelecionarTodos`, `onLimparSelecao`, `validationErrors: ValidationErrors`
+
+**LoadingProgress:** `phase: SearchPhase`, `ufsCompleted`, `ufsTotal`, `itemsFetched`, `itemsFiltered`, `elapsedSeconds`, `onCancel`, `selectedUfs?: string[]`, `sectorId?: string`
+
+**SaveSearchDialog:** `saveSearchName`, `onNameChange`, `onConfirm`, `onCancel`, `saveError: string | null`
+
+**SearchActions:** `result: BuscaResult`, `rawCount`, `sectorName`, `downloadLoading`, `downloadError`, `isMaxCapacity`, `onDownload`, `onSaveSearch`
+
+### 5.4 Reusability Assessment
+
+| Rating | Components |
+|---|---|
+| **High** | DateRangeSelector, SaveSearchDialog, ThemeProvider, ThemeToggle, AnalyticsProvider |
+| **Medium** | SearchForm, UfSelector, RegionSelector, EmptyState, SearchActions, SavedSearchesDropdown |
+| **Low** | LoadingProgress, SearchSummary, SourceBadges, SearchHeader |
+
+---
+
+## 6. State Management
+
+### Architecture
+
+Pure React hooks -- no external state library. State is organized into 5 custom hooks:
+
+| Hook | Location | Responsibility |
 |---|---|---|
-| `--success` | #16a34a | #22c55e |
-| `--error` | #dc2626 | #f87171 |
-| `--warning` | #ca8a04 | #facc15 |
+| `useSearchForm` | `app/hooks/useSearchForm.ts` (205 lines) | Form state, validation, sector fetching, UF selection |
+| `useSearchJob` | `app/hooks/useSearchJob.ts` (363 lines) | Search execution, polling, download, notifications |
+| `useSaveDialog` | `app/hooks/useSaveDialog.ts` (69 lines) | Save dialog visibility, name, errors |
+| `useAnalytics` | `hooks/useAnalytics.ts` (66 lines) | Mixpanel event tracking, user identification |
+| `useSavedSearches` | `hooks/useSavedSearches.ts` (148 lines) | Saved search CRUD over localStorage |
+
+### Data Flow
+
+```
+page.tsx (orchestrator)
+  |-- useSearchForm() -> form state, validation, sectors
+  |-- useSearchJob(trackEvent) -> search lifecycle, polling, results
+  |-- useSaveDialog({form, saveNewSearch, trackEvent}) -> dialog state
+  |-- useAnalytics() -> event tracking
+  |-- useSavedSearches() -> saved search persistence
+```
+
+All state flows down to components via props. No prop drilling issues due to flat component hierarchy (page -> components, max 2 levels deep).
+
+### Persistence Layer
+
+- **Theme:** `localStorage.getItem('descomplicita-theme')` -- string (ThemeId)
+- **Saved Searches:** `localStorage.getItem('descomplicita_saved_searches')` -- JSON array, max 10 items, sorted by `lastUsedAt`
+
+---
+
+## 7. API Integration
+
+### BFF (Backend for Frontend) Pattern
+
+The frontend never communicates directly with the Python backend. All requests go through Next.js API routes:
+
+```
+Browser -> Next.js API Route -> Python Backend (FastAPI @ BACKEND_URL)
+```
+
+This provides:
+- Backend URL abstraction (`BACKEND_URL` env var, default `http://localhost:8000`)
+- API key injection (`BACKEND_API_KEY` via `X-API-Key` header)
+- Error normalization (backend errors mapped to user-friendly Portuguese messages)
+- Response transformation (extracting/reshaping fields)
+- Binary file proxying (Excel download)
+
+### Async Search Pattern
+
+```
+1. POST /api/buscar         -> { job_id }
+2. GET /api/buscar/status   -> { status, progress } (every 2s via setInterval)
+3. GET /api/buscar/result   -> { resumo, download_id, ... } (when status=completed)
+4. GET /api/download?id=X   -> binary Excel file
+```
+
+- **Polling interval:** 2 seconds (fixed)
+- **Timeout:** 10 minutes
+- **On network error:** Silently retry next interval
+- **User cancellation:** Available at any time via cancel button
+
+### Error Handling
+
+| Scenario | HTTP Code | User-Facing Message |
+|---|---|---|
+| Missing parameters | 400 | "Selecione pelo menos um estado" / "Periodo obrigatorio" |
+| Backend unreachable | 503 | "Backend indisponivel em [URL]: [error]" |
+| Backend error | Forwarded | Backend's `detail` field or "Erro no backend" |
+| Job not found | 404 | "Job not found" |
+| Download expired | 404 | "Arquivo expirado. Faca uma nova busca..." |
+| Internal error | 500 | "Erro interno do servidor" |
+
+---
+
+## 8. Styling Architecture
+
+### Design Token System
+
+A comprehensive CSS custom property system in `globals.css` (55 variables in `:root`, mirrored in `.dark`):
+
+**Token Categories:**
+- Canvas/Ink: `--canvas`, `--ink`, `--ink-secondary`, `--ink-muted`, `--ink-faint`
+- Brand: `--brand-navy` (#0a1e3f), `--brand-blue` (#116dff), `--brand-blue-hover`, `--brand-blue-subtle`
+- Surfaces: `--surface-0` through `--surface-elevated`
+- Semantic: `--success`, `--error`, `--warning` (+ `-subtle` variants)
+- Status badges: 12 tokens for success/warning/error (bg, text, border, dot)
+- Borders: `--border`, `--border-strong`, `--border-accent` (opacity-based)
+- Focus: `--ring`
+
+All tokens are mapped to Tailwind classes in `tailwind.config.ts`, enabling usage like `bg-canvas`, `text-ink-secondary`, `border-status-success`.
+
+### Theme System
+
+5 themes managed via `ThemeProvider`:
+
+| Theme | Type | Canvas | Ink |
+|---|---|---|---|
+| Light | Light | #ffffff | #1e2d3b |
+| Paperwhite | Light | #F5F0E8 | #1e2d3b |
+| Sepia | Light | #EDE0CC | #2c1810 |
+| Dim | Dark | #2A2A2E | #e0e0e0 |
+| Dark | Dark | #121212 | #e0e0e0 |
+
+Implementation: `applyTheme()` imperatively sets CSS custom properties on `document.documentElement`. FOUC prevented by inline `<script>` in `<head>` that reads localStorage before React hydrates.
 
 ### Typography
 
-| Role | Font | Variable | Usage |
-|---|---|---|---|
-| Body | DM Sans | `--font-body` | All body text, labels, buttons |
-| Display | Fahkwang | `--font-display` | Headings (matches Descomplicita brand) |
-| Data | DM Mono | `--font-data` | Numbers, statistics, timestamps |
-
-All fonts loaded via `next/font/google` with `display: "swap"` for performance.
-
-**Font size:** `clamp(14px, 1vw + 10px, 16px)` responsive base with `line-height: 1.6`.
-
-### Spacing System
-
-Base: 4px (Tailwind default). Custom comment in config references 4px base but no custom values defined -- relies on Tailwind's default spacing scale.
+- Body: DM Sans, `line-height: 1.6`
+- Display: Fahkwang (headings)
+- Data: DM Mono (numbers, timestamps)
+- Base size: `clamp(14px, 1vw + 10px, 16px)` (fluid)
+- Tabular numbers: `font-variant-numeric: tabular-nums` via `.tabular-nums` utility
 
 ### Border Radius Scale
+
 | Token | Value | Usage |
 |---|---|---|
 | `rounded-input` | 4px | Form inputs |
@@ -394,620 +333,238 @@ Base: 4px (Tailwind default). Custom comment in config references 4px base but n
 | `rounded-card` | 8px | Cards, panels |
 | `rounded-modal` | 12px | Modals |
 
-### Depth Strategy
-
-**Borders-only** -- no box shadows. All depth conveyed through 1px borders with low-opacity values:
-- `--border`: rgba(0,0,0,0.08) / rgba(255,255,255,0.08)
-- `--border-strong`: rgba(0,0,0,0.15) / rgba(255,255,255,0.15)
-- `--border-accent`: rgba(17,109,255,0.3) / rgba(17,109,255,0.4)
-
-Exception: `shadow-lg` used on save search dialog and `shadow-sm` on theme dropdown.
-
-### Dark/Light Theme Implementation
-
-5 themes managed via `ThemeProvider`:
-
-| Theme | isDark | Canvas | Ink |
-|---|---|---|---|
-| Light | No | #ffffff | #1e2d3b |
-| Paperwhite | No | #F5F0E8 | #1e2d3b |
-| Sepia | No | #EDE0CC | #2c1810 |
-| Dim | Yes | #2A2A2E | #e0e0e0 |
-| Dark | Yes | #121212 | #e0e0e0 |
-
-Implementation uses inline `<script>` in `<head>` to prevent flash of unstyled content (FOUC), reading from localStorage before React hydrates. The `ThemeProvider` then takes over with `applyTheme()` which sets all CSS custom properties imperatively.
-
-### Component Consistency
-
-The design system is **well-defined but inconsistently applied**:
-- `error.tsx` uses hardcoded Tailwind colors (`bg-gray-50`, `bg-green-600`, `text-gray-900`) instead of design tokens
-- The `icon.svg` still shows "B" (from Descomplicita) with green background (`#166534`) instead of brand navy
-- Some hardcoded Tailwind color classes in `SourceBadges.tsx` (`bg-green-100`, `bg-red-100`, etc.) instead of semantic tokens
-- `carouselData.ts` uses hardcoded Tailwind colors (`bg-blue-50`, `bg-green-50`, etc.) for category styling
-
-### Responsive Breakpoints
-
-Uses Tailwind's default breakpoints:
-- `sm:` (640px) -- primary responsive breakpoint used throughout
-- `md:` (768px) -- used only for UF grid columns (`md:grid-cols-9`)
-- No `lg:` or `xl:` usage
-
----
-
-## 6. UX Patterns
-
-### User Flows
-
-**Primary Flow: Search -> Results -> Download**
-1. User lands on page, sees search form with defaults (SC/PR/RS, last 7 days, Vestuario sector)
-2. User can switch to "Termos Especificos" mode for custom keyword search
-3. User selects states via grid or region quick-select buttons
-4. User adjusts date range
-5. User clicks "Buscar [Sector Name]"
-6. Loading screen shows: progress bar, 5-stage indicator, UF grid, curiosity carousel, skeleton cards
-7. On completion: executive summary, highlights, statistics, source badges
-8. User clicks "Baixar Excel" to download
-9. Optionally saves search for later
-
-**Secondary Flow: Saved Searches**
-1. Click "Buscas Salvas" dropdown in header
-2. See list of up to 10 saved searches sorted by last used
-3. Click to load parameters into form, or delete individual searches
-
-### Loading States
-
-**Excellent loading UX** with multi-layered feedback:
-- 5-stage pipeline indicator (Queued -> Fetching -> Filtering -> Summarizing -> Generating Excel)
-- Real progress bar with percentage based on actual backend phase
-- UF visual grid showing completed/in-progress/pending states
-- ETA calculation based on per-UF timing
-- Elapsed time counter
-- Curiosity carousel rotating every 6 seconds (sector-aware content)
-- Skeleton result cards previewing upcoming layout
-- Document title updates during background tab: progress % shown
-- Browser notification on completion (if permission granted)
-- Cancel button available at all times
-
-### Error States
-
-- **API errors:** Red card with error message + "Tentar novamente" button
-- **Download errors:** Red card below download button
-- **Validation errors:** Inline red text below affected fields with `role="alert"`
-- **Error boundary:** Full-page error with "Ops! Algo deu errado" message
-- **Backend unavailable:** Handled with 503 status and user-friendly message
-- **Polling timeout:** 10-minute deadline with specific timeout message
-
-### Empty States
-
-Rich empty state component with:
-- Contextual messaging based on raw count and filter stats
-- Filter rejection breakdown (keyword, value range, state mismatch)
-- Actionable suggestions (expand dates, add states, change sector)
-- "Ajustar criterios de busca" button scrolls to top
-
-### Feedback Mechanisms
-
-- Button states: enabled/disabled/loading with visual changes
-- UF buttons: pressed state via `aria-pressed` and bg-brand-navy
-- Search mode toggle: segmented control with active state
-- Form validation: real-time inline errors
-- Download: loading spinner animation during download
-
-### Notifications
-
-- Browser Notification API (permission requested after first search)
-- Document title change when tab is in background
-- Title restored when user returns to tab
-
----
-
-## 7. API Integration
-
-### Frontend API Routes
-
-| Route | Method | Purpose | Backend Proxy |
-|---|---|---|---|
-| `/api/buscar` | POST | Submit search job | `POST /buscar` |
-| `/api/buscar/status` | GET | Poll job status | `GET /buscar/{job_id}/status` |
-| `/api/buscar/result` | GET | Fetch completed result | `GET /buscar/{job_id}/result` |
-| `/api/download` | GET | Serve Excel file | N/A (filesystem) |
-| `/api/setores` | GET | List available sectors | `GET /setores` |
-
-### Backend Communication Patterns
-
-- **Proxy pattern:** All API routes proxy to Python backend via `BACKEND_URL` env var
-- **Job-based async:** Search is async -- POST returns `job_id`, frontend polls status every 2s
-- **File handling:** Result route saves base64-encoded Excel to tmp filesystem, download route serves it
-- **TTL cleanup:** Downloaded files auto-expire after 1 hour (`DOWNLOAD_TTL_MS`)
-
-### Error Handling in API Routes
-
-Each route handles:
-- Missing/invalid parameters (400)
-- Backend unavailable (503)
-- Backend errors (forwarded status)
-- Network errors (catch blocks)
-- Job not found (404)
-
-### Polling Mechanism
-
-```
-POST /api/buscar -> { job_id }
-  |
-  v (every 2s via setInterval)
-GET /api/buscar/status?job_id= -> { status, progress }
-  |
-  v (when status === "completed" or "failed")
-GET /api/buscar/result?job_id= -> { resumo, download_id, ... }
-```
-
-- Polling interval: 2 seconds
-- Timeout: 10 minutes
-- On network error: silently retry next interval
-- On completion: stop polling, fetch result, update UI
-
----
-
-## 8. Performance Analysis
-
-### Bundle Size Considerations
-
-**Positive:**
-- Minimal dependencies (only mixpanel-browser and uuid beyond React/Next.js)
-- `output: 'standalone'` for optimized Docker builds
-- Google Fonts via `next/font` (self-hosted, no external requests)
-- `display: "swap"` on all fonts prevents blocking render
-
-**Concerns:**
-- `mixpanel-browser` (^2.74.0) adds significant bundle weight (~80KB minified)
-- Entire page is `"use client"` -- no server-side rendering benefit for the main content
-- Logo loaded from external Wix CDN (`static.wixstatic.com`) -- not self-hosted
-- No dynamic imports or code splitting for components
-- `carouselData.ts` (52 items, 368 lines) loaded eagerly even when not searching
-
-### Image Optimization
-
-- Logo: External URL via `<img>` tag, not using Next.js `<Image>` component (eslint disable comment present)
-- `logo-descomplicita.png` exists in `/public/` but is not used -- logo comes from Wix CDN
-- `icon.svg` is outdated (shows "B" in green, from Descomplicita era)
-
-### Code Splitting
-
-**None.** All components are imported statically. The entire UI loads as a single client-side bundle. Given it is a single-page app, this is acceptable for now but will become a concern as features grow.
-
-### SSR vs CSR Patterns
-
-- `layout.tsx` is a **server component** (renders HTML shell, fonts, metadata)
-- `page.tsx` is `"use client"` -- the entire page is client-rendered
-- All components are `"use client"`
-- API routes are server-side (Next.js Route Handlers)
-- No server-side data fetching for the main page
-
-### Loading Performance
-
-- **Font loading:** Optimized via `next/font/google` with `display: "swap"`
-- **Theme FOUC prevention:** Inline script in `<head>` applies theme before paint
-- **Animations:** CSS-based with `prefers-reduced-motion` support
-- **Body background:** CSS-only radial gradients (no image assets)
-
----
-
-## 9. Accessibility Audit
-
-### ARIA Labels/Roles
-
-**Present (27 occurrences across 6 files):**
-- `aria-pressed` on UF toggle buttons
-- `aria-busy` on search button during loading
-- `aria-live="polite"` on loading progress container
-- `aria-expanded` on dropdown triggers (ThemeToggle, SavedSearches)
-- `aria-label` on buttons (theme toggle, region buttons, saved searches, download, remove term)
-- `aria-hidden="true"` on decorative SVGs and backdrop
-- `role="alert"` on error messages and urgency alerts
-- `role="progressbar"` with `aria-valuenow/min/max` on progress bar
-
-### Keyboard Navigation
-
-**Partial implementation:**
-- All interactive elements are `<button>` or `<input>` (focusable by default)
-- `:focus-visible` styling defined globally (2px solid ring)
-- Theme dropdown closes on outside click but **no Escape key handler**
-- SavedSearchesDropdown closes on outside click but **no Escape key handler**
-- Tag input supports Backspace (remove last) and Enter (add term)
-- **No focus trap** in save search modal dialog
-- **No keyboard navigation** within dropdown menus (arrow keys)
-
-### Color Contrast
-
-**Generally good** due to dark ink on light canvas:
-- `--ink` (#1e2d3b) on `--canvas` (#ffffff) = 12.6:1 ratio (AAA)
-- `--ink-secondary` (#3d5975) on `--canvas` = 6.0:1 (AA for normal text)
-- `--ink-muted` (#808f9f) on `--canvas` = 3.4:1 (FAILS AA for normal text)
-- `--ink-faint` (#c0d2e5) on `--canvas` = 1.7:1 (FAILS all levels)
-
-**Dark mode concerns:**
-- `--ink` (#e8eaed) on `--canvas` (#121212) = 14.5:1 (AAA)
-- `--ink-muted` (#6b7a8a) on dark canvas = 3.8:1 (FAILS AA for normal text)
-
-### Screen Reader Support
-
-- Page language set to `pt-BR` in `<html lang="pt-BR">`
-- `<h1>` present ("Busca de Licitacoes")
-- Semantic HTML used (header, main, footer, section)
-- `<label>` elements properly associated with inputs via `htmlFor`
-- Error messages use `role="alert"` for live announcements
-- Decorative SVGs use `aria-hidden="true"`
-
-**Missing:**
-- No skip-to-content link
-- No `<nav>` element for header navigation
-- UF grid has no group label for screen readers
-- No announcement when search completes (only `aria-live` on loading)
-- Save search dialog missing `role="dialog"` and `aria-modal`
-
-### Focus Management
-
-- **No focus management** after search completes (results may be below viewport)
-- **No focus trap** in modal dialog
-- Focus ring visible via `:focus-visible` global style
-- Minimum touch target 44px enforced via global CSS (`button { min-height: 44px }`)
-
-### Form Accessibility
-
-- Labels associated via `htmlFor` on date inputs and save search name input
-- Sector select has `id="setor"` but label uses wrapper `<label>` without `htmlFor`
-- Terms input has `id="termos-busca"` but no visible `<label>` element (only wrapper label for section)
-- Validation errors displayed with `role="alert"`
-
----
-
-## 10. Responsive Design
-
-### Mobile Layout (< 640px)
-
-- Single-column layout
-- UF grid: 5 columns (`grid-cols-5`)
-- Stage labels hidden; mobile-specific detail card shown
-- Smaller text (`text-sm` for most elements, `text-2xl` for headings)
-- "Buscas Salvas" label hidden, only icon + count shown
-- Theme label hidden, only color preview circle shown
-- Smaller padding on result cards (`p-4`)
-- Dropdown width: 320px (`w-80`)
-
-### Tablet Layout (640px - 768px)
-
-- Date inputs side-by-side (`sm:grid-cols-2`)
-- UF grid: 7 columns (`sm:grid-cols-7`)
-- Larger text and padding
-- Stage labels visible
-- Header tagline visible
-
-### Desktop Layout (768px+)
-
-- UF grid: 9 columns (`md:grid-cols-9`)
+### Responsive Design
+
+- Mobile-first with breakpoints at `sm:` (640px) and `md:` (768px)
+- UF grid: 5 cols -> 7 (sm) -> 9 (md)
+- Date inputs: stacked -> side-by-side (sm)
+- Text scaling: `text-sm sm:text-base`, `text-2xl sm:text-3xl`
+- Padding scaling: `px-4 sm:px-6`, `py-3 sm:py-4`
 - Max content width: `max-w-4xl` (896px)
-- Centered layout with `mx-auto`
+- Hidden on mobile: header tagline, loading stage labels, theme label, "Buscas Salvas" text
 
-### Breakpoint Usage
+### Animations
 
-| Breakpoint | Occurrences | Primary Use |
+- `animate-fade-in-up`: Entrance with 12px upward slide (0.4s)
+- `animate-fade-in`: Opacity fade (0.3s)
+- `animate-shimmer`: Skeleton loading shimmer (1.5s infinite)
+- Stagger classes: `.stagger-1` through `.stagger-5` (50ms increments)
+- `prefers-reduced-motion`: All animations reduced to 0.01ms
+
+### Touch Targets
+
+Global minimum 44px height on buttons and form inputs via CSS, meeting WCAG 2.5.8.
+
+---
+
+## 9. Performance Analysis
+
+### Strengths
+
+- **Dynamic imports:** `SaveSearchDialog` (ssr: false), `LoadingProgress` (with skeleton fallback), `EmptyState` -- reduces initial bundle
+- **Font optimization:** `next/font/google` with `display: "swap"` and self-hosting
+- **`output: 'standalone'`** for optimized Docker builds
+- **`useCallback` usage:** All hook callbacks wrapped for referential stability
+- **Logo with `priority`:** LCP optimization for above-fold image
+- **Theme FOUC prevention:** Inline script applies theme before React hydrates
+
+### Concerns
+
+| Concern | Impact | Mitigation |
 |---|---|---|
-| `sm:` (640px) | ~50+ | Typography, padding, grid, visibility |
-| `md:` (768px) | 1 | UF grid columns only |
-| `lg:` / `xl:` | 0 | Not used |
-
-**Gap:** No large-screen optimization. Content is capped at 896px (`max-w-4xl`). On wide displays, there is significant whitespace with no additional density or layout changes.
+| Entire page is `"use client"` | No SSR benefit for SEO or initial paint | Acceptable for SPA; could SSR the form shell |
+| `carouselData.ts` (52 items, 369 lines) bundled eagerly | ~15KB of data only needed during loading | Move to dynamic import within LoadingProgress |
+| Fixed 2s polling interval | Unnecessary requests for long searches | Implement exponential backoff |
+| Mixpanel SDK loaded unconditionally (~40KB gzipped) | Bundle bloat when analytics disabled | Conditional dynamic import based on token presence |
+| Sentry SDK adds bundle weight | Always imported even when DSN empty | Conditional import (complex with Next.js plugin) |
+| No ISR/SSG for sectors list | Extra API call on every page load | Could use `getStaticProps` with revalidation |
 
 ---
 
-## 11. Testing Coverage
+## 10. Testing Coverage
 
-### Test File Inventory
+### Unit Tests (Jest)
 
-**Unit Tests (Jest):** 11 files, 3,726 lines total
+**Coverage (from jest.config.js thresholds):**
+- Statements: ~68% (threshold: 65%)
+- Functions: ~60% (threshold: 57%)
+- Branches: ~53% (threshold: 50%)
+- Lines: ~66% (threshold: 65%)
 
-| Test File | Lines | Tests |
+**Test Files (22 files):**
+
+| Category | Test Files | Description |
 |---|---|---|
-| `page.test.tsx` | 601 | UF selection, dates, validation, polling, results, edge cases |
-| `analytics.test.ts` | 449 | Mixpanel integration, event tracking |
-| `savedSearches.test.ts` | 333 | CRUD operations, capacity limits |
-| `components/LoadingProgress.test.tsx` | 311 | Phase rendering, progress, cancel |
-| `error.test.tsx` | 237 | Error boundary rendering, reset |
-| `api/buscar.test.ts` | 175 | POST validation, job creation, error handling |
-| `api/download.test.ts` | 149 | File serving, expiration, cleanup |
-| `api/buscar-result.test.ts` | 133 | Result fetching, status handling |
-| `components/ThemeToggle.test.tsx` | 135 | Theme switching UI |
-| `components/EmptyState.test.tsx` | 93 | Empty state rendering, filter stats |
-| `api/buscar-status.test.ts` | 75 | Status polling endpoint |
-| `setup.test.ts` | 37 | Jest setup verification |
+| Components | SearchForm, UfSelector, DateRangeSelector, SearchHeader, SearchSummary, SearchActions, LoadingProgress, EmptyState, SaveSearchDialog, SavedSearchesDropdown, ThemeToggle, accessibility | All major components tested |
+| Hooks | useSearchForm, useSearchJob | Core logic hooks tested |
+| API Routes | buscar, buscar-result, buscar-status, download | All API proxy routes tested |
+| Integration | page, error | Full page rendering and error boundary |
+| Libraries | analytics, savedSearches | Analytics tracking and storage |
 
-**E2E Tests (Playwright):** 4 files, 998 lines total
+**Quality Assessment:**
+- Dedicated accessibility test file (`accessibility.test.tsx`) with focus trap, ARIA, semantic, and contrast tests
+- API route tests mock `fetch` to verify proxy behavior
+- Hook tests validate state transitions and side effects
+- Testing Library used correctly (queries by role, not CSS selectors)
 
-| Test File | Lines | Scenarios |
-|---|---|---|
-| `01-happy-path.spec.ts` | 307 | Full user journey, UI elements, search, download |
-| `02-llm-fallback.spec.ts` | 245 | LLM fallback behavior |
-| `03-validation-errors.spec.ts` | 198 | Form validation scenarios |
-| `04-error-handling.spec.ts` | 248 | Error states, backend failures |
+### E2E Tests (Playwright)
 
-### Coverage Metrics
+**4 test scenarios:**
 
-From `jest.config.js` thresholds (last recorded):
-- **Statements:** 49.45%
-- **Branches:** 39.56%
-- **Functions:** 41.98%
-- **Lines:** 51.01%
-
-**Note:** The claimed 91.5% coverage likely refers to a different measurement or was aspirational. Actual thresholds in config are significantly lower.
-
-### Coverage Gaps
-
-**Components without dedicated tests:**
-- `RegionSelector` -- no unit test
-- `SavedSearchesDropdown` -- no dedicated unit test (tested indirectly via page)
-- `SourceBadges` -- no unit test
-- `AnalyticsProvider` -- no unit test
-- `ThemeProvider` -- no unit test
-- `carouselData` -- no unit test for `shuffleBalanced` algorithm
-
-**Hooks without dedicated tests:**
-- `useAnalytics` -- tested via analytics.test.ts but not as hook
-- `useSavedSearches` -- no dedicated hook test
-
-### E2E Test Patterns
-
-- Playwright configured for Chromium only
-- API mocking via `page.route()` for deterministic tests
-- Some E2E tests reference outdated class names (e.g., `bg-green-600` instead of `bg-brand-navy`)
-- axe-core dependency installed but not visibly used in current test files
-- Sequential execution (`fullyParallel: false`) for stability
-
----
-
-## 12. Frontend Technical Debt
-
-### TD-FE-001: God Component (page.tsx)
-- **Description:** The main page component is 1,071 lines with 20+ state variables, all business logic, form handling, polling logic, download logic, save search logic, and complete UI rendering. This violates single responsibility and makes testing, maintenance, and modification extremely difficult.
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Critical
-- **Category:** Code Quality
-- **Impact:** Any change to the UI or business logic requires touching a massive file. Testing individual features in isolation is impossible. New developers face a steep learning curve.
-
-### TD-FE-002: Missing Escape Key Handling on Dropdowns
-- **Description:** ThemeToggle and SavedSearchesDropdown close on outside click but do not respond to Escape key. This is a WCAG 2.1 requirement for dismissible content.
-- **Files:** `ThemeToggle.tsx`, `SavedSearchesDropdown.tsx`
-- **Severity:** High
-- **Category:** Accessibility
-- **Impact:** Keyboard-only users cannot dismiss dropdowns without clicking elsewhere.
-
-### TD-FE-003: Modal Missing Focus Trap and Dialog Role
-- **Description:** The save search modal dialog does not trap focus, does not have `role="dialog"` or `aria-modal="true"`, and does not return focus to the trigger element on close.
-- **File:** `frontend/app/page.tsx` (lines 1002-1061)
-- **Severity:** High
-- **Category:** Accessibility
-- **Impact:** Screen reader users may not know they are in a modal. Keyboard users can tab behind the modal overlay.
-
-### TD-FE-004: Insufficient Color Contrast for Muted Text
-- **Description:** `--ink-muted` (#808f9f) on white canvas has only 3.4:1 contrast ratio, failing WCAG AA for normal text (requires 4.5:1). `--ink-faint` (#c0d2e5) at 1.7:1 is decorative-only but used for text content in some places.
-- **Files:** globals.css, multiple components using `text-ink-muted` and `text-ink-faint`
-- **Severity:** High
-- **Category:** Accessibility
-- **Impact:** Low-vision users may struggle to read muted text labels, timestamps, and helper text.
-
-### TD-FE-005: No Skip-to-Content Link
-- **Description:** There is no skip navigation link for keyboard users to bypass the header and jump to main content.
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Medium
-- **Category:** Accessibility
-- **Impact:** Keyboard users must tab through header elements on every page load.
-
-### TD-FE-006: External Logo Dependency
-- **Description:** The logo is loaded from `static.wixstatic.com` instead of being self-hosted. This creates a runtime dependency on an external CDN, potential CORS issues, and privacy concerns (third-party tracking).
-- **File:** `frontend/app/page.tsx` (LOGO_URL constant)
-- **Severity:** Medium
-- **Category:** Performance / Reliability
-- **Impact:** Logo may fail to load if Wix CDN is down. Not using Next.js `<Image>` means no optimization.
-
-### TD-FE-007: Outdated Favicon
-- **Description:** `icon.svg` displays a green "B" (from Descomplicita era). Should show Descomplicita branding.
-- **File:** `frontend/app/icon.svg`
-- **Severity:** Medium
-- **Category:** Design
-- **Impact:** Brand inconsistency. Users see outdated branding in browser tabs.
-
-### TD-FE-008: Error Boundary Uses Hardcoded Colors
-- **Description:** `error.tsx` uses hardcoded Tailwind colors (`bg-gray-50`, `bg-green-600`, `text-gray-900`) instead of the design system tokens, breaking theme consistency.
-- **File:** `frontend/app/error.tsx`
-- **Severity:** Medium
-- **Category:** Design
-- **Impact:** Error page does not respect dark mode or custom themes.
-
-### TD-FE-009: Duplicate UFS Array Definition
-- **Description:** The `UFS` array is defined in both `app/types.ts` (with `as const` for type inference) and `app/page.tsx` (as plain array). `UF_NAMES` mapping only exists in `page.tsx`.
-- **Files:** `frontend/app/types.ts`, `frontend/app/page.tsx`
-- **Severity:** Medium
-- **Category:** Code Quality
-- **Impact:** Maintaining two copies risks divergence. UF-related constants should be centralized.
-
-### TD-FE-010: No Internationalization (i18n) Infrastructure
-- **Description:** All user-facing strings are hardcoded in Portuguese throughout the codebase. There is no i18n framework or string extraction.
-- **Files:** All component files
-- **Severity:** Medium
-- **Category:** Code Quality
-- **Impact:** If the app needs to support other languages (English, Spanish), every component would need manual refactoring. Even for Portuguese-only, centralized strings would improve consistency.
-
-### TD-FE-011: Deprecated API Usage in AnalyticsProvider
-- **Description:** Uses `performance.timing.navigationStart` which is deprecated in favor of `performance.timeOrigin`.
-- **File:** `frontend/app/components/AnalyticsProvider.tsx` (line 52)
-- **Severity:** Low
-- **Category:** Code Quality
-- **Impact:** Will eventually break in future browsers. Easy fix.
-
-### TD-FE-012: No Loading State for Sector List
-- **Description:** The sectors dropdown has no loading indicator while fetching from `/api/setores`. If the backend is slow, the dropdown appears empty or shows fallback data without indication.
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Low
-- **Category:** UX
-- **Impact:** Minor confusion if sectors take time to load.
-
-### TD-FE-013: E2E Tests Reference Outdated Class Names
-- **Description:** E2E tests check for `bg-green-600` CSS class (old Descomplicita theme) but the actual UI uses `bg-brand-navy`. These tests likely fail or are not being run.
-- **File:** `frontend/__tests__/e2e/01-happy-path.spec.ts` (line 64)
-- **Severity:** Low
-- **Category:** Code Quality
-- **Impact:** False test failures or skipped E2E tests.
-
-### TD-FE-014: Missing Focus Management After Search
-- **Description:** When search completes, results appear below the form but focus remains on the search button. Users on large forms may not notice results have loaded.
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Medium
-- **Category:** UX / Accessibility
-- **Impact:** Screen reader users may not know results are available. Visual users on mobile must scroll to see results.
-
-### TD-FE-015: No Code Splitting for Components
-- **Description:** All components are statically imported. The LoadingProgress component (415 lines), carouselData (368 lines with 52 items), and SavedSearchesDropdown could be dynamically imported.
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Low
-- **Category:** Performance
-- **Impact:** Larger initial bundle. These components are conditionally rendered and could benefit from `React.lazy()` or Next.js `dynamic()`.
-
-### TD-FE-016: No `<nav>` Semantic Element
-- **Description:** The header uses a `<header>` element but lacks `<nav>` for the navigation area (saved searches, theme toggle).
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Low
-- **Category:** Accessibility
-- **Impact:** Screen readers cannot announce navigation landmark.
-
-### TD-FE-017: SourceBadges and carouselData Use Hardcoded Colors
-- **Description:** These components use raw Tailwind color classes (`bg-green-100`, `bg-red-100`, `bg-blue-50`, etc.) instead of design system tokens. These colors do not respond to theme changes beyond basic dark: variants.
-- **Files:** `SourceBadges.tsx`, `carouselData.ts`
-- **Severity:** Low
-- **Category:** Design
-- **Impact:** Visual inconsistency in non-standard themes (Paperwhite, Sepia).
-
-### TD-FE-018: Unused Public Asset
-- **Description:** `public/logo-descomplicita.png` exists but is not referenced anywhere in the codebase. The logo comes from an external Wix URL.
-- **File:** `frontend/public/logo-descomplicita.png`
-- **Severity:** Low
-- **Category:** Code Quality
-- **Impact:** Unused asset increases repository size. Should either be used (replacing Wix URL) or removed.
-
-### TD-FE-019: Missing `aria-describedby` for Terms Input
-- **Description:** The custom terms tag input has helper text below it ("Digite cada termo...") but no `aria-describedby` linking the input to the description.
-- **File:** `frontend/app/page.tsx`
-- **Severity:** Low
-- **Category:** Accessibility
-- **Impact:** Screen reader users do not hear the input instructions.
-
-### TD-FE-020: Test Coverage Below Target
-- **Description:** Jest coverage thresholds show statements at 49.45% and branches at 39.56%, well below the stated 91.5% target. Multiple components lack dedicated unit tests.
-- **Files:** `jest.config.js`, test files
-- **Severity:** Medium
-- **Category:** Code Quality
-- **Impact:** Low confidence in refactoring. Changes to untested components may introduce regressions.
-
----
-
-## 13. Recommendations
-
-### Priority 1: Critical (Sprint 1)
-
-1. **Decompose page.tsx into feature modules** (TD-FE-001)
-   - Extract `SearchForm` component (mode toggle, sector select, terms input)
-   - Extract `UfSelector` component (grid, region selector, select/clear)
-   - Extract `DateRangeSelector` component
-   - Extract `SearchResults` component (summary, highlights, download)
-   - Extract `SaveSearchDialog` component
-   - Extract polling logic into a `useSearchJob` custom hook
-   - Target: No component exceeds 200 lines
-
-2. **Fix modal accessibility** (TD-FE-003)
-   - Add `role="dialog"` and `aria-modal="true"`
-   - Implement focus trap (lock focus inside modal)
-   - Return focus to trigger button on close
-   - Close on Escape key
-
-3. **Add Escape key handling to all dropdowns** (TD-FE-002)
-   - ThemeToggle: close on Escape
-   - SavedSearchesDropdown: close on Escape
-
-### Priority 2: High (Sprint 2)
-
-4. **Fix color contrast issues** (TD-FE-004)
-   - Darken `--ink-muted` to meet 4.5:1 ratio (e.g., #5a6a7a)
-   - Audit all uses of `text-ink-faint` for non-decorative text
-   - Review dark mode muted contrast
-
-5. **Self-host logo and update favicon** (TD-FE-006, TD-FE-007)
-   - Use the existing `public/logo-descomplicita.png` via Next.js `<Image>`
-   - Update `icon.svg` with Descomplicita branding (navy "D" or brand mark)
-   - Remove Wix CDN dependency
-
-6. **Add skip-to-content link** (TD-FE-005)
-   - Add visually-hidden link before header: "Ir para conteudo principal"
-   - Target the `<main>` element with `id="main-content"`
-
-7. **Fix focus management after search** (TD-FE-014)
-   - After results load, scroll to and focus the results section
-   - Use `ref` and `scrollIntoView({ behavior: "smooth" })`
-
-### Priority 3: Medium (Sprint 3)
-
-8. **Migrate error.tsx to design tokens** (TD-FE-008)
-   - Replace hardcoded gray/green Tailwind classes with design system tokens
-   - Ensure error page works correctly in all 5 themes
-
-9. **Centralize UFS/UF_NAMES constants** (TD-FE-009)
-   - Move to `lib/constants.ts` or expand `types.ts`
-   - Single source of truth for all UF-related data
-
-10. **Increase test coverage** (TD-FE-020)
-    - Add unit tests for RegionSelector, SourceBadges, SavedSearchesDropdown
-    - Add hook tests for useAnalytics and useSavedSearches
-    - Target: 70% statements, 55% branches
-    - Enable axe-core accessibility checks in E2E tests
-
-11. **Fix E2E test assertions** (TD-FE-013)
-    - Update class name assertions from `bg-green-600` to `bg-brand-navy`
-    - Verify all E2E tests pass against current UI
-
-### Priority 4: Low (Backlog)
-
-12. **Add code splitting** (TD-FE-015) -- Dynamic import for LoadingProgress and carouselData
-13. **Replace deprecated performance API** (TD-FE-011)
-14. **Migrate hardcoded colors in SourceBadges/carouselData** (TD-FE-017)
-15. **Add `<nav>` landmark** (TD-FE-016)
-16. **Add `aria-describedby`** for terms input (TD-FE-019)
-17. **Clean up unused assets** (TD-FE-018)
-18. **Evaluate i18n framework** (TD-FE-010) -- Consider next-intl if multi-language becomes a requirement
-19. **Add sector loading indicator** (TD-FE-012)
-
----
-
-## Appendix: Source File Line Counts
-
-| File | Lines |
+| File | Scenario |
 |---|---|
-| `app/page.tsx` | 1,071 |
-| `app/components/LoadingProgress.tsx` | 415 |
-| `app/components/carouselData.ts` | 368 |
-| `app/components/SavedSearchesDropdown.tsx` | 250 |
-| `hooks/useSavedSearches.ts` | 148 |
-| `app/components/EmptyState.tsx` | 140 |
-| `app/components/ThemeProvider.tsx` | 122 |
-| `app/components/SourceBadges.tsx` | 120 |
-| `app/types.ts` | 114 |
-| `lib/savedSearches.ts` | 99 |
-| `app/api/buscar/result/route.ts` | 98 |
-| `app/api/download/route.ts` | 76 |
-| `app/components/AnalyticsProvider.tsx` | 74 |
-| `app/components/ThemeToggle.tsx` | 73 |
-| `app/layout.tsx` | 72 |
-| `app/error.tsx` | 70 |
-| `hooks/useAnalytics.ts` | 66 |
-| `app/api/buscar/route.ts` | 60 |
-| `app/components/RegionSelector.tsx` | 53 |
-| `app/api/buscar/status/route.ts` | 41 |
-| `app/api/setores/route.ts` | 25 |
-| **Total source lines** | **3,505** |
-| **Total test lines** | **4,724** |
+| `01-happy-path.spec.ts` | Complete search -> results -> download flow |
+| `02-llm-fallback.spec.ts` | AI summary degradation handling |
+| `03-validation-errors.spec.ts` | Form validation error states |
+| `04-error-handling.spec.ts` | Backend error handling |
+
+**Configuration:** Chromium-only, 60s timeout, sequential execution, screenshots/video on failure, traces on first retry. `@axe-core/playwright` installed for automated a11y.
+
+### Test Gaps
+
+| Gap | Impact |
+|---|---|
+| No tests for ThemeProvider (theme switching, persistence, CSS property application) | Theme bugs undetected |
+| No tests for AnalyticsProvider (Mixpanel init, page tracking) | Analytics regressions |
+| No tests for RegionSelector (region toggle logic) | Region selection bugs |
+| No tests for carouselData (shuffleBalanced algorithm) | Shuffle bias undetected |
+| No visual regression tests | Design drift undetected |
+| No performance/Lighthouse CI tests | Performance regressions |
+| E2E tests require live backend | No CI-friendly mock server |
+
+---
+
+## 11. UX Debt Inventory
+
+| ID | Description | Severity | Effort |
+|---|---|---|---|
+| UXD-001 | **Multi-word terms impossible.** Space triggers token creation in term input, so "camisa polo" becomes two separate tokens. Need quote support or alternative delimiter. | **High** | Medium (3h) |
+| UXD-002 | **No loading state for sector fetch.** `useSearchForm` fetches sectors on mount but shows no indicator. Dropdown appears empty momentarily if backend is slow. | Medium | Small (1h) |
+| UXD-003 | **No 404 page.** Missing `not-found.tsx` for invalid routes. | Low | Small (1h) |
+| UXD-004 | **No keyboard shortcut for search.** Enter key in date fields does not submit. No Ctrl+Enter or similar. | Low | Small (1h) |
+| UXD-005 | **SavedSearchesDropdown uses div backdrop.** Not native `<dialog>` or proper ARIA listbox pattern. | Medium | Medium (3h) |
+| UXD-006 | **SaveSearchDialog uses div, not native `<dialog>`.** Manual focus trap works but native element preferred. | Medium | Medium (2h) |
+| UXD-007 | **No wrapping `<form>` element.** Prevents native form submission and browser autofill. | Medium | Small (2h) |
+| UXD-008 | **Mixpanel imported unconditionally.** ~40KB even without token. Should use dynamic import. | Low | Small (1h) |
+| UXD-009 | **No confirmation before page unload during search.** User can navigate away during long search without warning. | Low | Small (1h) |
+| UXD-010 | **ThemeProvider applies 30+ CSS properties imperatively.** Could use data attribute + CSS rules for maintainability. | Low | Large (8h) |
+| UXD-011 | **FOUC script in `<head>` duplicates ThemeProvider logic.** Subset handling may drift from full ThemeProvider. | Medium | Medium (3h) |
+| UXD-012 | **No offline/network indicator.** Fetch failures show generic errors. No dedicated connectivity state. | Medium | Medium (4h) |
+| UXD-013 | **Footer lacks meaningful content.** Single branding line, no links (privacy, terms, help). | Low | Small (1h) |
+| UXD-014 | **SourceBadges text missing Portuguese diacritics.** "combinacoes" should be "combinacoes" with proper accents. | Low | Trivial (15min) |
+| UXD-015 | **No color contrast audit for all 5 themes.** Sepia and Paperwhite themes not verified against WCAG AA. | Medium | Medium (4h) |
+| UXD-016 | **LoadingProgress is 450+ lines.** Handles progress bar, ETA, stages, UF grid, carousel, skeletons, analytics. Should decompose. | Medium | Large (6h) |
+| UXD-017 | **Hardcoded fallback sectors.** 7 sectors in `useSearchForm.ts` could become stale if backend changes. | Low | Small (1h) |
+| UXD-018 | **Hardcoded Tailwind colors in SearchSummary.** Type badges use `bg-blue-100`, `bg-purple-100` instead of design tokens. Break in Sepia/Paperwhite themes. | Low | Small (1h) |
+| UXD-019 | **carouselData uses hardcoded Tailwind category colors.** `bg-blue-50`, `bg-green-50`, etc. Not token-aware. | Low | Medium (2h) |
+| UXD-020 | **No form `noValidate` attribute.** Native browser validation may conflict with custom validation. | Low | Trivial (5min) |
+
+---
+
+## 12. Design System Assessment
+
+### What Exists (Strengths)
+
+1. **Comprehensive CSS custom property token system** with 55+ variables covering canvas, ink, brand, surface, semantic, status, border, and focus categories.
+2. **Full dark mode support** with `.dark` class override pattern and 5 theme variants.
+3. **Tailwind integration** maps all tokens to utility classes for consistent usage.
+4. **Three font families** with clear purpose (body, display, data).
+5. **Border radius scale** (input: 4px, button: 6px, card: 8px, modal: 12px).
+6. **Animation system** (fadeInUp, fadeIn, shimmer) with stagger utilities.
+7. **Global touch target minimum** (44px buttons/inputs).
+8. **`prefers-reduced-motion` support** disabling all animations.
+9. **Consistent button visual pattern** (brand-navy primary, surface-0 secondary).
+
+### What Is Missing
+
+1. **No component library or Storybook** -- components only documented in code.
+2. **No documented color palette** with contrast ratios per theme.
+3. **No icon system** -- 8+ unique SVGs are inline throughout components, duplicated across files.
+4. **No formal button variants** -- primary/secondary/ghost/danger patterns exist but are ad-hoc class strings.
+5. **No form field component** -- input styling (`w-full border border-strong rounded-input px-4 py-3 text-base bg-surface-0 text-ink focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors`) is repeated verbatim in 4 places.
+6. **No spacing documentation** -- relies on Tailwind defaults.
+7. **No typography scale documentation** beyond font family assignment.
+
+### Consistency Issues
+
+- **SearchSummary** type badges use hardcoded `bg-blue-100 text-blue-800` and `bg-purple-100 text-purple-800` instead of design tokens. These break in Sepia/Paperwhite themes.
+- **carouselData** category configs use hardcoded Tailwind colors (`bg-blue-50 dark:bg-blue-950/30`, etc.) -- partially dark-mode aware via `dark:` prefix but not token-based.
+- **Input styling** repeated verbatim in SearchForm (sector select), SearchForm (terms input wrapper), DateRangeSelector (2 date inputs), SaveSearchDialog (name input).
+
+### Recommendations
+
+1. **Extract a `<TextInput>` component** to eliminate repeated styling classes.
+2. **Extract a `<Button>` component** with `variant` prop (primary, secondary, ghost, danger, disabled).
+3. **Create a shared icons module** (`app/components/icons.tsx`) exporting named SVG components.
+4. **Set up Storybook** for visual documentation and isolated component development.
+5. **Audit contrast ratios** for all 5 themes against WCAG AA (4.5:1 text, 3:1 UI).
+6. **Migrate hardcoded colors** in SearchSummary and carouselData to design tokens.
+7. **Document the design system** in a dedicated `DESIGN_SYSTEM.md` with color, typography, spacing, and component guidelines.
+
+---
+
+## 13. Accessibility (A11y) Assessment
+
+### Strengths (Implemented)
+
+- **Skip navigation link** (`"Pular para o conteudo principal"`) in root layout
+- **`lang="pt-BR"`** on `<html>` element
+- **`aria-pressed`** on UF toggle buttons
+- **`aria-live="polite"`** regions for search results and loading states
+- **`role="alert"`** on all error messages (validation, search, download)
+- **`aria-expanded`** and **`aria-haspopup`** on dropdown triggers
+- **`aria-busy`** on search button during loading
+- **`aria-label`** on region buttons, navigation, and icon-only buttons
+- **`aria-describedby`** linking term input to help text
+- **`role="group"`** with **`aria-label`** on UF grid
+- **`role="dialog"`** with **`aria-modal`** and **`aria-labelledby`** on save dialog
+- **Focus trap** implementation in SaveSearchDialog (Tab cycling, Escape to close)
+- **`role="progressbar"`** with `aria-valuenow`/`min`/`max` on progress bar
+- **`role="menu"`** / **`role="menuitem"`** with full keyboard navigation on theme toggle (ArrowUp/Down, Home/End, Escape)
+- **Focus management** after search results (auto-focus heading + scroll into view)
+- **Screen-reader-only result count announcement** via `aria-live` region
+- **Hidden "Resultados" heading** (`tabIndex={-1}`) as focus target
+- **`prefers-reduced-motion`** respected globally
+- **44px minimum touch targets** on all interactive elements
+- **Escape key handlers** on both ThemeToggle and SavedSearchesDropdown
+
+### Weaknesses
+
+| Issue | Impact | Fix Effort |
+|---|---|---|
+| No `aria-required` on mandatory form fields | Screen readers do not announce required state | Trivial |
+| Delete confirmation in SavedSearchesDropdown uses timeout (3s auto-cancel) | Confusing for screen reader users | Small |
+| Color alone distinguishes UF selected/unselected (mitigated by `aria-pressed`) | Visual-only users with color blindness | Small |
+| No contrast audit for Sepia/Paperwhite themes | Possible WCAG AA failures | Medium |
+| Region partial selection count only conveyed visually | Screen readers miss "(2/4)" indication | Small |
+
+### Overall A11y Grade: **B+**
+
+The application demonstrates deliberate, above-average accessibility attention for a POC. The main gaps are around edge cases in non-standard themes, missing `aria-required`, and some visual-only state indicators. The foundational patterns (ARIA roles, focus management, keyboard navigation, screen reader announcements) are solid.
+
+---
+
+## 14. Summary of Key Findings
+
+### What Changed Since v2.0
+
+| Previous Issue (v2.0) | Current Status |
+|---|---|
+| God component (page.tsx 1,071 lines) | **RESOLVED** -- Decomposed to 185 lines + 14 components + 5 hooks |
+| Missing Escape key on dropdowns | **RESOLVED** -- Both ThemeToggle and SavedSearchesDropdown handle Escape |
+| Modal missing focus trap and dialog role | **RESOLVED** -- SaveSearchDialog has full focus trap, role="dialog", aria-modal |
+| No skip-to-content link | **RESOLVED** -- Added in root layout |
+| No `<nav>` semantic element | **RESOLVED** -- Header nav has `aria-label="Navegacao principal"` |
+| No focus management after search | **RESOLVED** -- Auto-focus results heading with scroll |
+| External logo from Wix CDN | **RESOLVED** -- Self-hosted via next/image with priority |
+| Error boundary uses hardcoded colors | **RESOLVED** -- Uses CSS custom properties with fallbacks |
+| Duplicate UFS array | **RESOLVED** -- Centralized in `app/constants/ufs.ts` |
+| Test coverage ~49% | **IMPROVED** -- Now ~68% statements |
+
+### Top Priorities for Next Phase
+
+1. **UXD-001 (High):** Fix multi-word term input -- critical UX bug preventing legitimate search terms
+2. **UXD-015 (Medium):** Audit contrast ratios across all 5 themes for WCAG AA compliance
+3. **UXD-016 (Medium):** Decompose LoadingProgress into smaller sub-components
+4. **Design System:** Extract shared form input and button components to eliminate 4x duplication
+5. **Testing:** Add tests for ThemeProvider, RegionSelector, carouselData; target 75% coverage

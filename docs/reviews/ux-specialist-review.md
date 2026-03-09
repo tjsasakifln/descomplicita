@@ -1,296 +1,251 @@
 # UX Specialist Review
-**Reviewer:** @ux-design-expert (Pixel)
-**Date:** 2026-03-07
-**Reviewed Document:** docs/prd/technical-debt-DRAFT.md
-**Codebase Reference Commit:** 9fbd54d0 (main branch)
+## Reviewer: @ux-design-expert (Vera)
+## Data: 2026-03-09
+
+> **Note:** This review supersedes the previous review by @ux-design-expert (Pixel) dated 2026-03-07.
+> The codebase has changed substantially since that review -- the god component has been decomposed,
+> accessibility improvements have been implemented, and the debt IDs have been renumbered (UXD-* scheme).
+> All assessments below are based on the current codebase state as of commit 9c47d4ce.
 
 ---
 
-## 1. Debts Validated
+## Summary
 
-All frontend-related debts in the DRAFT were validated against the actual source code. Evidence and adjusted assessments follow.
+I reviewed all 20 UXD-* debts and 12 cross-cutting (XD-*) debts from the technical debt DRAFT against the actual codebase. The assessment is largely accurate. I validated 19 of 20 UXD debts, adjusted severity on 4 items, and found 3 new debts that were missed. The most impactful finding remains UXD-001 (multi-word terms impossible) -- this is a genuine user-facing bug that blocks legitimate search workflows. From a pure UX perspective, the hardcoded Tailwind colors in SearchSummary (UXD-018) should be elevated because they cause visible breakage in Sepia/Paperwhite themes, directly degrading the experience for users who chose those themes.
 
-| ID | Debt | Original Severity | Adjusted Severity | Hours | Complexity | Design Review? | Notes |
-|----|------|-------------------|-------------------|-------|------------|----------------|-------|
-| TD-004 | God component (page.tsx) | Critical | **Critical** | 28-40 | Complex | Yes | Confirmed: 23 useState calls, 4 useRef calls, 1,071 lines. Validated at `frontend/app/page.tsx`. This is the single largest UX velocity blocker. |
-| TD-008 | Modal missing focus trap and dialog role | High | **High** | 4-6 | Medium | No | Confirmed: Lines 1002-1061 of page.tsx. No `role="dialog"`, no `aria-modal`, no focus trap, no Escape handler. grep confirms zero occurrences of these attributes across the entire frontend. |
-| TD-009 | Missing Escape key on dropdowns | High | **High** | 2-3 | Simple | No | Confirmed: `ThemeToggle.tsx` lines 11-18 only handle mousedown outside click. `SavedSearchesDropdown.tsx` line 144 uses onClick backdrop. Neither has keydown listener. |
-| TD-010 | Insufficient color contrast (ink-muted) | High | **High** | 4-6 | Medium | Yes | Confirmed: `globals.css` line 11: `--ink-muted: #808f9f` (3.4:1 on white). Line 48: dark mode `--ink-muted: #6b7a8a` (3.8:1 on #121212). Both fail WCAG AA 4.5:1. Additionally, `--ink-faint` (#c0d2e5, 1.7:1) is used for actual text content in `SavedSearchesDropdown.tsx` lines 160 and 212, not just decorative purposes. Severity correctly High. |
-| TD-027 | No skip-to-content link | Medium | **Medium** | 1-2 | Simple | No | Confirmed: No skip link in page.tsx or layout.tsx. The header contains SavedSearchesDropdown and ThemeToggle, so keyboard users must tab through at least 4-5 interactive elements before reaching the form. |
-| TD-028 | External logo dependency (Wix CDN) | Medium | **Medium** | 2-3 | Simple | Yes | Confirmed: `page.tsx` line 15: `LOGO_URL = "https://static.wixstatic.com/..."`. Uses raw `<img>` tag (not Next.js Image). `public/logo-descomplicita.png` exists but is unused. |
-| TD-029 | Outdated favicon (Descomplicita "B") | Medium | **Medium** | 1-2 | Simple | Yes | Confirmed: `icon.svg` line 2-3: green (#166534) rectangle with white "B" letter. Completely wrong brand identity. |
-| TD-030 | Error boundary uses hardcoded colors | Medium | **Medium** | 2-4 | Simple | No | Confirmed: `error.tsx` uses `bg-gray-50`, `bg-white`, `text-gray-900`, `text-gray-600`, `bg-gray-100`, `text-gray-700`, `bg-green-600`, `text-gray-500`. Zero design system tokens used. This page completely ignores the 5-theme system. The green button (#16a34a) is from the old Descomplicita palette, not brand-navy. |
-| TD-031 | Missing focus management after search | Medium | **High** (upgraded) | 3-5 | Medium | No | Confirmed: No scrollIntoView or focus call after search completes. On mobile, the search form takes the full viewport, so results are entirely invisible until the user manually scrolls. For screen reader users, there is zero announcement of completion. This affects conversion (users might think search failed) and is an accessibility gap. Upgrading to High. |
-| TD-035 | Frontend emoji in source code | Low | **Low** | 1 | Simple | No | Confirmed: `LoadingProgress.tsx` line 11-16 embeds emoji directly in JSX. `AnalyticsProvider.tsx` lines 40-46 uses emoji in console.log. Style inconsistency, but functionally harmless. |
-| TD-039 | Deprecated performance API | Low | **Low** | 1 | Simple | No | Confirmed: `AnalyticsProvider.tsx` line 52: `performance.timing.navigationStart`. Deprecated but still functional in most browsers. |
-| TD-040 | No loading state for sector list | Low | **Low** | 1-2 | Simple | No | Confirmed: `page.tsx` lines 94-111 fetches sectors with no loading indicator. Falls back to hardcoded list silently. Minor UX gap. |
-| TD-041 | E2E tests reference outdated class names | Low | **Low** | 2-3 | Simple | No | Confirmed per DRAFT. Tests reference `bg-green-600` (old Descomplicita) while UI uses `bg-brand-navy`. |
-| TD-042 | No code splitting for components | Low | **Low** | 4-6 | Medium | No | Confirmed: All imports in page.tsx are static. `LoadingProgress` (415 lines) and `carouselData` (368 lines, 52 items) are conditionally rendered and good candidates for `next/dynamic`. |
-| TD-043 | No `<nav>` semantic element | Low | **Low** | 1 | Simple | No | Confirmed: Header in page.tsx has no `<nav>` wrapping the SavedSearchesDropdown and ThemeToggle. |
-| TD-044 | SourceBadges/carouselData hardcoded colors | Low | **Medium** (upgraded) | 3-5 | Medium | Yes | Confirmed: `SourceBadges.tsx` lines 49-54 uses `bg-green-100`, `bg-yellow-100`, `bg-red-100` with explicit `dark:` variants. These break visually in Paperwhite and Sepia themes because the dark: variant logic does not match the 5-theme system (Paperwhite/Sepia are light themes but have different canvas colors). `carouselData.ts` similarly uses hardcoded category colors. Upgrading to Medium because this causes visible visual inconsistency in 2 of 5 themes. |
-| TD-045 | Unused public asset | Low | **Low** | 0.5 | Simple | No | Confirmed: `public/logo-descomplicita.png` exists, unused. Will be resolved by TD-028. |
-| TD-046 | Missing aria-describedby for terms input | Low | **Low** | 1 | Simple | No | Confirmed: page.tsx terms input has helper text "Digite cada termo..." without `aria-describedby` linkage. |
+The previous review (Pixel, 2026-03-07) referenced debts (TD-004 god component, TD-008 focus trap, TD-009 Escape key, etc.) that have since been resolved. The current codebase is in substantially better shape: page.tsx is 185 lines, focus traps and ARIA roles are implemented, Escape handlers are present, and test coverage is at ~68%. The remaining debts are real but less severe than the previous assessment.
 
 ---
 
-## 2. Debts Added (Missed in DRAFT)
+## Debitos Validados
 
-| New ID | Debt | Severity | Hours | Category | Evidence |
-|--------|------|----------|-------|----------|----------|
-| TD-047 | Dropdown menus lack `role="menu"` and `role="menuitem"` ARIA pattern | Medium | 2-3 | Accessibility | `ThemeToggle.tsx` and `SavedSearchesDropdown.tsx` render dropdown items as plain `<button>` elements without menu roles. Screen readers cannot announce these as menu structures. No arrow key navigation between items. WCAG 4.1.2 requires proper role semantics for custom widgets. |
-| TD-048 | `window.confirm()` used for destructive action | Medium | 2-3 | UX | `SavedSearchesDropdown.tsx` line 174 uses `window.confirm('Deseja excluir todas as buscas salvas?')`. This native dialog is un-styled, breaks theme consistency, cannot be customized, and is blocked by some browsers. Should use a custom confirmation modal following the design system. |
-| TD-049 | EmptyState component lacks ARIA live region | Low | 1 | Accessibility | `EmptyState.tsx` renders informational content (rejection breakdown, suggestions) without `role="status"` or `aria-live`. When search completes with zero results, screen readers are not proactively informed. |
-| TD-050 | SourceBadges expandable section has no `aria-expanded` or keyboard disclosure pattern | Low | 1-2 | Accessibility | `SourceBadges.tsx` lines 30-42: the toggle button has no `aria-expanded` attribute, no `aria-controls` linking to the detail panel. Screen readers cannot communicate the expand/collapse state. |
-| TD-051 | UF grid buttons lack group label for screen readers | Medium | 1-2 | Accessibility | The 27 UF toggle buttons in `page.tsx` (lines ~600-650) have no `role="group"` wrapper or `aria-label` to communicate their purpose as a state selector grid. Screen reader users encounter 27 unlabeled toggle buttons without context. |
-| TD-052 | No `<h2>` heading structure in main content sections | Low | 1-2 | Accessibility | `page.tsx` uses a single `<h1>` ("Busca de Licitacoes") but the results section, loading section, and form sections lack heading hierarchy (`<h2>`, `<h3>`). Screen reader navigation by heading is ineffective. The EmptyState has an `<h3>` but there is no `<h2>` parent. |
-| TD-053 | Hardcoded `borderColor` in ThemeToggle preview circle | Low | 0.5 | Design | `ThemeToggle.tsx` line 58: `borderColor: theme === t.id ? "#116dff" : "var(--border-strong)"`. The `#116dff` is hardcoded rather than using the `--brand-blue` token. Minor but breaks the token abstraction. |
+| ID | Debito | Severidade Original | Severidade Ajustada | Horas | Prioridade | Impacto UX | Notas |
+|----|--------|---------------------|---------------------|-------|------------|------------|-------|
+| UXD-001 | Termos multi-palavras impossiveis | **Alta** | **Alta** | 3h | **P1** | Critico | Confirmado: SearchForm.tsx linha 113, espaco (`val.endsWith(" ")`) dispara criacao de token. Usuarios de licitacoes frequentemente buscam termos compostos ("camisa polo", "material de limpeza"). Bloqueador funcional real. |
+| UXD-002 | Sem loading state para fetch de setores | Media | Media | 1h | P3 | Medio | Confirmado: useSearchForm.ts usa FALLBACK_SETORES hardcoded (7 setores) enquanto busca. Dropdown nunca fica completamente vazio, mas setores podem estar desatualizados momentaneamente. Impacto menor que o previsto devido ao fallback. |
+| UXD-003 | Sem pagina 404 | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: nenhum `not-found.tsx` encontrado. Impacto baixo pois app tem rota unica. |
+| UXD-004 | Sem atalho de teclado para busca | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: Enter no input de termos cria token, nao submete busca. Campos de data nao tem handler de Enter. |
+| UXD-005 | SavedSearchesDropdown sem ARIA listbox | Media | Media | 3h | P3 | Medio | Confirmado: usa `div` com backdrop fixo inset-0. Funcional mas semanticamente incorreto. `aria-expanded` e `aria-haspopup` presentes, porem falta `role="listbox"` e `role="option"` nos itens. |
+| UXD-006 | SaveSearchDialog sem `<dialog>` nativo | Media | **Baixa** | 2h | P4 | Baixo | Confirmado: usa `div` com `role="dialog"` e `aria-modal="true"`. Focus trap manual funciona corretamente (Tab cycling, Escape). A implementacao atual atende ARIA spec. Migrar para `<dialog>` nativo e melhoria de codigo, nao de UX. Severidade reduzida. |
+| UXD-007 | Sem elemento `<form>` envolvendo formulario | Media | Media | 2h | P3 | Medio | Confirmado: page.tsx nao envolve o formulario em `<form>`. Impede autofill do browser e submissao nativa. Afeta usabilidade em mobile (teclado nao mostra "Go"/"Enviar"). |
+| UXD-008 | Mixpanel importado incondicionalmente | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: AnalyticsProvider importa mixpanel-browser no topo. ~40KB de bundle desnecessario quando analytics desabilitado. Impacto em performance, nao em UX diretamente. |
+| UXD-009 | Sem confirmacao page unload durante busca | Baixa | Baixa | 0.5h | P4 | Baixo | Parcialmente abordado: LoadingProgress.tsx ja tem listener `beforeunload` mas apenas para analytics tracking (trackEvent), nao para exibir confirmacao ao usuario. Falta adicionar `e.preventDefault(); e.returnValue = ""` para mostrar dialogo nativo do browser. Esforco reduzido pois o listener ja existe. |
+| UXD-010 | ThemeProvider imperativo (30+ props CSS) | Baixa | Baixa | 8h | P4 | Baixo | Confirmado: `applyTheme()` em ThemeProvider.tsx faz 30+ chamadas `root.style.setProperty()`. Funcional mas dificil de manter. Refatorar para data-attribute + CSS rules melhoraria DX mas nao afeta UX diretamente. |
+| UXD-011 | Script FOUC duplica logica do ThemeProvider | Media | Media | 3h | P3 | Medio | Confirmado: layout.tsx linhas 41-61 duplicam parcialmente a logica do ThemeProvider (canvas/ink apenas, dark class). Script inline aplica apenas 2-4 propriedades vs 30+ do ThemeProvider completo. Flash parcial possivel em Sepia/Paperwhite (surfaces e borders nao aplicadas no script inline). |
+| UXD-012 | Sem indicador offline/rede | Media | Media | 4h | P3 | Medio | Confirmado: nenhum uso de `navigator.onLine` ou Network Information API encontrado. Erros de rede durante polling mostram mensagem generica. |
+| UXD-013 | Footer sem conteudo significativo | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: page.tsx linha 180-182, footer contem apenas "DescompLicita -- Licitacoes e Contratos de Forma Descomplicada". Sem links de utilidade. |
+| UXD-014 | SourceBadges sem acentos portugues | Baixa | Baixa | 0.25h | P4 (Quick Win) | Baixo | Confirmado: SourceBadges.tsx linha 112, `combinac{...}oes` / `combinac{...}ao` sem acentuacao correta. |
+| UXD-015 | Sem auditoria de contraste (5 temas) | Media | **Alta** | 4h | **P2** | Alto | Confirmado e severidade elevada. ThemeProvider.tsx mostra que Sepia e Paperwhite tem tratamento especial para surfaces, mas cores semanticas como `--ink-secondary: #3d5975` sobre `--canvas: #EDE0CC` (Sepia) precisam verificacao. Acessibilidade e obrigacao legal (LBI 13.146/2015, WCAG AA), nao opcional. |
+| UXD-016 | LoadingProgress 450+ linhas | Media | Media | 6h | P3 | Baixo | Confirmado: 452 linhas. Componente funcional e complexo por natureza. Decomposicao melhora manutenibilidade mas nao afeta UX do usuario final. |
+| UXD-017 | Setores fallback hardcoded | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: useSearchForm.ts linhas 45-51, 7 setores hardcoded como FALLBACK_SETORES. Risco de drift se backend adicionar ou remover setores. |
+| UXD-018 | Cores hardcoded em SearchSummary | Baixa | **Media** | 1h | **P2** (Quick Win) | Medio | Confirmado e severidade elevada: SearchSummary.tsx linhas 26-33 usam `bg-blue-100 text-blue-800` e `bg-purple-100 text-purple-800` com fallback `dark:`. Essas cores ignoram completamente os temas Sepia e Paperwhite, criando badges visualmente inconsistentes. Usuarios desses temas veem cores que nao combinam com o restante da interface. |
+| UXD-019 | carouselData com cores hardcoded | Baixa | **Media** | 2h | P3 | Medio | Confirmado e severidade elevada: carouselData.ts usa `bg-blue-50 dark:bg-blue-950/30`, `bg-green-50`, etc. Mesma questao do UXD-018 -- ignora Sepia/Paperwhite. Porem impacto menor pois carrossel so aparece durante loading (transiente). |
+| UXD-020 | Sem noValidate no form | Baixa | Baixa | 0.1h | P4 (Quick Win) | Trivial | Confirmado: nenhum uso de `noValidate` encontrado. Porem, sem elemento `<form>` (UXD-007), `noValidate` nao se aplica atualmente. Este debito depende de UXD-007 ser resolvido primeiro. |
 
 ---
 
-## 3. Debts Contested (Disagree with Assessment)
+## Debitos Removidos
 
-| ID | Debt | Reason for Disagreement | Suggested Change |
-|----|------|------------------------|-----------------|
-| TD-010 | Color contrast: placed in "Low Impact + High Effort (Deprioritize)" quadrant in Section 8 | The DRAFT correctly marks severity as High, but then the Priority Matrix (Section 8) puts it in the "Deprioritize" quadrant with rationale "requires full contrast audit." A full audit is not required for the primary fix -- darkening `--ink-muted` in globals.css is a 2-line change that immediately resolves the most impactful failures. The `--ink-faint` audit is secondary. This should be in the Quick Wins quadrant. | Move TD-010 to "High Impact + Low Effort" for the primary fix (darken `--ink-muted`). Keep the `--ink-faint` comprehensive audit as a separate follow-up task. |
-| TD-031 | Focus management after search: categorized as Medium | As noted above, this should be High severity. On mobile devices, users have no visual indication that results have loaded. For screen reader users, there is no announcement whatsoever. This directly impacts conversion -- users may abandon the app thinking their search timed out. | Upgrade to High severity and move to Sprint 2 (Accessibility Critical Path). |
-| TD-016 | Branding inconsistency: estimated 4-8 hours | The frontend portion (TD-029 favicon + any UI references) is trivial (1-2 hours). The docker-compose and backend references are separate. The frontend effort is over-estimated when combined with non-frontend work. | Split estimate: 1-2 hours frontend, 2-3 hours backend/infra. |
+Nenhum debito completamente removido. Todos os 20 UXD debts sao reais e verificados no codigo.
+
+**UXD-020 merece nota:** embora valido, e inoperante ate que UXD-007 (adicionar `<form>`) seja resolvido. Nao e um falso positivo, mas e uma dependencia que deve ser documentada.
 
 ---
 
-## 4. Answers to @architect Questions
+## Debitos Adicionados
 
-### Question 1: TD-004 God Component Decomposition -- Component Boundaries
+| ID | Debito | Severidade | Horas | Prioridade | Impacto UX |
+|----|--------|------------|-------|------------|------------|
+| UXD-021 | **Cores amber hardcoded em SourceBadges e carouselData.** SourceBadges.tsx linha 111 usa `text-amber-600 dark:text-amber-400` para mensagem de truncamento, e carouselData.ts linha 46 usa `text-amber-600 dark:text-amber-400` para categoria "dica". Mesma classe de problema que UXD-018/019 -- nao responsivo aos temas Sepia/Paperwhite. Deveria usar token `text-warning`. | Baixa | 0.5h | P4 (Quick Win) | Baixo |
+| UXD-022 | **Sem `aria-required` em campos obrigatorios.** Nenhum campo do formulario marca campos obrigatorios com `aria-required="true"`. Verificado: zero resultados para `aria-required` no frontend. Screen readers nao anunciam quais campos sao mandatorios (UF, datas). Afeta acessibilidade. | Media | 0.5h | P2 (Quick Win) | Medio |
+| UXD-023 | **Delete confirmation timeout (3s) inacessivel para screen readers.** SavedSearchesDropdown.tsx linha 93 usa `setTimeout(() => setDeleteConfirmId(null), 3000)` e linha 199 faz o mesmo para "Limpar todas". Usuarios de screen reader ou com deficiencias motoras podem nao conseguir confirmar a acao em 3 segundos. WCAG 2.2.1 (Timing Adjustable) recomenda no minimo 20 segundos ou remocao do timeout. | Media | 1h | P2 | Medio |
 
-The proposed decomposition is sound but I recommend adjustments for future feature evolution:
+---
 
-**Approved as-is:**
-- `SearchForm` (mode toggle, sector select, terms input) -- good boundary
-- `DateRangeSelector` -- good, self-contained
-- `SaveSearchDialog` -- good, natural extraction point
-- `useSearchJob` custom hook -- critical, extracts the 23-state + 4-ref problem
+## Cross-cutting Debts Review
 
-**Recommended modifications:**
-- `UfSelector` should include the `RegionSelector` as a child (they are always used together). The parent component should be `UfSelector` which internally renders `RegionSelector` and the UF grid. This keeps the UF selection concern fully encapsulated.
-- `SearchResults` should be split further into `SearchSummary` (executive summary, highlights, urgency alert) and `SearchActions` (download button, save search trigger, stats). This supports a future comparison view where two summaries could appear side-by-side without duplicating action logic.
+### XD-SEC-01 (Headers de seguranca ausentes) - Media
+**Impacto UX:** Indireto. CSP poderia bloquear o inline script de FOUC (layout.tsx linhas 41-63) se implementado sem `nonce` ou hash. Ao implementar CSP, sera necessario alinhar com UXD-010/011 para evitar retrabalho.
 
-**Additional extraction I recommend:**
-- `SearchHeader` component wrapping the logo, SavedSearchesDropdown, and ThemeToggle. This enables adding navigation items later (e.g., a "Minhas Buscas" page link) without touching page.tsx.
+### XD-SEC-02 (Autenticacao fragil end-to-end) - Critica
+**Impacto UX:** Nenhum impacto UX direto na versao atual (POC sem login). Quando auth for implementado, sera necessario adicionar fluxo de login, registro, e tratamento de sessao expirada no frontend. Planejar UX de auth antecipadamente evitara retrabalho significativo.
 
-**Proposed final component tree:**
+### XD-SEC-03 (dangerouslySetInnerHTML + sem CSP) - Media
+**Impacto UX:** Confirmado em layout.tsx linhas 41-63. O script inline e seguro hoje (sem input de usuario), mas quando CSP for adicionado, este script precisara ser refatorado. Alinhar com UXD-010/011.
+
+### XD-API-01 (Sem versionamento de API) - Media
+**Impacto UX:** Mudancas no backend podem quebrar o frontend silenciosamente. Usuarios veriam erros genericos. Impacto mitigado pelo BFF pattern (API routes em Next.js atuam como adaptadores).
+
+### XD-API-02 (Sem testes de contrato) - Media
+**Impacto UX:** Drift entre tipos TypeScript e schemas Pydantic pode causar dados undefined no frontend, resultando em UI quebrada (texto faltando, contadores incorretos, downloads silenciosamente falhando).
+
+### XD-API-03 (Codigos de erro nao estruturados) - Baixa
+**Impacto UX:** Frontend depende de parsing de texto livre para exibir erros. Mensagens de erro podem ser confusas se backend mudar wording. Severidade adequada.
+
+### XD-PERF-01 (Download bufferizado em cadeia) - Alta
+**Impacto UX:** Alto. Usuarios experimentam delay significativo entre clicar "Download" e receber o arquivo. Sem indicador de progresso real para o download (apenas spinner). Para arquivos grandes, pode causar timeout (TD-H06) sem feedback claro ao usuario.
+
+### XD-PERF-02 (Sem paginacao end-to-end) - Media
+**Impacto UX:** Medio. O componente SearchSummary mostra resumo AI e o download Excel e o CTA principal, entao a maioria dos usuarios nao precisa percorrer resultados individualmente. Impacto aumentara quando lista detalhada de licitacoes for implementada.
+
+### XD-PERF-03 (Polling intervalo fixo) - Baixa
+**Impacto UX:** Baixo. Polling a cada 2s e imperceptivel para o usuario. Backoff exponencial economizaria requests mas nao melhoraria UX perceptivelmente. Severidade adequada.
+
+### XD-TEST-01 (Sem testes integracao frontend-backend) - Media
+**Impacto UX:** Indireto. Bugs de integracao so sao detectados em producao, afetando usuarios reais.
+
+### XD-TEST-02 (Sem smoke tests pos-deploy) - Media
+**Impacto UX:** Indireto. Deploy quebrado afeta todos os usuarios sem deteccao automatica.
+
+### XD-TEST-03 (Sem testes regressao visual) - Baixa
+**Impacto UX:** Com 5 temas, mudancas visuais involuntarias sao provaveis. Regressao visual nos temas Sepia/Paperwhite e particularmente arriscada dado os tokens hardcoded (UXD-018/019/021). Severidade adequada mas importancia cresce com cada correcao de tema.
+
+---
+
+## Respostas ao Architect
+
+### 1. UXD-001 (termos multi-palavras): abordagem preferida
+
+**Recomendacao: combinacao de aspas + virgula como delimitadores.**
+
+- Aspas duplas para termos compostos: `"camisa polo"` resulta em token unico "camisa polo"
+- Virgula como delimitador alternativo: `camisa polo, material limpeza` cria dois tokens compostos
+- Manter espaco como delimitador para termos simples (retrocompativel)
+- Placeholder deve atualizar para: `"Separe termos por virgula ou use aspas para termos compostos"`
+- Impacto na curva de aprendizado: minimo. Aspas sao convencao universal (Google, Amazon). Hint text no placeholder e no `aria-describedby` orientam usuarios novos.
+- Alternativa descartada: modal de adicao de termo (overengineering para POC).
+
+### 2. UXD-015 (contraste dos temas): ferramenta e decisao sobre temas
+
+**Ferramenta recomendada:** axe DevTools browser extension para auditoria manual dos 5 temas, complementado por `@axe-core/playwright` (ja instalado no projeto) para auditoria automatizada no E2E.
+
+**Processo:**
+1. Para cada tema, executar axe no browser com todos os estados visiveis (form vazio, loading, resultados, empty state, erro)
+2. Documentar todos os pares foreground/background e seus ratios de contraste
+3. Ajustar tokens no ThemeProvider onde necessario
+4. Adicionar teste E2E com axe para cada tema prevenindo regressoes
+
+**Sobre manter Sepia e Paperwhite:** Manter ambos. Eles atendem casos de uso reais:
+- **Paperwhite:** reduz fadiga visual para uso prolongado (e-ink aesthetic)
+- **Sepia:** preferido por usuarios com sensibilidade a luz azul
+- Remover temas seria uma regressao de acessibilidade e preferencia do usuario
+- O custo de manter 5 temas e baixo se os tokens forem corrigidos (UXD-018/019/021)
+
+### 3. UXD-016 (LoadingProgress): decomposicao recomendada
+
+**Sim, a decomposicao sugerida esta correta.** Recomendo:
+
 ```
-HomePage (page.tsx, target: <150 lines)
-  SearchHeader
-    Logo
-    SavedSearchesDropdown
-    ThemeToggle
-  SearchForm
-    SearchModeToggle
-    SectorSelect | TermsInput
-    UfSelector
-      RegionSelector
-      UfGrid
-    DateRangeSelector
-  LoadingProgress (existing, 415 lines -- consider splitting stage indicator from carousel)
-  SearchSummary (executive summary, highlights)
-  SearchActions (download, save, stats)
-  SourceBadges (existing)
-  EmptyState (existing)
-  SaveSearchDialog
-  Footer
-```
-
-**Target:** No component exceeds 200 lines. `useSearchJob` hook handles polling, phase state, and job lifecycle. A `useSearchForm` hook handles form state, validation, and defaults.
-
-### Question 2: TD-010 Color Contrast -- `--ink-muted` Fix
-
-Darkening `--ink-muted` to approximately `#5a6a7a` is acceptable. I have verified this value:
-
-- `#5a6a7a` on `#ffffff` (light canvas) = 4.86:1 -- passes WCAG AA for normal text
-- For dark mode, the current `#6b7a8a` on `#121212` = 3.8:1, failing AA. I recommend darkening the dark mode value to `#8a99a9` which yields 5.2:1 on `#121212`.
-
-**On the `--ink-faint` question:** The role of `--ink-faint` should be restricted to purely decorative purposes (borders, background tints, placeholder text). Currently it is used for actual readable text content in `SavedSearchesDropdown.tsx` lines 160 and 212 (helper text and timestamps). Those usages should be changed to `text-ink-muted`. The `--ink-faint` token value itself does not need to change -- its purpose just needs to be enforced through a lint rule or documentation.
-
-**Recommendation:** Do not change the design intent of the muted role. Darken the value. Document that `--ink-faint` is decoration-only.
-
-### Question 3: TD-FE-010 (i18n) -- Is It a Near-Term Need?
-
-**No, i18n is not a near-term need.** The product exclusively targets Brazilian procurement professionals operating in Brazilian government portals. All backend data is in Portuguese. The domain vocabulary (licitacao, modalidade, pregao, etc.) does not translate meaningfully.
-
-**However,** during the God Component decomposition (TD-004), I recommend extracting user-facing string constants into a centralized `frontend/lib/strings.ts` file -- not for i18n, but for:
-1. Consistency of messaging across components
-2. Easier A/B testing of copy
-3. Simpler QA verification of Portuguese text
-4. Enabling future i18n with minimal additional work if needed
-
-This adds approximately 2-3 hours to the TD-004 effort but provides immediate maintainability value. It is not a separate debt item -- it should be part of the decomposition workstream.
-
-### Question 4: TD-030 Error Boundary -- Theme System Participation
-
-**The error boundary should partially participate in the theme system** with a defensive fallback.
-
-Rationale: Error boundaries catch JavaScript errors. If the error is in the ThemeProvider itself, CSS custom properties may be unavailable. However, the design tokens are defined in `globals.css` via `:root` and `.dark` selectors, not via JavaScript. They will always be available as long as the stylesheet loads.
-
-**Recommended approach:**
-1. Use design system tokens for background, text, and border colors (`bg-canvas`, `text-ink`, etc.)
-2. Keep the button using `bg-brand-navy` (matches the rest of the app)
-3. Add a CSS `@supports` fallback for the unlikely case CSS variables fail:
-```css
-.error-fallback {
-  background: var(--canvas, #ffffff);
-  color: var(--ink, #1e2d3b);
-}
-```
-
-This way the error page respects all 5 themes but has a safe fallback. Effort: 2 hours.
-
-### Question 5: TD-028 Logo -- Brand Asset Status
-
-The local `public/logo-descomplicita.png` should be used as-is via Next.js `<Image>`. Verify with the brand owner whether there is an SVG version available (preferred for resolution independence and smaller file size).
-
-**For the favicon (TD-029):** The new favicon should be a navy "D" on a white/transparent background, or the Descomplicita brand mark if one exists. The SVG favicon should use:
-```svg
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="6" fill="#0a1e3f"/>
-  <text x="16" y="23" text-anchor="middle" font-family="system-ui,sans-serif"
-        font-weight="bold" font-size="18" fill="white">D</text>
-</svg>
+LoadingProgress.tsx (orquestrador, ~80 linhas)
+  |-- ProgressBar.tsx (~40 linhas: barra visual, ETA, porcentagem)
+  |-- StageList.tsx (~60 linhas: lista de estagios com icones e status)
+  |-- UfProgressGrid.tsx (~50 linhas: grid de UFs com status individual)
+  |-- CuriosityCarousel.tsx (~80 linhas: carrossel de dicas/curiosidades)
+  |-- LoadingSkeleton.tsx (~30 linhas: skeleton para fallback do dynamic import)
 ```
 
-This maintains structural consistency with the existing SVG favicon while updating the brand colors and letter. The brand owner should confirm whether a brand mark or the "D" letter is preferred.
+Beneficios: cada sub-componente e testavel isoladamente, o carrossel pode ser lazy-loaded separadamente, e futuros ajustes de UX em um estagio nao arriscam quebrar outros. O carouselData.ts (369 linhas, 52 items) deve ser dynamically imported dentro de CuriosityCarousel para reduzir bundle inicial (~15KB economia).
 
-### Question 6: Frontend Test Coverage Discrepancy
+### 4. Design System: prioridade entre opcoes
 
-**The 49.45% statement / 39.56% branch coverage from `jest.config.js` is the canonical measurement.** The 91.5% figure in the architecture doc appears to be aspirational or from a partial measurement (possibly covering only the files that have tests, excluding files without any test coverage).
+**Ordem recomendada:**
 
-**Realistic target for next milestone:**
-- After TD-004 decomposition: 65% statements, 50% branches (each extracted component should ship with a co-located test file)
-- After accessibility remediation sprint: 70% statements, 55% branches
-- Long-term target: 80% statements, 65% branches
+1. **(a) Extrair `<TextInput>` e `<Button>` primeiro.** Impacto imediato: elimina 4x duplicacao de estilos de input (verificada em SearchForm setor select, SearchForm terms wrapper, DateRangeSelector 2x, SaveSearchDialog) e padroniza botoes. Retorno de investimento mais rapido. Estimativa: 4h para TextInput + Button + migracao dos 4+ locais.
+2. **(c) Documentacao de design system.** Um `DESIGN_SYSTEM.md` simples com tokens existentes, tipografia, e componentes. Nao precisa ser exaustivo -- documenta o que ja existe. 2h.
+3. **(b) Setup Storybook.** Ultimo, pois Storybook e mais util quando ha componentes reutilizaveis para documentar. Sem (a) e (c), Storybook seria um shell vazio. Estimativa: 3h para setup + stories iniciais dos componentes extraidos.
 
-**Important:** The decomposition in TD-004 will temporarily decrease coverage because new files are created without tests. The target should be enforced per-component, not as a global threshold, during the decomposition sprint.
+### 5. UXD-005/UXD-006: prioridade de migracao para `<dialog>`
 
-### Question 7: Large-Screen Optimization (`max-w-4xl`)
+**Nao e prioritaria.** As implementacoes atuais funcionam corretamente:
 
-**The narrow content column (896px) is intentional and correct for this application.** Rationale:
+- **SaveSearchDialog** tem focus trap funcional, `role="dialog"`, `aria-modal="true"`, Escape handler -- atende ARIA spec completamente
+- **SavedSearchesDropdown** tem `aria-expanded`, `aria-haspopup`, Escape handler via document keydown listener -- funcional
 
-1. The primary content is a search form and text-heavy results (executive summary, highlights). Optimal reading width for body text is 50-75 characters per line, which maps to approximately 600-900px.
-2. The UF grid (27 buttons) renders well at 9 columns within 896px. Wider would create too much whitespace between buttons.
-3. Procurement professionals typically have one application window alongside their email/ERP. A narrow layout works well in split-screen scenarios.
+Migracao para `<dialog>` nativo traz beneficios de manutenibilidade (eliminacao de codigo de focus trap) mas nao melhora UX ou acessibilidade perceptivelmente. Por esse motivo rebaixei UXD-006 para Baixa.
 
-**Future consideration:** If a comparison view (side-by-side results from two searches) or a dashboard view is added, the max-width should expand to `max-w-7xl` (1280px) with a two-column layout. This is a feature decision, not a debt.
+**UXD-005 permanece Media** porque o dropdown nao e semanticamente um dialog -- e um listbox/menu. A correcao deveria adicionar `role="listbox"` e `role="option"` nos itens da lista, nao migrar para `<dialog>`.
 
----
+### 6. Acessibilidade geral: B+ adequado para POC?
 
-## 5. Design Recommendations
+**B+ e adequado para estagio POC, mas existem itens que deveriam ser P2 antes de lancamento publico:**
 
-### 5.1 God Component Decomposition Strategy
+- **UXD-022 (aria-required):** Quick win de 30 minutos, melhora experiencia de screen reader significativamente. Campos obrigatorios nao sao anunciados como tal.
+- **UXD-015 (contraste):** Obrigacao legal em muitas jurisdicoes (incluindo Brasil, LBI 13.146/2015). Deveria ser P2 no minimo.
+- **UXD-023 (timeout 3s em confirmacao de delete):** Viola WCAG 2.2.1 (Timing Adjustable) tecnicamente. Fix simples: aumentar timeout para 10s ou remover completamente.
 
-**Phase 1: Extract hooks (4-6 hours)**
-1. `useSearchJob` -- polling logic, job lifecycle, phase state, elapsed time, cancel (moves ~150 lines out of page.tsx)
-2. `useSearchForm` -- form state, validation, defaults, saved search loading (moves ~100 lines)
+Nenhum desses e P0 bloqueador pois a app funciona para a maioria dos usuarios. Mas esses 3 itens devem ser resolvidos antes de qualquer lancamento publico ou apresentacao para clientes.
 
-**Phase 2: Extract leaf components (8-12 hours)**
-3. `SaveSearchDialog` -- lines 1002-1061 of page.tsx, add `role="dialog"`, focus trap (resolves TD-008 simultaneously)
-4. `UfSelector` -- UF grid + RegionSelector composition, UF_NAMES constant
-5. `SearchHeader` -- logo, dropdowns, theme toggle
-6. `DateRangeSelector` -- date inputs with validation display
-
-**Phase 3: Extract result components (6-10 hours)**
-7. `SearchSummary` -- executive summary, highlights, urgency alert
-8. `SearchActions` -- download button, save search trigger, statistics
-
-**Phase 4: Wire and test (8-12 hours)**
-9. Rewrite `page.tsx` as a thin orchestrator (<150 lines)
-10. Add unit tests for each extracted component
-11. Run E2E suite to verify no regressions
-
-**Total: 26-40 hours** (aligns with DRAFT estimate)
-
-### 5.2 Design System Improvements
-
-**Immediate (with TD-010 fix):**
-- Darken `--ink-muted` to `#5a6a7a` (light) and `#8a99a9` (dark)
-- Document token usage rules: `--ink-faint` is decoration-only, never for readable text
-- Add a comment block in `globals.css` documenting contrast ratios for each ink token
-
-**Short-term (with TD-004 decomposition):**
-- Create semantic color tokens for status indicators: `--status-success`, `--status-warning`, `--status-error` that work across all 5 themes (replacing hardcoded Tailwind colors in SourceBadges)
-- Add `--status-success-bg`, `--status-warning-bg`, `--status-error-bg` surface tokens for badge backgrounds
-- Move category colors from `carouselData.ts` into CSS custom properties
-
-**Medium-term:**
-- Create a `frontend/lib/design-tokens.ts` file exporting all token values for use in JavaScript contexts (e.g., inline styles in ThemeToggle line 58)
-- Add Tailwind plugin or custom config for status color utilities
-
-### 5.3 Accessibility Remediation Plan
-
-Priority order based on user impact and legal risk (LBI Law 13.146/2015):
-
-**Wave 1 -- Keyboard users unblocked (Sprint 2, ~8-10 hours):**
-1. TD-008: Modal focus trap + dialog role (4-6h) -- Keyboard users currently trapped
-2. TD-009: Escape key on dropdowns (2-3h) -- Keyboard users cannot dismiss
-3. TD-027: Skip-to-content link (1h) -- Quick win
-
-**Wave 2 -- Screen reader users supported (Sprint 2-3, ~8-10 hours):**
-4. TD-031: Focus management after search (3-5h) -- Users miss results
-5. TD-051 (new): UF grid group label (1-2h)
-6. TD-046: aria-describedby for terms input (1h)
-7. TD-047 (new): Menu roles on dropdowns (2-3h)
-8. TD-050 (new): SourceBadges aria-expanded (1-2h)
-
-**Wave 3 -- Visual accessibility (Sprint 2, ~5-7 hours):**
-9. TD-010: Color contrast fix (4-6h) -- Two-line CSS change for primary fix, plus audit of ink-faint usage
-
-**Wave 4 -- Structural semantics (Backlog, ~3-4 hours):**
-10. TD-043: Nav element (1h)
-11. TD-052 (new): Heading hierarchy (1-2h)
-12. TD-049 (new): EmptyState aria-live (1h)
+A nota B+ e justificada pelo trabalho ja realizado: skip navigation, focus traps, ARIA roles, keyboard navigation em menus, aria-live regions, prefers-reduced-motion, 44px touch targets. A fundacao de acessibilidade e solida.
 
 ---
 
-## 6. Effort Summary
+## Recomendacoes de Design
 
-| Category | Items | Hours (Low) | Hours (High) | Priority |
-|----------|-------|-------------|--------------|----------|
-| Accessibility (existing) | 8 (TD-008, 009, 010, 027, 031, 043, 046, + TD-031 upgrade) | 14 | 24 | Critical/High |
-| Accessibility (new) | 5 (TD-047, 049, 050, 051, 052) | 6 | 10 | Medium/Low |
-| Component Architecture | 2 (TD-004, TD-042) | 32 | 46 | Critical |
-| Design Consistency | 5 (TD-029, 030, 044, 053, TD-028) | 9 | 15 | Medium |
-| UX Quality | 2 (TD-040, TD-048) | 3 | 5 | Low/Medium |
-| Branding (frontend portion) | 2 (TD-029, TD-028) | 3 | 5 | Medium |
-| Code Quality (frontend) | 4 (TD-021, 035, 039, 041) | 5 | 10 | Low |
-| Performance (frontend) | 1 (TD-042) | 4 | 6 | Low |
-| **TOTAL (Frontend)** | **29** | **76** | **121** | |
+### 1. Resolver inconsistencia de cores por tema (UXD-018/019/021)
+Criar tokens semanticos para badges de tipo no design token system:
+- `--badge-primary-bg`, `--badge-primary-text`, `--badge-primary-border`
+- `--badge-secondary-bg`, `--badge-secondary-text`, `--badge-secondary-border`
+- `--badge-info-text` (para mensagens warning/informativas, substituindo amber hardcoded)
 
-**Notes:**
-- These estimates are frontend-only. Backend debts (TD-001 through TD-003, TD-005 through TD-007, etc.) are outside my scope.
-- TD-004 is the highest-leverage item: completing it unblocks TD-008, TD-031, TD-042, and TD-021, and makes all future frontend work faster.
-- The accessibility wave 1 items (TD-008, TD-009, TD-027) are high impact, low effort, and should be done in the same sprint as or immediately after TD-004.
-- TD-031 severity upgrade (Medium to High) is my strongest recommendation. On mobile, invisible results are a direct conversion killer.
+Esses tokens devem ser definidos por tema no ThemeProvider `applyTheme()`, eliminando todas as cores Tailwind hardcoded em SearchSummary, carouselData, e SourceBadges.
+
+### 2. Input de termos multi-palavras (UXD-001)
+A implementacao deve:
+- Detectar aspas no input e nao quebrar em espacos quando dentro de aspas
+- Aceitar virgula como delimitador alternativo ao espaco
+- Mostrar hint text claro com exemplos no `aria-describedby`
+- Suportar paste de termos separados por virgula (parse no onChange)
+- Atualizar placeholder contextualmente
+
+### 3. Componentes de formulario extraidos
+Priorizar `<TextInput>` com as seguintes props:
+```
+id, label, value, onChange, placeholder, error?, required?, maxLength?, hint?
+```
+Isso eliminaria a duplicacao de classes CSS em 4+ locais e garantiria consistencia visual automaticamente, alem de fornecer ponto unico para adicionar `aria-required` (resolvendo UXD-022).
+
+### 4. Script FOUC alinhado com ThemeProvider (UXD-011)
+O script inline em layout.tsx aplica apenas `--canvas` e `--ink` (+ dark class). Quando o ThemeProvider monta, ele aplica 30+ propriedades. O gap temporal causa micro-flash em superficies, borders, e badges. Opcoes:
+- **Curto prazo (recomendado):** Expandir script inline para cobrir `--surface-0`, `--surface-1`, `--border`, `--border-strong` (4 propriedades extras com maior impacto visual)
+- **Longo prazo:** Migrar para data-attribute approach (UXD-010) que eliminaria o script inline completamente
 
 ---
 
-## 7. Sprint Sequence Recommendation (UX Perspective)
+## Ordem de Resolucao Recomendada (UX)
 
-**Sprint 1 (Security):** No change from DRAFT -- agree with TD-001, TD-002, TD-006, TD-012 first.
+1. **UXD-001** - Termos multi-palavras (3h) -- bloqueador funcional, usuarios nao conseguem buscar termos compostos
+2. **UXD-022** - Adicionar aria-required (0.5h) -- quick win de acessibilidade
+3. **UXD-018** - Cores hardcoded SearchSummary (1h) -- quebra visual em temas, quick win
+4. **UXD-015** - Auditoria de contraste dos 5 temas (4h) -- obrigacao de acessibilidade
+5. **UXD-023** - Timeout de confirmacao de delete (1h) -- violacao WCAG 2.2.1
+6. **UXD-007** - Adicionar elemento `<form>` (2h) -- melhora autofill e mobile UX
+7. **UXD-021** - Cores amber hardcoded (0.5h) -- quick win junto com UXD-018
+8. **UXD-019** - Cores hardcoded carouselData (2h) -- consistencia visual em temas
+9. **UXD-011** - Alinhar script FOUC com ThemeProvider (3h) -- elimina micro-flash de tema
+10. **UXD-005** - SavedSearchesDropdown ARIA listbox (3h) -- semantica correta para screen readers
+11. **UXD-012** - Indicador offline/rede (4h) -- melhora feedback de erros de conectividade
+12. **UXD-016** - Decomposicao LoadingProgress (6h) -- manutenibilidade e testabilidade
 
-**Sprint 2 (Accessibility + UX Quick Wins):**
-TD-008, TD-009, TD-010 (primary fix only), TD-027, TD-031 (~14-22 hours)
-Rationale: These are all small, independent fixes that immediately improve the experience for keyboard, screen reader, and low-vision users. Brazilian accessibility law applies to government-facing tools.
+---
 
-**Sprint 3 (Frontend Architecture):**
-TD-004 (God component decomposition, ~28-40 hours)
-During this sprint, also resolve TD-021 (UFS dedup) and TD-028 (self-host logo) as natural parts of the extraction.
+## Quick Wins UX
 
-**Sprint 4 (Design Cleanup):**
-TD-029 (favicon), TD-030 (error boundary), TD-044 (hardcoded colors), TD-048 (window.confirm replacement) (~8-14 hours)
+Correcoes com alto retorno de investimento, executaveis em menos de 1 hora cada:
 
-**Backlog:**
-TD-042, TD-043, TD-046, TD-047, TD-049, TD-050, TD-051, TD-052, TD-053, TD-035, TD-039, TD-040, TD-041
+| ID | Debito | Tempo | Impacto | Descricao da Correcao |
+|----|--------|-------|---------|----------------------|
+| UXD-014 | SourceBadges sem acentos | 15min | Percepcao de qualidade | Corrigir `combinacoes`/`combinacao` para formas com acentuacao correta em SourceBadges.tsx linha 112 |
+| UXD-020 | Sem noValidate no form | 5min | Prevencao de conflito | Adicionar `noValidate` ao `<form>` (implementar junto com UXD-007) |
+| UXD-022 | Sem aria-required | 30min | Acessibilidade | Adicionar `aria-required="true"` nos campos de UF, data, e setor/termos |
+| UXD-021 | Cores amber hardcoded | 30min | Consistencia visual | Substituir `text-amber-600 dark:text-amber-400` por `text-warning` em SourceBadges.tsx e carouselData.ts |
+| UXD-018 | Cores hardcoded SearchSummary | 1h | Corrigir quebra em temas | Criar tokens de badge e substituir `bg-blue-100` etc. por tokens que respeitem todos os 5 temas |
+| UXD-009 | Sem confirmacao page unload | 30min | Prevencao de perda | Adicionar `e.preventDefault(); e.returnValue = ""` no listener existente de beforeunload em LoadingProgress.tsx |
+
+**Total quick wins: ~3 horas para 6 correcoes com impacto imediato.**
 
 ---
 
 **Review Status: COMPLETE**
-**Reviewer:** @ux-design-expert (Pixel)
-**Signed:** 2026-03-07
+**Reviewer:** @ux-design-expert (Vera)
+**Signed:** 2026-03-09
 **Next step:** Consolidation by @architect into final technical-debt.md

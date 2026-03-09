@@ -1,344 +1,271 @@
-# QA Review -- Technical Debt Assessment
-**Reviewer:** @qa (Shield)
-**Date:** 2026-03-07
-**Reviewed Document:** docs/prd/technical-debt-DRAFT.md
-**Codebase Commit:** 9fbd54d0 (main branch)
+# QA Review - Technical Debt Assessment
 
----
+## Reviewer: @qa (Quinn)
+## Data: 2026-03-09
 
 ## Gate Status: APPROVED WITH CONDITIONS
 
-The DRAFT is well-structured, thorough, and ready for final consolidation -- provided the conditions listed at the end of this review are addressed. The assessment correctly identifies the most critical issues and proposes a reasonable execution plan.
+## Assessment Completeness Score: 8/10
+
+## Executive Summary
+
+The technical debt DRAFT is a well-structured, thorough consolidation of the Brownfield Discovery Phases 1 and 3. It covers 52 debts across system, frontend/UX, and cross-cutting categories with a clear prioritization matrix and dependency analysis. The assessment demonstrates strong technical rigor and the severity ratings are largely accurate.
+
+However, there are notable gaps: (1) the assessment does not address operational/infrastructure debts beyond the Vercel timeout issue, (2) secret management and environment variable handling are underexamined, (3) the dependency chain analysis is incomplete with some missing edges, and (4) the backend test coverage is not quantified while the frontend coverage is well-documented. The assessment is fit for planning with the conditions outlined below.
 
 ---
 
-## 1. Coverage Investigation
+## Gaps Identificados
 
-### 1.1 Frontend Coverage Analysis
-
-**Configured coverage (jest.config.js):**
-- Statements threshold: 49%
-- Branches threshold: 39%
-- Functions threshold: 41%
-- Lines threshold: 50%
-
-The `jest.config.js` comments explicitly document the discrepancy: "target: 60% per CLAUDE.md, current: 49.45%". The thresholds are set to the current measured values, not aspirational targets.
-
-**Actual measured coverage:** ~49.45% statements, ~39.56% branches (per config comments -- these are the last-run values baked into the threshold floor).
-
-**The 91.5% claim is incorrect.** The system-architecture.md (Section 13.2) states "91.5% frontend test coverage" but this is contradicted by the project's own jest.config.js. The 91.5% figure likely originated from an early draft or was aspirational. The DRAFT correctly flags this discrepancy in Section 9 and Appendix C.
-
-**Components without dedicated unit tests:**
-- `RegionSelector.tsx` -- no unit test
-- `SavedSearchesDropdown.tsx` -- no dedicated test (only indirect via page.test.tsx)
-- `SourceBadges.tsx` -- no unit test
-- `AnalyticsProvider.tsx` -- no unit test
-- `ThemeProvider.tsx` -- no unit test
-- `carouselData.ts` -- no unit test for `shuffleBalanced` algorithm
-
-**Hooks without dedicated tests:**
-- `useSavedSearches` -- no dedicated hook test
-- `useAnalytics` -- tested via analytics.test.ts but not as an isolated hook
-
-**Verdict:** The DRAFT's characterization of a major coverage gap is **confirmed**. The 91.5% figure must be corrected in the final document. Realistic current coverage is ~49% statements.
-
-### 1.2 Backend Coverage Analysis
-
-**Configured coverage (pyproject.toml):**
-- `fail_under = 70.0` (CI threshold)
-- Branch coverage enabled
-- Source includes all backend files, excludes tests/ and venv/
-
-**Claim validity: PARTIALLY VALID but needs qualification.**
-
-The 99.2% claim is plausible given the test infrastructure:
-- 26 test files with a total of **1,028 test function definitions** (counted via `def test_` pattern matching). The architecture doc claims 226+ tests, which significantly undercounts the actual number.
-- Every backend module has a corresponding test file.
-- Coverage runs in CI with `--cov=.` and uploads to Codecov.
-
-However, several important qualifications:
-
-1. **The CI coverage check uses `continue-on-error: true`** (tests.yml line 76). This means even if coverage drops below 70%, the pipeline still passes. This weakens the enforcement of the threshold.
-
-2. **Integration tests are skipped.** `test_pncp_integration.py` has `@pytest.mark.skip(reason="Integration test - requires real API access")`. The integration-tests CI job prints a placeholder message: "Integration tests will be implemented in issue #27".
-
-3. **Tests heavily use mocks.** The `conftest.py` and `mock_helpers.py` create mock orchestrators. While this is appropriate for unit tests, there is no end-to-end backend pipeline test that exercises POST /buscar -> poll -> result with even partially real components.
-
-4. **Test-to-source naming inconsistency detected.** `test_main.py:24` asserts `app.title == "Descomplicita API"` but `main.py:59` now sets `title="Descomplicita API"`. This test is **currently failing** or was patched locally. This is a concrete branding debt artifact that the DRAFT should flag more prominently.
-
-5. **Test files also use deprecated patterns.** `test_main.py:124` uses `datetime.utcnow()`, `test_concurrency.py:222` uses `asyncio.get_event_loop()`. When TD-015 and TD-024 are fixed, these test files will also need updates.
-
-**Untested or lightly tested modules:**
-- `config.py` -- `test_config.py` exists (23 tests) -- appears adequate
-- `sources/comprasgov_source.py`, `querido_diario_source.py`, `tce_rj_source.py` -- tests exist for disabled sources (good for when they are re-enabled)
-
-**Verdict:** The 99.2% line coverage claim is plausible but the **quality** of that coverage is moderate. High line coverage does not equal high confidence when integration tests are absent and CI enforcement uses `continue-on-error`.
+| # | Gap | Area | Impacto | Recomendacao |
+|---|-----|------|---------|--------------|
+| G-01 | **Backend test coverage not quantified.** The DRAFT quotes 33 backend test files but never states a coverage percentage. `pyproject.toml` sets `fail_under = 70.0` but actual measured coverage is not reported. | Backend / Testing | Cannot validate if backend coverage target is met; planning assumptions may be wrong | Run `pytest --cov` and document actual coverage in the assessment |
+| G-02 | **No assessment of secret/credential management.** `OPENAI_API_KEY`, `API_KEY`, `BACKEND_API_KEY`, Redis URL, Sentry DSN -- all managed via environment variables with no rotation policy, no vault, no encryption at rest. | Security / Infra | Credential leak risk; no audit trail for secret access | Add a debt item for secrets management (at least Medium severity) |
+| G-03 | **No assessment of logging/PII exposure.** Structured logging with correlation IDs is mentioned as a strength, but no analysis of whether user search terms, IP addresses, or other PII are logged. | Security / Compliance | LGPD compliance risk (Brazilian data protection law) | Audit log output for PII leakage; add debt if found |
+| G-04 | **No assessment of dependency vulnerabilities.** No mention of `pip audit`, `npm audit`, Dependabot, or Snyk. Third-party supply chain risk unaddressed. | Security | Known CVEs in dependencies could be exploitable | Add debt item for dependency scanning in CI |
+| G-05 | **No assessment of error information leakage.** Backend error responses may expose stack traces, internal paths, or dependency versions in production. | Security | Information disclosure to attackers | Audit error responses in production mode |
+| G-06 | **Infrastructure debt not covered.** Railway and Vercel configuration drift, lack of IaC (Infrastructure as Code), no staging environment mentioned, no blue-green or canary deployment strategy. | Infra / DevOps | Deployment risk, no rollback strategy documented | Add infra debt section or explicitly scope it out |
+| G-07 | **No assessment of data validation depth.** Input validation exists (termos_busca max length) but no analysis of injection risks in UF codes, date ranges, or sector IDs passed to external APIs. | Security | Potential SSRF or injection via crafted parameters forwarded to PNCP/Transparencia | Audit input validation for all API parameters |
+| G-08 | **Backup/recovery not addressed.** Redis is ephemeral by design, but there is no mention of what happens when Redis is completely unavailable (not just slow). | Resilience | Complete service failure if Redis goes down without graceful degradation | Assess Redis failure modes |
+| G-09 | **OpenAI API cost control not assessed.** No mention of token usage limits, cost caps, or monitoring for the LLM calls. A runaway loop could generate significant costs. | Operational | Unexpected cloud costs | Add operational debt item |
+| G-10 | **Frontend bundle size not baselined.** No Lighthouse CI, no bundle analysis (webpack-bundle-analyzer), no performance budget. | Performance | Regressions undetectable without baseline | Establish bundle size budget |
 
 ---
 
-## 2. Gaps Identified
+## Riscos Cruzados
 
-| # | Gap | Area | Risk Level | Recommendation |
-|---|-----|------|------------|----------------|
-| G-01 | **Failing backend test not flagged** -- `test_main.py` asserts `app.title == "Descomplicita API"` but main.py says `"Descomplicita API"`. At least 2 tests are currently broken. | Code Quality | High | Add as sub-item of TD-016 or new TD item. Fix immediately since it masks CI failures. |
-| G-02 | **CI coverage check is non-blocking** -- `continue-on-error: true` on the coverage threshold step means coverage regressions pass silently | Maintainability | Medium | Remove `continue-on-error` once coverage stabilizes, or add a separate required status check |
-| G-03 | **No Sentry or APM integration** -- `.env.example` has a SENTRY_DSN placeholder but no actual Sentry SDK is installed in requirements.txt or package.json | Observability | Medium | Add as a new debt item (TD-047). The system-architecture.md mentions it in recommendations but it is missing from the debt inventory. |
-| G-04 | **`termos_busca` input not length-limited** -- while regex injection is mitigated via `re.escape()`, there is no max length validation. A user could submit a megabyte-long string. | Security | Medium | Add length validation to `BuscaRequest.termos_busca` (e.g., `max_length=500`) |
-| G-05 | **Debug/diagnostic endpoints in production** -- `/cache/stats`, `/cache/clear`, `/debug/pncp-test` are exposed without auth | Security | Medium | Should be gated behind auth or disabled in production. Add as security debt item. |
-| G-06 | **E2E tests do not use axe-core despite it being installed** -- `@axe-core/playwright` is in dependencies but `grep -r "axe" __tests__/e2e/` returns zero matches | Testing | Low | Document in test improvement plan |
-| G-07 | **Postgres service in CI is unused** -- tests.yml provisions a postgres:15 service for integration tests that are skipped. Wasted CI resources. | Infrastructure | Low | Remove or actually implement integration tests |
-| G-08 | **CORS comment still references `bidiq-uniformes.vercel.app`** -- main.py:73 has a comment with the old domain name | Branding | Low | Include in TD-016 branding cleanup |
-| G-09 | **Backend tests also use deprecated APIs** -- TD-015 and TD-024 remediation must include updating test files that use the same deprecated patterns | Maintainability | Low | Note as dependency in TD-015 and TD-024 |
-| G-10 | **No health check dependency validation** -- `/health` returns OK without verifying PNCP or OpenAI reachability. A "healthy" backend may have no working external connections. | Observability | Medium | Add as new debt item or sub-item of observability recommendations |
+| Risco | Areas Afetadas | Probabilidade | Impacto | Mitigacao |
+|-------|---------------|---------------|---------|-----------|
+| Resolving TD-C02 (auth) without TD-H04 (database) creates a half-solution -- auth tokens need persistence | Backend + Infra | Alta | Alto | Plan these together; consider JWT stateless auth as interim or add database first |
+| Resolving TD-C01 (Excel streaming) may break existing BFF download route (TD-H06) simultaneously | Backend + Frontend | Media | Alto | Implement with feature flag; test download flow end-to-end before cutover |
+| Removing dead code from 3 disabled sources (TD-C03) risks accidentally breaking the orchestrator's source registry pattern | Backend | Media | Medio | Write orchestrator integration tests before removal; verify source discovery mechanism |
+| Fixing UXD-001 (multi-word terms) changes the search API contract -- frontend tokenization change may require backend `termos_busca` parsing adjustment | Frontend + Backend | Media | Medio | Verify backend handles quoted terms or comma-separated terms correctly |
+| Adding security headers (CSP) may break inline theme script (TD-M10/XD-SEC-03) | Frontend | Alta | Medio | Must add `nonce` or `sha256` hash to CSP for inline script; resolve TD-M10 first or simultaneously |
+| Rate limiting (already implemented via slowapi) is per-IP, but behind Railway proxy all requests may share the same IP | Backend + Infra | Media | Alto | Verify `X-Forwarded-For` handling in slowapi configuration |
+| Switching from synchronous to async OpenAI client (TD-H03) changes error handling patterns | Backend | Baixa | Medio | Comprehensive LLM test coverage already exists; verify fallback path still works |
 
 ---
 
-## 3. Risk Assessment
+## Validacao de Severidades
 
-### 3.1 Security Risks
+Items where QA disagrees with the DRAFT severity ratings:
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Wildcard CORS exploitation (TD-001) | High -- already exploitable | High -- any site can abuse the API | Sprint 1 quick fix; 1-2 hours |
-| Root container escape (TD-002) | Low (requires kernel vuln) | Critical -- full host access | Sprint 1 quick fix; 1-2 hours |
-| Resource exhaustion via no auth (TD-003) | High -- no barrier to entry | High -- 10 job slots monopolized | Backlog is risky; at minimum, deploy TD-006 (rate limiting) in Sprint 1 |
-| Debug endpoints exposed (G-05) | Medium -- requires knowledge | Medium -- cache clear could disrupt service | Gate behind env-based feature flag |
-| Unbounded `termos_busca` (G-04) | Low -- unlikely accidental | Medium -- memory pressure | Add `max_length` validation |
-
-**Security Risk Assessment:** The DRAFT correctly identifies TD-001, TD-002, and TD-003 as Critical/High. However, I flag a concern with the execution plan: **TD-003 (authentication) is placed in the Backlog, which means the system will remain fully unauthenticated through 6 sprints.** At minimum, a simple API key (Phase 1 of TD-003) should be elevated to Sprint 1 or 2. Without it, TD-006 (rate limiting by IP) is easy to bypass via IP rotation.
-
-### 3.2 Regression Risks
-
-| Debt Resolution | Regression Risk | Mitigation |
-|-----------------|-----------------|------------|
-| TD-004 (God component decomposition) | **HIGH** -- 1,071-line refactor touches all UI features | Establish E2E baseline before refactor; run full Playwright suite after each extraction; keep feature parity checklist |
-| TD-005 (Redis migration) | **MEDIUM** -- changes job lifecycle | Dual-write strategy (in-memory + Redis) during transition; comprehensive job lifecycle tests |
-| TD-011 (requests -> httpx migration) | **MEDIUM** -- changes HTTP behavior | Compare response counts between old and new implementations on same query; regression test with known-good query producing N results |
-| TD-013 (DI refactor) | **MEDIUM** -- touches all module initialization | Run full backend test suite; verify startup behavior in Docker |
-| TD-010 (color contrast fix) | **LOW** -- visual only | Before/after screenshots across all 5 themes; visual regression test |
-| TD-016 (branding cleanup) | **LOW** -- string replacements | Search-and-replace audit; ensure no functional code depends on old names |
-
-### 3.3 Integration Risks
-
-| Risk | Components Affected | Mitigation |
-|------|---------------------|------------|
-| TD-007 + TD-023 (file delivery refactor) | Backend result endpoint, frontend result route, frontend download route, frontend download button | End-to-end download test must pass on both old and new paths during migration |
-| TD-005 + TD-026 (Redis introduction) | Backend startup, job store, cache, Docker compose, Railway config | Add Redis to docker-compose.yml; validate Railway supports Redis add-on; run full test suite with Redis backend |
-| TD-004 (frontend decomposition) + frontend tests | All component tests reference `page.tsx` imports | Tests must be migrated alongside component extraction; test files that import from `page.tsx` will break |
-| TD-014 (lifespan migration) + TD-013 (DI) | Backend startup, cleanup tasks, global singletons | These should be done together to avoid double-refactoring `main.py` startup logic |
+| ID | Severidade DRAFT | Severidade QA | Justificativa |
+|----|-----------------|---------------|---------------|
+| TD-H05 | Alta (listed in 1.2) but P4 in matrix | **Deveria ser Media** | The DRAFT correctly identifies `allow_headers=["*"]` but inconsistently rates it -- Alta in the table (Section 1.2) but "Baixo impacto" in the description and P4 in the priority matrix. The actual codebase confirms `allow_origins` is properly whitelisted (not `*`), so only `allow_headers` is permissive. This is genuinely low-risk. Severity should be consistently Media with P3-P4 priority. |
+| TD-M04 | Media | **Alta** | No timeout on OpenAI API calls is more dangerous than rated. A single hanging LLM call blocks a thread pool thread indefinitely, and since `filter_batch` shares the same default executor (TD-L06), this creates a cascading failure path. Under concurrent load, all threads could be blocked by slow LLM responses, causing the entire application to hang. Should be P2, not P4. |
+| TD-M09 | Media | **Baixa** | MD5 for dedup keys is used on non-security-critical data (bid deduplication). The DRAFT itself acknowledges "risco teorico de colisao" is negligible. This is a code hygiene issue, not a Medium severity debt. |
+| XD-PERF-03 | Baixa | **Media** | Fixed 2s polling for searches that can run 2-10 minutes generates 60-300 unnecessary requests per search. With concurrent users, this creates meaningful backend load. Exponential backoff is a simple fix with significant operational benefit. Should be P3, not P4. |
+| TD-C03 | Critica | **Alta** | Three disabled data sources represent dead code and reduced coverage, but since the system is functional with 2 sources and this is a POC, "Critical" overstates the urgency. The dead code is inert (disabled, not actively breaking). Downgrade to Alta, keep at P1 for cleanup. |
 
 ---
 
-## 4. Dependency Validation
+## Dependencias Validadas
 
-### Proposed Sprint Order: NEEDS MINOR ADJUSTMENT
+### Chain Analysis
 
-The 6-sprint plan in Section 8 is fundamentally sound. The dependency map in Section 7 is accurate. However, I identify the following adjustments:
+The DRAFT's dependency graph (Section 8) is largely correct. QA validation and additions:
 
-**Issue 1: TD-003 in Backlog is too late.**
-Authentication (even API-key-only) should move to Sprint 2 at latest. Without auth, rate limiting (TD-006) is ineffective against determined abuse. The DRAFT correctly notes "TD-003 REQUIRES TD-001" but then places TD-003 in the Backlog while TD-001 is Sprint 1. The dependency chain is satisfied by Sprint 2.
-
-**Issue 2: TD-013 and TD-014 should be combined in one sprint.**
-The DRAFT places them together in Sprint 4, which is correct. The dependency map notes TD-013 ENHANCES TD-014 -- these are tightly coupled and should be done by the same developer in the same PR.
-
-**Issue 3: TD-004 (Sprint 3) regression risk needs E2E baseline.**
-Sprint 2 includes accessibility work but the E2E tests are currently broken (TD-041 references `bg-green-600`). TD-041 should be moved to Sprint 2 or early Sprint 3 as a prerequisite for TD-004. You cannot validate a major refactor against a broken test suite.
-
-**Issue 4: Hidden dependency -- backend test fixes (G-01) block CI.**
-If `test_main.py` is asserting `app.title == "Descomplicita API"` and the app title is now `"Descomplicita API"`, CI may already be red. This must be fixed before any other work.
-
-**Revised Sprint Suggestions:**
-
-| Sprint | Change | Reason |
-|--------|--------|--------|
-| Sprint 0 (immediate) | Fix broken test assertions (G-01), fix E2E class name assertions (TD-041) | Unblock CI and E2E validation |
-| Sprint 1 | Add TD-003 Phase 1 (API key auth, ~4-8 hours) alongside TD-001, TD-002, TD-006, TD-012 | Meaningful security posture |
-| Sprint 2 | No change -- accessibility sprint | Fine as-is |
-| Sprint 3 | No change -- God component decomposition | Fine, but requires Sprint 0 E2E fixes |
-| Sprint 4 | Combine TD-013 + TD-014 in same PR | Tightly coupled |
-| Sprint 5 | No change | Fine |
-| Sprint 6 | No change | Fine |
-
----
-
-## 5. Answers to @architect Questions (Section 9)
-
-### Q1 (TD-041): Are E2E tests currently passing in CI?
-
-**No.** The E2E test `01-happy-path.spec.ts` line 64 asserts `await expect(spButton).toHaveClass(/bg-green-600/)` but the actual UI uses `bg-brand-navy` for selected UF buttons (confirmed in `page.tsx` lines 587, 598). This assertion **will fail** against the current codebase.
-
-The CI workflow (`tests.yml`) does run E2E tests (lines 147-304) with a full backend+frontend stack. However, the E2E job depends on unit tests passing first. If the backend unit tests are also failing (due to the `app.title` assertion mismatch at `test_main.py:24`), the E2E tests may never execute.
-
-**Recommendation:** Fix both `test_main.py` title assertions and E2E class name assertions as Sprint 0.
-
-### Q2 (TD-020): Frontend coverage discrepancy investigation
-
-**Finding:** The 91.5% figure in `system-architecture.md` Section 13.2 is factually wrong. The canonical measurement is in `jest.config.js`, which records 49.45% statements. The comments in `jest.config.js` explicitly track the progression: "Progress: 31% -> 49.45% (+18.45% from test additions)".
-
-There are no additional test suites that could account for the difference. Playwright E2E tests are excluded from Jest coverage (`testPathIgnorePatterns: ['/__tests__/e2e/']`). There is no separate coverage tool configured.
-
-**Recommendation:** Correct the architecture doc to state actual coverage. Set a realistic target of 60% statements for next milestone (as the jest.config.js comments already suggest).
-
-### Q3: Testing strategy for TD-004 (God Component decomposition)
-
-**Recommended strategy:**
-
-1. **Before decomposition:** Fix E2E tests (TD-041) to establish a passing baseline. Run and record full Playwright suite results.
-2. **During decomposition:** Extract one component at a time. After each extraction:
-   - Run existing `page.test.tsx` (601 lines) to verify no regression
-   - Run full E2E suite
-   - Add unit tests for the extracted component
-3. **After decomposition:** Each extracted component should have its own test file. The `page.test.tsx` should shrink proportionally.
-4. **Feature parity checklist:** Create a manual QA checklist covering: search submission, UF selection, date range, sector switching, custom terms, polling, result display, Excel download, save search, load saved search, theme switching, region selector. Verify each after the refactor.
-
-### Q4: Accessibility testing with axe-core
-
-**Finding:** `@axe-core/playwright` (v4.11.0) is listed as a dev dependency in `package.json` but is **not imported or used** in any E2E test file. Zero matches for "axe" in the `__tests__/e2e/` directory.
-
-**Recommendation:** Yes, implement axe-core checks in E2E tests and gate PRs on zero critical/serious violations. Add to at least the happy-path E2E test:
-```typescript
-import AxeBuilder from '@axe-core/playwright';
-// After page loads:
-const results = await new AxeBuilder({ page }).analyze();
-expect(results.violations.filter(v => ['critical', 'serious'].includes(v.impact))).toHaveLength(0);
+**Chain 1: Authentication -> Persistence (CONFIRMED)**
 ```
+TD-C02 (auth) --> TD-H04 (database)
+```
+- Confirmed: Proper user auth requires persistent user store.
+- **HOWEVER:** Stateless JWT auth could unblock TD-C02 without TD-H04. The dependency is conditional, not absolute. The DRAFT should note this alternative.
 
-### Q5: Backend test fidelity -- behavior vs code paths
+**Chain 2: Memory/Streaming (CONFIRMED with addition)**
+```
+TD-C01 (Excel in memory) --> TD-M02 (no pagination) --> TD-H06 (Vercel timeout)
+```
+- Confirmed: These three are tightly coupled. Streaming + pagination resolves all three.
+- **ADDITION:** This chain should also include XD-PERF-01 (3-copy buffered download), which is the cross-cutting manifestation of the same problem.
 
-**Assessment: Mixed.** The tests are well-structured and test meaningful behavior:
-- `test_resilience.py` -- tests partial failures, full outages, rate limiting scenarios with mock PNCP errors
-- `test_filter.py` -- 63 tests covering keyword matching, normalization, exclusions
-- `test_load.py` -- tests 1/5/27 UF searches and progress phase transitions
-- `test_concurrency.py` -- tests 429 responses when job slots are full
+**Chain 3: Security Headers (CONFIRMED with BLOCKER)**
+```
+XD-SEC-01 --> TD-M07 (CSP) + TD-M08 (HSTS)
+```
+- Confirmed.
+- **BLOCKER IDENTIFIED:** TD-M10 (dangerouslySetInnerHTML for theme) MUST be resolved before or simultaneously with TD-M07 (CSP). Adding CSP with `script-src` restrictions will break the inline theme script. This is not captured in the DRAFT's dependency graph.
 
-However:
-- No integration test exercises the full POST -> poll -> result pipeline with real (or semi-real) components
-- The `test_pncp_integration.py` tests are permanently skipped
-- All external calls (PNCP API, OpenAI) are mocked
-- The `run_sync` fixture in `test_resilience.py` patches `run_in_executor` to avoid deadlocks -- this is necessary but means the async execution model is not truly tested
+**Chain 4: Job Durability (CONFIRMED)**
+```
+TD-H02 (asyncio tasks) --> TD-H01 (in-memory store)
+```
+- Confirmed: Moving to a proper task queue (Celery/RQ) would eliminate the need for the dual-write in-memory + Redis store.
 
-**Recommendation:** Add at least one integration test that runs the full pipeline with a mock HTTP server (using `pytest-httpx` or `respx`) returning canned PNCP responses. This would validate the entire chain without real API calls.
+**Chain 5: Theme Refactoring (CONFIRMED)**
+```
+UXD-010 (ThemeProvider imperative) --> UXD-011 (FOUC script duplication)
+```
+- Confirmed.
 
-### Q6: TD-037 (Date range max removed) -- resource consumption testing
+**MISSING Dependency: LLM + Thread Pool**
+```
+TD-M04 (no LLM timeout) --> TD-L06 (shared ThreadPoolExecutor) --> TD-H03 (sync OpenAI client)
+```
+- These three are interconnected: the lack of timeout on a synchronous OpenAI call running in a shared thread pool creates a cascading failure risk. Resolving TD-H03 (async client) resolves all three.
 
-**Finding:** No specific test exists for large date range resource consumption. The `BuscaRequest` schema in `schemas.py` no longer enforces a max-days limit. A user could query 365 days across 27 UFs, which would create 27 x 7 (or 27 x 3 with modalidade reduction) = 81-189 PNCP API task combinations, each potentially fetching up to 10 pages.
+**MISSING Dependency: Contract Testing**
+```
+XD-API-02 (no contract tests) --> TD-L02/XD-API-03 (unstructured errors)
+```
+- Contract tests cannot be properly written until error codes are structured. Otherwise the contract would codify free-text error parsing.
 
-**Risk:** This could result in:
-- 810-1,890 HTTP requests to PNCP per single search
-- Extended job duration (potentially 10+ minutes)
-- Memory pressure from accumulating results
-- Rate limiting from PNCP
+### Is the proposed resolution order correct?
 
-**Mitigation already in place:** Dynamic pagination cap (`min(max_pages, max(2, 600/num_tasks))`) and modalidade reduction for >10 UFs. These limit the blast radius but do not prevent very long-running jobs.
+**Largely yes**, with these adjustments:
+1. TD-M04 (LLM timeout) should move from P4 to P2 -- it is a production reliability risk.
+2. TD-M10 must be resolved before or with TD-M07 (CSP header) -- blocking dependency.
+3. XD-PERF-03 (polling backoff) should move from P4 to P3 -- easy win, reduces backend load.
+4. TD-C02 (auth) does not necessarily require TD-H04 (database) if JWT is used.
 
-**Recommendation:** Re-introduce a configurable max date range (e.g., 90 days) or add a warning/confirmation step for ranges >30 days. Add a test that verifies resource bounds for extreme queries.
+### Circular Dependencies
 
-### Q7: Circuit breaker / rate limiter testing
-
-**Finding:** `test_resilience.py` has 9 test functions covering error scenarios, and `test_pncp_client.py` has 41 tests including retry, rate limiting, and circuit breaker logic. These are unit-tested with mocks simulating timeouts and 429 responses.
-
-**Not tested under realistic load:** No test simulates concurrent requests hitting the circuit breaker under genuine latency conditions. The tests use synchronous mocks with `run_sync` fixture, which bypasses the actual threading model.
-
-**Recommendation:** The unit tests are adequate for verifying logic correctness. True load testing should be done as a separate performance test suite (outside CI), not as part of the debt assessment.
-
----
-
-## 6. Test Requirements
-
-### For Critical/High Debts
-
-| Debt ID | Required Tests | Type | Est. Hours |
-|---------|---------------|------|------------|
-| TD-001 | Verify CORS rejects requests from non-whitelisted origins; verify whitelisted origins work | Unit (backend) | 1 |
-| TD-002 | Verify Dockerfile USER directive is non-root; container smoke test runs as appuser | Integration (Docker) | 0.5 |
-| TD-003 | Auth middleware tests: reject without key, accept with valid key, reject expired token (Phase 2) | Unit (backend) | 4 |
-| TD-004 | Unit tests for each extracted component; existing page.test.tsx must still pass; E2E full regression | Unit + E2E (frontend) | 8 |
-| TD-005 | Job lifecycle tests against Redis (create, poll, complete, expire, TTL cleanup); horizontal scaling test with 2 instances | Integration (backend) | 4 |
-| TD-006 | Rate limit enforcement: verify 429 after N requests from same IP; verify different IPs are independent | Unit (backend) | 2 |
-| TD-007 | Download via signed URL works; base64 path removed; large file download completes | Integration (full stack) | 3 |
-| TD-008 | Focus trap inside modal; Escape closes modal; focus returns to trigger; aria-modal present | Unit (frontend) + E2E | 2 |
-| TD-009 | Escape key closes ThemeToggle and SavedSearchesDropdown | Unit (frontend) | 1 |
-| TD-010 | Automated contrast ratio check via axe-core for all text elements in all 5 themes | E2E (frontend) | 2 |
-| TD-011 | Response count parity test: same query returns same count with httpx as with requests | Integration (backend) | 2 |
-| TD-012 | Verify production Docker image does not contain pytest/ruff/mypy binaries | Integration (Docker) | 0.5 |
-| TD-013 | All existing tests pass with DI-based initialization; startup behavior unchanged | Unit (backend) | 2 |
-| TD-014 | Lifespan events fire correctly; cleanup task runs on shutdown | Unit (backend) | 1 |
-
-**Total estimated test hours for Critical/High debts: ~33 hours**
+No circular dependencies detected. The graph is a DAG.
 
 ---
 
-## 7. Effort Estimate Validation
+## Testes Requeridos
 
-| Area | DRAFT Estimate (Low-High) | QA Assessment | Adjustment Reason |
-|------|---------------------------|---------------|-------------------|
-| Security (6 items) | 24-54h | 28-58h (+4) | TD-003 Phase 1 (API key) should be scoped at minimum. Underestimate if JWT added. |
-| Accessibility (8 items) | 15-28h | 15-28h | Reasonable |
-| Code Quality (12 items) | 36-68h | 40-76h (+4-8) | TD-004 testing effort underestimated; add 4-8h for comprehensive test migration |
-| Performance (6 items) | 33-62h | 33-62h | Reasonable |
-| Scalability (3 items) | 25-42h | 25-42h | Reasonable |
-| Maintainability (8 items) | 26-50h | 26-50h | Reasonable |
-| Design/UX (3 items) | 5-10h | 5-10h | Reasonable |
-| **Sprint 0 (new)** | N/A | **2-4h** | Fix broken tests (G-01), E2E assertions (TD-041) |
-| **TOTAL** | **164-314h** | **174-330h** | +10-16h for Sprint 0 and test migration |
+### Per-Debt Test Requirements
 
-The estimates are generally reasonable. The wide ranges on TD-003 (16-40h) and TD-004 (24-40h) appropriately reflect scope uncertainty.
+| Debt ID | Testes Necessarios | Tipo | Prioridade |
+|---------|--------------------|------|------------|
+| TD-C02 | Auth middleware unit tests (valid/invalid/missing key, exempt routes), integration test for full auth flow, test API_KEY unset behavior | Unit + Integration | P0 |
+| TD-C01 | Memory usage test under concurrent jobs (measure RSS), streaming download test, test with large result sets (500+ bids) | Performance + Integration | P1 |
+| TD-H02 | Test job survival across SIGTERM, test job recovery after process restart, test concurrent job limits | Integration + Resilience | P1 |
+| TD-H01 | Test Redis-only mode (no in-memory), test Redis unavailable fallback, test data consistency after restart | Integration | P1 |
+| TD-C03 | Orchestrator test with reduced source list, verify no import errors after dead code removal, source registry integrity test | Unit + Integration | P1 |
+| UXD-001 | E2E test for multi-word search term submission, test quote/delimiter parsing, test edge cases (empty quotes, nested quotes) | E2E + Unit | P1 |
+| TD-H03 | Async OpenAI client test, test timeout behavior, test fallback path with async client, load test with concurrent LLM calls | Unit + Performance | P2 |
+| TD-H06 | Test download with file sizes >5MB, test streaming response through BFF, test timeout boundary (9s, 10s, 11s) | Integration + E2E | P2 |
+| TD-M02 | Pagination API contract test, test page boundaries, test with 0 results / 1 page / many pages | Unit + Contract | P2 |
+| XD-SEC-01 | Security header presence tests (CSP, HSTS, Referrer-Policy), test CSP does not break inline scripts, Lighthouse security audit | Integration + E2E | P2 |
+| XD-API-02 | Pydantic schema export, TypeScript type generation, schema diff in CI | Contract | P2 |
+| TD-M04 | Test LLM call with artificial 30s delay, verify timeout triggers fallback, verify thread pool not exhausted | Unit + Resilience | P2 |
 
----
+### General Test Improvements
 
-## 8. Additional Findings
+1. **Backend coverage baseline needed.** Run `pytest --cov` and record the actual percentage. The `pyproject.toml` threshold of 70% must be validated.
 
-### 8.1 Backend Branding Inconsistency in Tests (NEW -- not in DRAFT)
+2. **Frontend E2E mock server.** The 4 E2E tests in `frontend/__tests__/e2e/` require a live backend, making them unusable in CI. Implement MSW (Mock Service Worker) or a lightweight Express mock server for CI-friendly E2E runs. This is the single most impactful testing improvement.
 
-The following backend test files still reference "Descomplicita":
-- `tests/conftest.py:1` -- docstring
-- `tests/mock_helpers.py:1` -- docstring
-- `tests/__init__.py:1` -- comment
-- `tests/test_main.py:24` -- **functional assertion** `app.title == "Descomplicita API"`
-- `tests/test_main.py:238` -- **functional assertion** `info["title"] == "Descomplicita API"`
-- `tests/test_pncp_client.py:75` -- asserts User-Agent header contains "Descomplicita"
+3. **Contract tests between frontend TypeScript types and backend Pydantic schemas.** Generate a shared JSON Schema from Pydantic models and validate TypeScript interfaces against it in CI.
 
-The first two `test_main.py` assertions are **broken** since `main.py:59` now sets `title="Descomplicita API"`. These are functional test failures, not just cosmetic branding issues.
+4. **Missing frontend unit tests for:**
+   - ThemeProvider (theme switching, localStorage persistence, CSS property application)
+   - RegionSelector (region toggle logic, partial selection state)
+   - AnalyticsProvider (Mixpanel initialization, conditional loading)
+   - API route for `setores` (not found in test files -- `buscar-result.test.ts` exists but no `setores.test.ts`)
 
-### 8.2 `pyproject.toml` Still Uses Old Name
+5. **Backend smoke test suite.** Create a minimal post-deploy verification: `GET /health`, `GET /setores`, `POST /buscar` with a small valid request. Automate as a Railway post-deploy hook or GitHub Actions workflow.
 
-`pyproject.toml:6` states `name = "bidiq-uniformes-backend"`. This should be updated to `descomplicita-backend` as part of TD-016.
-
-### 8.3 `DeprecationWarning` Filter in pytest Config
-
-`pyproject.toml:43` has `"ignore::DeprecationWarning"`. This means deprecated API usage (TD-015, TD-024) does **not** surface as test warnings. When those debts are fixed, consider removing this filter to catch future deprecations.
+6. **Security regression tests.** The existing `test_security.py` covers CORS, auth, rate limiting, debug endpoints, and input validation -- this is good. Add tests for: response body does not contain stack traces in production mode, security headers are present.
 
 ---
 
-## 9. Final Verdict
+## Metricas de Qualidade Propostas
 
-### Gate Decision: APPROVED WITH CONDITIONS
-
-### Conditions (must be addressed before final consolidation):
-
-1. **BLOCKING:** Add Sprint 0 / immediate fix for broken backend tests (`test_main.py` title assertions) and E2E test class name assertions (TD-041). These are not future debt -- they are currently broken tests that may be masking CI failures.
-
-2. **REQUIRED:** Correct the 91.5% frontend coverage claim in the final document. State the actual figure (~49.45% statements) and the realistic target (60%).
-
-3. **REQUIRED:** Elevate TD-003 Phase 1 (API key auth) from Backlog to Sprint 1 or Sprint 2. An unauthenticated public API with only IP-based rate limiting is insufficient for a production deployment.
-
-4. **RECOMMENDED:** Add the gaps identified in this review (G-01 through G-10) to the debt inventory or acknowledge them in the final document.
-
-5. **RECOMMENDED:** Note that backend test files must also be updated when fixing TD-015 (datetime.utcnow) and TD-024 (get_event_loop), as tests use the same deprecated patterns.
-
-### Overall Assessment:
-
-The Technical Debt Assessment DRAFT is a high-quality document. The 46 debts are well-categorized, correctly prioritized by severity, and the dependency map is accurate. The effort estimates are realistic with appropriate uncertainty ranges. The cross-cutting concern analysis in Section 6 demonstrates genuine architectural understanding.
-
-The primary weaknesses are:
-- An inaccurate frontend coverage claim inherited from the architecture document
-- Authentication being deprioritized to the Backlog despite being Critical severity
-- Missing detection of currently-broken tests (which should be Sprint 0 fixes, not debt items)
-
-With the conditions above addressed, this assessment is ready for final consolidation and sprint planning.
+| Metrica | Valor Atual | Meta | Prazo |
+|---------|------------|------|-------|
+| Frontend statement coverage | ~68% | 75% | Next sprint |
+| Frontend branch coverage | ~53% | 60% | Next sprint |
+| Backend statement coverage | Unknown (threshold: 70%) | 75% | Measure immediately, improve next sprint |
+| E2E test scenarios | 4 (require live backend) | 8 (with mock server in CI) | Next milestone |
+| Security headers present | 3/6 (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection) | 6/6 (add CSP, HSTS, Referrer-Policy) | Next sprint |
+| Lighthouse Performance score | Not baselined | Baseline + no regression | Next milestone |
+| Bundle size (frontend) | Not baselined | Baseline + budget | Next milestone |
+| Mean time to detect deployment failure | No smoke tests | < 2 minutes via automated smoke test | Next sprint |
+| Dependency vulnerability count | Not scanned | 0 critical, 0 high | Ongoing |
+| OpenAI API error rate | Not monitored | < 5% with fallback activation | Next milestone |
 
 ---
 
-*Review completed: 2026-03-07*
-*Reviewed by: @qa (Shield)*
-*Against codebase commit: 9fbd54d0 (main branch)*
+## Riscos de Regressao
+
+What could break during debt resolution, ordered by risk:
+
+1. **Resolving TD-C01 (Excel streaming):** The entire download pipeline (backend generation -> BFF proxy -> browser download) is tightly coupled. Switching to streaming changes the response contract. Both `backend/main.py` and `frontend/app/api/download/route.ts` must change simultaneously. **Risk: broken downloads in production if only one side is updated.**
+
+2. **Resolving TD-C02 (authentication):** Adding per-user auth will break every frontend API route that currently injects a single shared `BACKEND_API_KEY`. The BFF layer needs to forward user tokens instead. **Risk: complete service outage if auth middleware is deployed without frontend update.**
+
+3. **Resolving TD-C03 (removing dead sources):** The orchestrator uses a source registry pattern. Removing source classes could affect the registry, import chain, or configuration. **Risk: import errors on startup if a removed source is still referenced in config.**
+
+4. **Adding CSP header (TD-M07/XD-SEC-01):** The inline `<script>` for theme FOUC prevention in `layout.tsx` will be blocked by a restrictive CSP. **Risk: flash of unstyled content (broken theme) on every page load.**
+
+5. **Resolving TD-H02 (task queue):** Moving from `asyncio.create_task` to Celery/RQ introduces a new infrastructure dependency (message broker). **Risk: new failure mode if broker goes down; increased deployment complexity.**
+
+6. **Resolving TD-M02 (pagination):** Frontend currently renders all results. Adding pagination changes the data contract and requires frontend UI changes (page controls, state management). **Risk: partial results displayed without clear pagination UX.**
+
+7. **Resolving UXD-001 (multi-word terms):** Changing tokenization behavior may affect existing users who have adapted to the current behavior (separate tokens). Saved searches in localStorage may become invalid. **Risk: breaking existing saved searches.**
+
+---
+
+## Parecer Final
+
+### Strengths of the Assessment
+
+1. **Comprehensive coverage.** 52 debts across 3 categories (system, frontend/UX, cross-cutting) with consistent ID naming scheme.
+2. **Well-structured cross-cutting analysis.** Section 4 correctly identifies debts that span backend and frontend, avoiding siloed thinking.
+3. **Honest severity ratings.** The assessment does not inflate or deflate -- most ratings are accurate and well-justified.
+4. **Actionable dependency graph.** Section 8 captures the most important dependency chains, enabling informed sprint planning.
+5. **Quick wins section.** Section 9 identifies 13 items (~25% of debts) requiring only ~12-14 hours -- excellent for building momentum.
+6. **Expert questions.** Section 7 demonstrates self-awareness of blind spots and invites specialist validation.
+7. **Accurate source material.** Claims about the codebase (CORS config, SIGTERM handler, MD5 usage, sync OpenAI client, `create_task` for jobs) were all verified against the actual source code.
+
+### Weaknesses
+
+1. **Backend test coverage is a blind spot.** The assessment quotes file counts but not actual coverage percentages. The `pyproject.toml` sets a 70% threshold, but whether this is being met is unknown.
+2. **Security analysis is surface-level.** CORS, auth, and headers are covered, but secret management, PII in logs, dependency vulnerabilities, error information leakage, and input validation depth are not assessed.
+3. **Infrastructure/operational debts are absent.** No mention of IaC, staging environments, deployment strategy, monitoring/alerting gaps, or cost controls.
+4. **Inconsistent severity for TD-H05.** Listed as Alta in the severity table but treated as Baixo in the priority matrix. This undermines trust in the ratings.
+5. **Missing dependency edge.** TD-M10 (inline script) blocks TD-M07 (CSP) -- this is a critical planning dependency that is absent from the graph.
+6. **TD-M04 underrated.** No LLM timeout combined with shared thread pool (TD-L06) and sync client (TD-H03) creates a cascading failure path that deserves Alta, not Media.
+7. **No mention of LGPD compliance.** For a Brazilian government procurement tool, data protection law applicability should at least be acknowledged.
+
+### Recommendations Before Proceeding to Planning
+
+1. **REQUIRED:** Measure and document actual backend test coverage percentage. Run `pytest --cov` and add the result to the assessment.
+2. **REQUIRED:** Fix TD-H05 severity inconsistency (choose one rating and apply consistently).
+3. **REQUIRED:** Add the TD-M10 -> TD-M07 dependency to the graph (CSP requires inline script resolution).
+4. **RECOMMENDED:** Upgrade TD-M04 from P4 to P2 and from Media to Alta (thread pool exhaustion risk).
+5. **RECOMMENDED:** Add a "Security Gaps" subsection covering secret management, PII logging, dependency scanning, and error information leakage.
+6. **RECOMMENDED:** Add infrastructure/operational debt items or explicitly declare them out of scope with justification.
+7. **OPTIONAL:** Add XD-PERF-03 (polling backoff) to the Quick Wins section -- it is a low-effort, high-impact operational improvement.
+
+### Verdict: APPROVED WITH CONDITIONS
+
+The assessment is comprehensive enough to proceed to sprint planning, provided the three REQUIRED items are addressed:
+
+1. Backend test coverage must be measured and documented.
+2. TD-H05 severity inconsistency must be resolved.
+3. TD-M10 -> TD-M07 dependency must be added to the graph.
+
+The RECOMMENDED items should be addressed during sprint planning but do not block proceeding from the assessment phase.
+
+---
+
+### QA Answers to Questions Raised in Section 7
+
+Responding to the questions directed at @qa in the DRAFT:
+
+**1. Coverage target (75% statements):** Yes, 75% is a reasonable next-milestone target for the frontend. For the backend, first establish the baseline -- the 70% `fail_under` in `pyproject.toml` is the immediate gate. Focus coverage efforts on hooks (`useSearchJob`, `useSearchForm`) and API routes for maximum risk reduction per test written.
+
+**2. Contract testing approach:** For a POC at this scale, **shared JSON Schema validation** is the pragmatic choice over Pact. Export Pydantic models as JSON Schema, generate or validate TypeScript interfaces against them in CI. Pact is overkill until there are multiple consumers or teams.
+
+**3. E2E without live backend:** **MSW (Mock Service Worker)** is the recommended approach. It runs in the same process as the tests, requires no additional infrastructure, and supports request interception at the network level. Docker Compose adds complexity that is not justified for 4-8 E2E scenarios.
+
+**4. Visual regression testing:** **Not yet.** For a POC with 5 themes, the cost of maintaining visual snapshots outweighs the benefit. Instead, run a one-time manual contrast audit (UXD-015) and add a Lighthouse CI check for accessibility scores. Revisit visual regression after the design system is extracted.
+
+**5. Smoke tests scope:** Minimum viable: `GET /health` (backend alive), `GET /setores` (data layer working), `POST /buscar` with 1 UF + short date range (full pipeline). Skip download in smoke tests -- it is slow and tested by E2E. Implement as a 30-second GitHub Actions workflow triggered on deploy.
+
+**6. Quality gates beyond coverage:** Enforce in CI: (a) `npm audit --audit-level=high` and `pip audit`, (b) TypeScript strict mode (already enabled), (c) ESLint with no warnings, (d) bundle size budget (set after baselining), (e) Lighthouse accessibility score >= 90.
+
+**7. Untested component priority:** ThemeProvider > RegionSelector > AnalyticsProvider > carouselData. ThemeProvider is the highest risk -- it touches every visual element and has 5 code paths (themes). RegionSelector has user-facing logic (partial selection). AnalyticsProvider and carouselData are lower risk.
+
+---
+
+*Review generated: 2026-03-09*
+*Reviewer: @qa (Quinn)*
+*Source documents: technical-debt-DRAFT.md, system-architecture.md v3.0, frontend-spec.md v3.0*
+*Codebase validation: backend/tests/ (31 test files), frontend/__tests__/ (22 unit + 4 E2E), backend/main.py, backend/llm.py, backend/sources/orchestrator.py, vercel.json*

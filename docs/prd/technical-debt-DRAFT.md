@@ -1,637 +1,335 @@
-# Technical Debt Assessment -- DRAFT
+# Technical Debt Assessment - DRAFT
 
-**Project:** Descomplicita (formerly Descomplicita)
-**Date:** 2026-03-07
-**Status:** DRAFT -- Pending specialist validation
-**Consolidated by:** @architect (Atlas)
-**Sources:**
-- `docs/architecture/system-architecture.md` -- Section 14 (31 debts)
-- `docs/frontend/frontend-spec.md` -- Section 12 (20 debts)
+## Descomplicita POC v0.2
+## Data: 2026-03-09
+## Para Revisao dos Especialistas
 
----
-
-## 1. Executive Summary
-
-**Total unique debts identified:** 46 (after de-duplication of 5 overlapping items from 51 raw entries)
-
-**Breakdown by severity:**
-
-| Severity | Count | % |
-|----------|-------|---|
-| Critical | 4 | 9% |
-| High | 10 | 22% |
-| Medium | 17 | 37% |
-| Low | 15 | 33% |
-| **Total** | **46** | 100% |
-
-**Breakdown by area:**
-
-| Area | Count |
-|------|-------|
-| Security | 6 |
-| Accessibility | 8 |
-| Code Quality | 12 |
-| Performance | 6 |
-| Scalability | 3 |
-| Maintainability | 8 |
-| Design/UX | 3 |
-
-**Estimated total effort range:** 164 -- 314 hours
-
-**Key findings:**
-- **Security is the most urgent concern**: wildcard CORS, no authentication, no rate limiting, and root container execution create a vulnerable attack surface in production.
-- **Accessibility gaps are systemic**: 8 debts across keyboard navigation, contrast, ARIA semantics, and focus management indicate accessibility was not systematically validated against WCAG 2.1 AA.
-- **The frontend monolith** (`page.tsx` at 1,071 lines) is the single largest maintainability risk, blocking all future feature work.
-- **In-memory architecture** (job store, cache) prevents horizontal scaling and loses state on every deploy.
+> **Status:** RASCUNHO - Consolidacao das Fases 1 e 3 do Brownfield Discovery.
+> Fase 2 (Database) foi pulada - arquitetura stateless sem banco de dados.
+> Este documento requer validacao dos especialistas antes de ser usado para planejamento.
 
 ---
 
-## 2. Critical Debts (Immediate Action Required)
+### 1. Debitos de Sistema
 
-| ID | Debt | Area | Severity | Est. Hours | Risk |
-|----|------|------|----------|------------|------|
-| TD-001 | CORS allows all origins | Security | Critical | 1-2 | Exploitation |
-| TD-002 | Backend Dockerfile runs as root | Security | Critical | 1-2 | Container escape |
-| TD-003 | No authentication or authorization | Security | Critical | 16-40 | Resource abuse |
-| TD-004 | God component (page.tsx, 1,071 lines) | Code Quality | Critical | 24-40 | Dev velocity |
+Consolidados de `docs/architecture/system-architecture.md` - Secao 9: Technical Debt Inventory.
 
-### TD-001: CORS Allows All Origins
+#### 1.1 Severidade Critica
 
-- **Source ID:** System TD-01
-- **Location:** `backend/main.py:76`
-- **Description:** `allow_origins=["*"]` permits any website to make requests to the API. Combined with TD-003 (no auth), any third party can consume backend resources.
-- **Impact:** Any malicious site can trigger searches, exhaust job slots, and exfiltrate procurement data.
-- **Remediation:** Restrict to `["https://descomplicita.vercel.app", "http://localhost:3000"]`. Add `CORS_ORIGINS` environment variable for configurability.
-- **Effort:** 1-2 hours
+| ID | Descricao | Impacto | Esforco |
+|----|-----------|---------|---------|
+| TD-C01 | **Excel bytes armazenados no resultado do job (memoria + Redis).** Jobs completados armazenam bytes Excel brutos tanto no dict Python quanto serializados no Redis como JSON. Um job com 500 licitacoes pode produzir dados multi-MB duplicados entre duas stores. Sem streaming ou armazenamento temporario em arquivo. | Esgotamento de memoria sob carga concorrente, pressao de memoria no Redis | Medio |
+| TD-C02 | **Sem autenticacao de usuario.** Chave API unica compartilhada para todos os clientes. Sem identidade de usuario, sem modelo de autorizacao, sem trilha de auditoria. Se API_KEY nao estiver definida, todos os endpoints ficam totalmente abertos. | Exposicao de seguranca, sem accountability | Alto |
+| TD-C03 | **3 de 5 fontes de dados desabilitadas.** ComprasGov (API deprecada), Querido Diario (retorna HTML), TCE-RJ (404). A arquitetura multi-source esta subutilizada; efetivamente um sistema dual-source. Codigo morto permanece na codebase. | Cobertura de dados reduzida, carga de manutencao por codigo morto | Alto |
 
-### TD-002: Backend Dockerfile Runs as Root
+#### 1.2 Severidade Alta
 
-- **Source ID:** System TD-02
-- **Location:** `backend/Dockerfile`
-- **Description:** No `USER` directive in the Dockerfile. All container processes run as root, which violates container security best practices.
-- **Impact:** If an attacker gains code execution in the container, they have root privileges. Risk of container escape on unpatched kernels.
-- **Remediation:** Add `RUN adduser --disabled-password --gecos '' appuser` and `USER appuser` to Dockerfile. Ensure file permissions are correct for the app directory.
-- **Effort:** 1-2 hours
+| ID | Descricao | Impacto | Esforco |
+|----|-----------|---------|---------|
+| TD-H01 | **In-memory job store como primario.** RedisJobStore estende JobStore in-memory em padrao dual-write. Na reinicializacao do processo, estado in-memory e perdido. Redis serve como fallback para leituras, mas o dual-write adiciona complexidade e potencial inconsistencia. | Perda de dados de jobs em restart durante buscas ativas | Medio |
+| TD-H02 | **asyncio.create_task para jobs em background.** Jobs rodam como tasks asyncio nao rastreadas no mesmo processo. Sem fila de tarefas (Celery, RQ). Em shutdown/deploy, jobs em execucao sao silenciosamente perdidos. Handler SIGTERM existe mas apenas define um evento que nada aguarda. | Perda de jobs em deploy/restart | Alto |
+| TD-H03 | **API OpenAI chamada sincronamente no thread pool.** `gerar_resumo()` usa cliente sincrono OpenAI via `loop.run_in_executor(None, ...)`, bloqueando uma thread do pool padrao. Deveria usar cliente async OpenAI. | Esgotamento do thread pool sob buscas concorrentes | Medio |
+| TD-H04 | **Sem banco de dados.** Todo estado e efemero. Sem dados historicos de busca, sem persistencia de analytics, sem preferencias de usuario server-side. Limita evolucao do produto. | Nao e possivel construir features que requerem persistencia | Alto |
+| TD-H05 | **CORS allow_headers=\* e excessivamente permissivo.** Aceita qualquer header. Deveria limitar a Content-Type, X-API-Key, X-Request-ID. | Risco menor de seguranca, pratica nao-padrao | Baixo |
+| TD-H06 | **Funcoes serverless Vercel tem duracao maxima de 10s.** A rota de download faz buffer do arquivo Excel inteiro (`response.arrayBuffer()`) antes de retornar. Arquivos grandes podem exceder o limite de 10s ou 1024MB de memoria. | Falhas de download para arquivos grandes | Medio |
 
-### TD-003: No Authentication or Authorization
+#### 1.3 Severidade Media
 
-- **Source ID:** System TD-03
-- **Location:** `backend/main.py` (all endpoints)
-- **Description:** All API endpoints are publicly accessible. Any client can submit searches, poll results, and exhaust the 10-job concurrency limit.
-- **Impact:** Resource exhaustion, potential abuse for competitive intelligence scraping, no audit trail.
-- **Remediation:** Phase 1: Add API key authentication (header-based). Phase 2: User accounts with JWT. Phase 3: Role-based access control.
-- **Effort:** 16-40 hours (depending on phase)
+| ID | Descricao | Impacto | Esforco |
+|----|-----------|---------|---------|
+| TD-M01 | **Filtro de deadline desabilitado.** Campo `dataAberturaProposta` foi mal interpretado como prazo de submissao. Filtro comentado com TODO. Sem verificacao alternativa de deadline. | Usuarios veem licitacoes historicas irrelevantes | Medio |
+| TD-M02 | **Sem paginacao nos resultados.** Todos os resultados filtrados retornados em uma unica resposta. Conjuntos grandes afetam tempo de resposta e memoria. | Degradacao de performance com muitos resultados | Medio |
+| TD-M03 | **Modelo LLM hardcoded.** `gpt-4.1-nano` hardcoded em `llm.py` linha 131. Docker-compose expoe variavel `LLM_MODEL` mas o codigo a ignora. | Nao e possivel trocar modelos sem alterar codigo | Baixo |
+| TD-M04 | **Sem timeout para chamadas LLM.** Cliente OpenAI usa timeout padrao. Respostas longas do LLM podem bloquear o worker do thread pool indefinidamente. | Estrangulamento de threads | Baixo |
+| TD-M05 | **Estado global mutavel para DI.** `dependencies.py` usa globais a nivel de modulo sem framework de DI. Testes requerem patching cuidadoso. | Complexidade de teste, acoplamento oculto | Medio |
+| TD-M06 | **Sem versionamento de API.** Endpoints nao versionados (`/buscar` e nao `/v1/buscar`). Breaking changes afetam todos os clientes simultaneamente. | Evolucao de API dificultada | Medio |
+| TD-M07 | **Sem header Content-Security-Policy.** CSP ausente na config do Vercel. | Lacuna na mitigacao de XSS | Baixo |
+| TD-M08 | **Sem header Strict-Transport-Security.** HSTS ausente na config do Vercel. | Risco de downgrade de protocolo | Baixo |
+| TD-M09 | **MD5 usado para chaves de dedup.** `orchestrator.py` usa MD5 para hashing de chave composta. Embora o risco de colisao seja desprezivel para este caso, e um hash fraco por padroes modernos. | Risco teorico de colisao | Baixo |
+| TD-M10 | **dangerouslySetInnerHTML para tema no frontend.** Script inline em `layout.tsx` para prevenir flash de tema. Atualmente seguro (sem input de usuario), mas contorna protecao XSS do React. | Vetor potencial de XSS se modificado | Baixo |
+| TD-M11 | **Versao hardcoded em multiplos locais.** "0.3.0" aparece em `main.py` na definicao do app e na resposta do endpoint raiz. Sem single source of truth. | Risco de drift de versao | Baixo |
 
-### TD-004: God Component (page.tsx)
+#### 1.4 Severidade Baixa
 
-- **Source ID:** Frontend TD-FE-001
-- **Location:** `frontend/app/page.tsx` (1,071 lines, 20+ state variables)
-- **Description:** The entire application UI, business logic, form handling, polling, download, and save-search logic lives in a single component. This violates single responsibility and makes testing, maintenance, and onboarding extremely difficult.
-- **Impact:** Any UI or logic change requires modifying a massive file. Individual features cannot be tested in isolation. New developers face a steep learning curve.
-- **Remediation:** Extract into feature modules:
-  - `SearchForm` component (mode toggle, sector select, terms input)
-  - `UfSelector` component (grid, region selector)
-  - `DateRangeSelector` component
-  - `SearchResults` component (summary, highlights, download)
-  - `SaveSearchDialog` component
-  - `useSearchJob` custom hook (polling logic)
-  - Target: no component exceeds 200 lines
-- **Effort:** 24-40 hours
+| ID | Descricao | Impacto | Esforco |
+|----|-----------|---------|---------|
+| TD-L01 | **is_healthy() usa httpx sincrono.** `ComprasGovSource.is_healthy()` e `TransparenciaSource.is_healthy()` fazem chamadas HTTP sincronas, bloqueando o event loop se chamadas de contexto async. Atualmente usado apenas em testes. | Chamada bloqueante em contexto async se usado | Baixo |
+| TD-L02 | **Sem codigos de erro estruturados.** Respostas de erro usam mensagens em portugues em texto livre. Sem codigos machine-readable para tratamento no cliente. | Tratamento de erros no cliente e fragil | Baixo |
+| TD-L03 | **Buscas salvas apenas em localStorage.** Sem persistencia server-side. Perdidas ao limpar browser. Sem sync cross-device. | Perda de dados, sem cross-device | Baixo |
+| TD-L04 | **test_placeholder.py existe.** Arquivo de teste vazio commitado como scaffolding. | Higiene de codigo | Baixo |
+| TD-L05 | **Conjuntos grandes de keywords/exclusoes.** Setor Vestuario tem ~130 keywords de inclusao e ~100 de exclusao via regex. Custo CPU mitigado por ordenacao fail-fast do filtro. | Preocupacao de performance em escala | Baixo |
+| TD-L06 | **filter_batch roda no ThreadPoolExecutor padrao.** Usa `loop.run_in_executor(None, ...)` que compartilha o executor padrao com chamadas LLM. Contencao possivel. | Contencao de recursos sob carga | Baixo |
 
 ---
 
-## 3. High Priority Debts
+### 2. Debitos de Database
 
-| ID | Debt | Area | Severity | Est. Hours | Risk |
-|----|------|------|----------|------------|------|
-| TD-005 | In-memory job store not scalable | Scalability | High | 16-24 | Data loss on restart |
-| TD-006 | No per-IP/user rate limiting | Security | High | 4-8 | Resource exhaustion |
-| TD-007 | Excel base64 in JSON response | Performance | High | 8-16 | Memory/bandwidth waste |
-| TD-008 | Modal missing focus trap and dialog role | Accessibility | High | 4-6 | WCAG failure |
-| TD-009 | Missing Escape key on dropdowns | Accessibility | High | 2-3 | WCAG failure |
-| TD-010 | Insufficient color contrast (ink-muted) | Accessibility | High | 3-5 | WCAG AA failure |
-| TD-011 | PNCP client uses blocking requests lib | Performance | High | 16-24 | Thread pool exhaustion |
-| TD-012 | Dev dependencies in production image | Performance | High | 2-4 | Larger image, slower deploys |
-| TD-013 | Global mutable singletons | Maintainability | High | 8-12 | Testing difficulty |
-| TD-014 | Deprecated startup event pattern | Maintainability | High | 2-4 | Future breakage |
+**N/A** - Projeto stateless, sem banco de dados.
 
-### TD-005: In-Memory Job Store Not Horizontally Scalable
-
-- **Source ID:** System TD-04
-- **Location:** `backend/job_store.py`
-- **Description:** All job state is held in a Python dict with asyncio.Lock. State is lost on every container restart. Cannot run multiple backend instances behind a load balancer.
-- **Impact:** Every deployment causes all active jobs to fail silently. Users get 404 on their job_id after a redeploy.
-- **Remediation:** Replace with Redis-backed job store (preserves state across restarts, enables horizontal scaling).
-- **Effort:** 16-24 hours
-
-### TD-006: No Per-IP/User Rate Limiting
-
-- **Source ID:** System TD-05
-- **Location:** `backend/main.py:289-293`
-- **Description:** Only a global concurrency limit of 10 active jobs exists. A single client can monopolize all job slots.
-- **Impact:** Trivial denial-of-service: 10 concurrent POST /buscar requests fill the queue. All other users get HTTP 429.
-- **Remediation:** Add SlowAPI middleware or similar per-IP rate limiting (e.g., 5 requests/minute per IP).
-- **Effort:** 4-8 hours
-
-### TD-007: Excel Base64 Transmitted in JSON Response
-
-- **Source ID:** System TD-06
-- **Location:** `backend/main.py:538-539`
-- **Description:** The entire Excel file is base64-encoded and embedded in the JSON job result. For large reports (hundreds of bids), this bloats JSON payloads significantly (~1.37x the file size).
-- **Impact:** Increased memory usage on both backend and frontend. Slower response times for large result sets.
-- **Remediation:** Use pre-signed URLs (S3/R2) or direct streaming via a dedicated download endpoint.
-- **Effort:** 8-16 hours
-
-### TD-008: Modal Missing Focus Trap and Dialog Role
-
-- **Source ID:** Frontend TD-FE-003
-- **Location:** `frontend/app/page.tsx:1002-1061`
-- **Description:** The save-search modal dialog lacks `role="dialog"`, `aria-modal="true"`, focus trapping, and focus restoration on close.
-- **Impact:** Screen reader users may not know they are in a modal. Keyboard users can tab behind the modal overlay, interacting with obscured content.
-- **Remediation:** Add proper ARIA attributes, implement focus trap (e.g., via `focus-trap-react`), restore focus to trigger button on close, close on Escape.
-- **Effort:** 4-6 hours
-
-### TD-009: Missing Escape Key Handling on Dropdowns
-
-- **Source ID:** Frontend TD-FE-002
-- **Location:** `frontend/app/components/ThemeToggle.tsx`, `frontend/app/components/SavedSearchesDropdown.tsx`
-- **Description:** Both dropdowns close on outside click but do not respond to the Escape key. WCAG 2.1 SC 1.4.13 requires dismissible content to be closable via Escape.
-- **Impact:** Keyboard-only users cannot dismiss dropdowns without clicking elsewhere, which is impossible without a pointing device.
-- **Remediation:** Add `useEffect` with `keydown` listener for Escape key in both components.
-- **Effort:** 2-3 hours
-
-### TD-010: Insufficient Color Contrast for Muted Text
-
-- **Source ID:** Frontend TD-FE-004
-- **Location:** `frontend/app/globals.css` (token definitions), multiple components
-- **Description:** `--ink-muted` (#808f9f) on white canvas achieves only 3.4:1 contrast ratio, failing WCAG AA for normal text (4.5:1 required). `--ink-faint` (#c0d2e5) at 1.7:1 is used for some text content. Dark mode `--ink-muted` (#6b7a8a) also fails at 3.8:1.
-- **Impact:** Low-vision users cannot reliably read muted labels, timestamps, and helper text.
-- **Remediation:** Darken `--ink-muted` to approximately #5a6a7a (meets 4.5:1). Audit all uses of `text-ink-faint` and restrict to truly decorative contexts.
-- **Effort:** 3-5 hours
-
-### TD-011: PNCP Client Uses Blocking `requests` Library
-
-- **Source ID:** System TD-11
-- **Location:** `backend/pncp_client.py`
-- **Description:** The PNCP client uses the synchronous `requests` library wrapped in `run_in_executor`, consuming ThreadPoolExecutor threads. The Transparencia source already uses `httpx` async natively.
-- **Impact:** Thread pool contention under load. Maximum 3 concurrent workers limits throughput.
-- **Remediation:** Migrate PNCPClient to `httpx.AsyncClient` with `asyncio.Semaphore(3)` for concurrency control.
-- **Effort:** 16-24 hours
-
-### TD-012: Dev Dependencies in Production Image
-
-- **Source ID:** System TD-10
-- **Location:** `backend/requirements.txt:23-31`
-- **Description:** pytest, ruff, mypy, faker, and other dev tools are installed in the production Docker image.
-- **Impact:** Larger container image (~50-100MB extra), slower deployments, increased attack surface.
-- **Remediation:** Split into `requirements.txt` (production) and `requirements-dev.txt` (development/CI).
-- **Effort:** 2-4 hours
-
-### TD-013: Global Mutable Singletons
-
-- **Source ID:** System TD-07
-- **Location:** `backend/main.py:151-188`
-- **Description:** `_pncp_source`, `_orchestrator`, and `_job_store` are module-level globals with lazy initialization. This pattern prevents proper dependency injection and complicates testing.
-- **Impact:** Tests must monkeypatch module-level globals. Cannot run tests in parallel safely.
-- **Remediation:** Use FastAPI's dependency injection system (`Depends()`) with app state or a proper DI container.
-- **Effort:** 8-12 hours
-
-### TD-014: Deprecated `@app.on_event("startup")` Pattern
-
-- **Source ID:** System TD-08
-- **Location:** `backend/main.py:191`
-- **Description:** Uses deprecated FastAPI startup event handler. FastAPI recommends the lifespan context manager pattern.
-- **Impact:** Will emit deprecation warnings and eventually break in future FastAPI versions.
-- **Remediation:** Migrate to `@asynccontextmanager async def lifespan(app)` pattern.
-- **Effort:** 2-4 hours
+O debito TD-H04 (ausencia de banco de dados) esta listado na Secao 1 como debito de sistema, pois impacta a evolucao arquitetural do produto como um todo.
 
 ---
 
-## 4. Medium Priority Debts
+### 3. Debitos de Frontend/UX
 
-| ID | Debt | Area | Severity | Est. Hours | Risk |
-|----|------|------|----------|------------|------|
-| TD-015 | `datetime.utcnow()` deprecated | Code Quality | Medium | 1-2 | Future breakage |
-| TD-016 | Branding inconsistency (Descomplicita remnants) | Maintainability | Medium | 4-8 | User confusion |
-| TD-017 | No request/correlation ID logging | Maintainability | Medium | 4-8 | Debug difficulty |
-| TD-018 | Hardcoded PNCP base URL | Maintainability | Medium | 1-2 | Env inflexibility |
-| TD-019 | No API versioning | Maintainability | Medium | 4-8 | Breaking changes |
-| TD-020 | Filter diagnostic code in production | Code Quality | Medium | 1-2 | Performance waste |
-| TD-021 | Duplicate UFS constant definition | Code Quality | Medium | 1-2 | Divergence risk |
-| TD-022 | No OpenAPI schema for result endpoint | Maintainability | Medium | 2-4 | Poor docs |
-| TD-023 | Excel download uses filesystem tmpdir | Scalability | Medium | 8-16 | Serverless incompatible |
-| TD-024 | `asyncio.get_event_loop()` deprecated | Code Quality | Medium | 1-2 | Future breakage |
-| TD-025 | No graceful shutdown | Maintainability | Medium | 4-8 | Orphaned tasks |
-| TD-026 | Cache not shared across restarts | Performance | Medium | 8-16 | Repeated fetches |
-| TD-027 | No skip-to-content link | Accessibility | Medium | 1-2 | WCAG failure |
-| TD-028 | External logo dependency (Wix CDN) | Performance | Medium | 2-4 | Reliability risk |
-| TD-029 | Outdated favicon (Descomplicita "B") | Design | Medium | 1-2 | Brand inconsistency |
-| TD-030 | Error boundary uses hardcoded colors | Design | Medium | 2-4 | Theme breakage |
-| TD-031 | Missing focus management after search | Accessibility | Medium | 2-4 | UX / a11y gap |
+Consolidados de `docs/frontend/frontend-spec.md` - Secao 11: UX Debt Inventory.
 
-### TD-015: `datetime.utcnow()` Deprecated
+> :warning: **PENDENTE:** Revisao do @ux-design-expert
 
-- **Source ID:** System TD-09
-- **Location:** `backend/main.py:145`
-- **Description:** `datetime.utcnow()` is deprecated in Python 3.12+ in favor of `datetime.now(timezone.utc)`.
-- **Effort:** 1-2 hours
-
-### TD-016: Branding Inconsistency (Descomplicita Remnants)
-
-- **Source IDs:** System TD-12, TD-13, TD-14; Frontend TD-FE-007
-- **Locations:**
-  - `docker-compose.yml:30,74,94` -- container names `bidiq-backend`, `bidiq-frontend`, network `bidiq-network`
-  - `README.md:1` -- title says "Descomplicita"
-  - `backend/sectors.py:1` -- module docstring says "Descomplicita"
-  - `frontend/app/icon.svg` -- shows green "B" from Descomplicita era
-- **Description:** Multiple files retain Descomplicita branding despite the rebrand to Descomplicita. This is a consolidated debt covering 4 original items.
-- **Impact:** User-facing brand confusion (favicon), developer confusion (documentation/config).
-- **Remediation:** Batch update all Descomplicita references. Update favicon with Descomplicita brand mark.
-- **Effort:** 4-8 hours
-
-### TD-017: No Request/Correlation ID Logging
-
-- **Source ID:** System TD-15
-- **Location:** `backend/main.py` (throughout)
-- **Description:** Log entries are correlated only by job_id in string interpolation, not structured logging fields. No correlation ID is generated per HTTP request.
-- **Effort:** 4-8 hours
-
-### TD-018: Hardcoded PNCP Base URL
-
-- **Source ID:** System TD-16
-- **Location:** `backend/pncp_client.py:81`
-- **Description:** `PNCPClient.BASE_URL` is a class constant, not configurable via environment variable.
-- **Effort:** 1-2 hours
-
-### TD-019: No API Versioning
-
-- **Source ID:** System TD-17
-- **Location:** `backend/main.py`
-- **Description:** Endpoints are unversioned (`/buscar` not `/v1/buscar`). Breaking changes affect all clients simultaneously.
-- **Effort:** 4-8 hours
-
-### TD-020: Filter Diagnostic Code in Production Path
-
-- **Source ID:** System TD-18
-- **Location:** `backend/main.py:441-455`
-- **Description:** Debug logging imports `filter.py` internals and iterates raw data inside the request handler.
-- **Effort:** 1-2 hours
-
-### TD-021: Duplicate UFS Constant Definition
-
-- **Source IDs:** System TD-19; Frontend TD-FE-009
-- **Locations:** `frontend/app/page.tsx:18-21`, `frontend/app/types.ts:6-10`
-- **Description:** The UFS array is defined in both files with slightly different forms (`as const` vs plain array). `UF_NAMES` mapping only exists in `page.tsx`.
-- **Remediation:** Centralize in `frontend/lib/constants.ts`.
-- **Effort:** 1-2 hours
-
-### TD-022: No OpenAPI Schema for Job Result Endpoint
-
-- **Source ID:** System TD-20
-- **Location:** `backend/main.py:650`
-- **Description:** `GET /buscar/{job_id}/result` returns raw `JSONResponse`, not a typed Pydantic model. Swagger docs are incomplete.
-- **Effort:** 2-4 hours
-
-### TD-023: Excel Download Uses Filesystem tmpdir
-
-- **Source ID:** System TD-21
-- **Location:** `frontend/app/api/buscar/result/route.ts:63-64`
-- **Description:** Excel files are saved to `os.tmpdir()` on the Next.js server. Not suitable for serverless (Vercel edge) or multi-instance deployment.
-- **Remediation:** Use signed URLs (S3/R2) or pass-through streaming. Ties closely to TD-007.
-- **Effort:** 8-16 hours
-
-### TD-024: `asyncio.get_event_loop()` Deprecated
-
-- **Source ID:** System TD-22
-- **Location:** `backend/main.py:320`, `backend/sources/pncp_source.py:104`
-- **Description:** Should use `asyncio.get_running_loop()`.
-- **Effort:** 1-2 hours
-
-### TD-025: No Graceful Shutdown
-
-- **Source ID:** System TD-23
-- **Location:** `backend/main.py:191-198`
-- **Description:** Background tasks (`run_search_job`, cleanup) are not cancelled on SIGTERM. Active searches may produce orphaned results.
-- **Effort:** 4-8 hours
-
-### TD-026: Cache Not Shared Across Restarts
-
-- **Source ID:** System TD-24
-- **Location:** `backend/pncp_client.py:108`
-- **Description:** In-memory LRU cache is lost on container restart. After every deployment, all PNCP responses must be re-fetched.
-- **Remediation:** Use Redis for shared cache (pairs with TD-005).
-- **Effort:** 8-16 hours
-
-### TD-027: No Skip-to-Content Link
-
-- **Source ID:** Frontend TD-FE-005
-- **Location:** `frontend/app/page.tsx`
-- **Description:** No skip navigation link for keyboard users to bypass header elements.
-- **Effort:** 1-2 hours
-
-### TD-028: External Logo Dependency (Wix CDN)
-
-- **Source ID:** Frontend TD-FE-006
-- **Location:** `frontend/app/page.tsx` (LOGO_URL constant)
-- **Description:** Logo loaded from `static.wixstatic.com` instead of self-hosted. Not using Next.js `<Image>` component.
-- **Remediation:** Use existing `public/logo-descomplicita.png` via Next.js `<Image>`.
-- **Effort:** 2-4 hours
-
-### TD-029: Outdated Favicon (Descomplicita "B")
-
-- **Source ID:** Frontend TD-FE-007 (also covered in TD-016 branding consolidation)
-- **Location:** `frontend/app/icon.svg`
-- **Description:** Favicon displays a green "B" from the Descomplicita era.
-- **Note:** This is a sub-item of TD-016 but tracked separately for frontend team assignment.
-- **Effort:** 1-2 hours
-
-### TD-030: Error Boundary Uses Hardcoded Colors
-
-- **Source ID:** Frontend TD-FE-008
-- **Location:** `frontend/app/error.tsx`
-- **Description:** Uses `bg-gray-50`, `bg-green-600`, `text-gray-900` instead of design system tokens. Error page does not respect themes.
-- **Effort:** 2-4 hours
-
-### TD-031: Missing Focus Management After Search
-
-- **Source ID:** Frontend TD-FE-014
-- **Location:** `frontend/app/page.tsx`
-- **Description:** When search completes, focus remains on the search button. Results may be below viewport. Screen reader users are not informed.
-- **Remediation:** After results load, scroll to and focus the results section via ref.
-- **Effort:** 2-4 hours
+| ID | Descricao | Severidade | Esforco |
+|----|-----------|------------|---------|
+| UXD-001 | **Termos multi-palavras impossiveis.** Espaco dispara criacao de token no input de termos, entao "camisa polo" se torna dois tokens separados. Necessario suporte a aspas ou delimitador alternativo. | **Alta** | Medio (3h) |
+| UXD-002 | **Sem estado de carregamento para fetch de setores.** `useSearchForm` busca setores no mount mas nao mostra indicador. Dropdown aparece vazio momentaneamente se backend estiver lento. | Media | Pequeno (1h) |
+| UXD-003 | **Sem pagina 404.** Falta `not-found.tsx` para rotas invalidas. | Baixa | Pequeno (1h) |
+| UXD-004 | **Sem atalho de teclado para busca.** Enter em campos de data nao submete. Sem Ctrl+Enter ou similar. | Baixa | Pequeno (1h) |
+| UXD-005 | **SavedSearchesDropdown usa div como backdrop.** Nao usa `<dialog>` nativo ou padrao ARIA listbox adequado. | Media | Medio (3h) |
+| UXD-006 | **SaveSearchDialog usa div, nao `<dialog>` nativo.** Focus trap manual funciona mas elemento nativo e preferido. | Media | Medio (2h) |
+| UXD-007 | **Sem elemento `<form>` envolvendo formulario.** Impede submissao nativa e autofill do browser. | Media | Pequeno (2h) |
+| UXD-008 | **Mixpanel importado incondicionalmente.** ~40KB mesmo sem token. Deveria usar import dinamico. | Baixa | Pequeno (1h) |
+| UXD-009 | **Sem confirmacao antes de page unload durante busca.** Usuario pode navegar para fora durante busca longa sem aviso. | Baixa | Pequeno (1h) |
+| UXD-010 | **ThemeProvider aplica 30+ propriedades CSS imperativamente.** Poderia usar data attribute + regras CSS para manutenibilidade. | Baixa | Grande (8h) |
+| UXD-011 | **Script FOUC no `<head>` duplica logica do ThemeProvider.** Subset handling pode divergir do ThemeProvider completo. | Media | Medio (3h) |
+| UXD-012 | **Sem indicador offline/rede.** Falhas de fetch mostram erros genericos. Sem estado dedicado de conectividade. | Media | Medio (4h) |
+| UXD-013 | **Footer sem conteudo significativo.** Linha unica de branding, sem links (privacidade, termos, ajuda). | Baixa | Pequeno (1h) |
+| UXD-014 | **Texto de SourceBadges sem acentos portugues.** "combinacoes" deveria ter acentos corretos. | Baixa | Trivial (15min) |
+| UXD-015 | **Sem auditoria de contraste de cores para os 5 temas.** Temas Sepia e Paperwhite nao verificados contra WCAG AA. | Media | Medio (4h) |
+| UXD-016 | **LoadingProgress tem 450+ linhas.** Gerencia barra de progresso, ETA, estagios, grid UF, carrossel, skeletons, analytics. Deveria decompor. | Media | Grande (6h) |
+| UXD-017 | **Setores fallback hardcoded.** 7 setores em `useSearchForm.ts` podem ficar desatualizados se backend mudar. | Baixa | Pequeno (1h) |
+| UXD-018 | **Cores Tailwind hardcoded em SearchSummary.** Badges de tipo usam `bg-blue-100`, `bg-purple-100` em vez de design tokens. Quebram nos temas Sepia/Paperwhite. | Baixa | Pequeno (1h) |
+| UXD-019 | **carouselData usa cores Tailwind hardcoded por categoria.** `bg-blue-50`, `bg-green-50`, etc. Nao utiliza tokens. | Baixa | Medio (2h) |
+| UXD-020 | **Sem atributo `noValidate` no form.** Validacao nativa do browser pode conflitar com validacao customizada. | Baixa | Trivial (5min) |
 
 ---
 
-## 5. Low Priority Debts
+### 4. Debitos Cruzados (Cross-cutting)
 
-| ID | Debt | Area | Severity | Est. Hours | Risk |
-|----|------|------|----------|------------|------|
-| TD-032 | No structured error codes | Maintainability | Low | 4-8 | Client parsing |
-| TD-033 | f-string in logger calls | Code Quality | Low | 2-4 | Minor perf |
-| TD-034 | No pagination for sectors endpoint | Scalability | Low | 1-2 | Future concern |
-| TD-035 | Frontend emoji in source code | Code Quality | Low | 1-2 | Style inconsistency |
-| TD-036 | No content-length validation for downloads | Security | Low | 1-2 | Large file risk |
-| TD-037 | Date range max removed | Performance | Low | 1-2 | PNCP overload |
-| TD-038 | Module-level singleton in job_store.py | Code Quality | Low | 1 | Unused code |
-| TD-039 | Deprecated performance API in AnalyticsProvider | Code Quality | Low | 1 | Future breakage |
-| TD-040 | No loading state for sector list | UX | Low | 1-2 | Minor UX gap |
-| TD-041 | E2E tests reference outdated class names | Code Quality | Low | 2-4 | Test failures |
-| TD-042 | No code splitting for components | Performance | Low | 4-8 | Bundle size |
-| TD-043 | No `<nav>` semantic element | Accessibility | Low | 1 | Screen reader |
-| TD-044 | SourceBadges/carouselData hardcoded colors | Design | Low | 2-4 | Theme inconsistency |
-| TD-045 | Unused public asset (logo-descomplicita.png) | Code Quality | Low | 0.5 | Repo bloat |
-| TD-046 | Missing aria-describedby for terms input | Accessibility | Low | 1 | Screen reader gap |
+Debitos que impactam tanto backend quanto frontend simultaneamente.
 
-### Brief Descriptions
+#### 4.1 Seguranca Cross-layer
 
-- **TD-032** (System TD-26): Error responses use free-text Portuguese messages, not machine-parseable codes. `backend/main.py` throughout.
-- **TD-033** (System TD-27): Uses `f"msg {val}"` in `logger.info()` instead of `"msg %s", val` for lazy formatting. `backend/main.py`.
-- **TD-034** (System TD-28): `/setores` returns all sectors in one response. Not a problem at 6 sectors. `backend/main.py:201-204`.
-- **TD-035** (System TD-29): LoadingProgress.tsx and other components embed emoji characters directly in JSX. `frontend/app/components/LoadingProgress.tsx`.
-- **TD-036** (System TD-30): Frontend serves downloaded Excel files without size validation. `frontend/app/api/download/route.ts`.
-- **TD-037** (System TD-31): `BuscaRequest` no longer enforces a max date range, allowing arbitrarily large queries. `backend/schemas.py:59-73`.
-- **TD-038** (System TD-25): `job_store.py:158` creates a `job_store = JobStore()` singleton that is never used. `main.py` creates its own `_job_store`.
-- **TD-039** (Frontend TD-FE-011): `performance.timing.navigationStart` is deprecated. `frontend/app/components/AnalyticsProvider.tsx:52`.
-- **TD-040** (Frontend TD-FE-012): No loading indicator while fetching sector list from `/api/setores`. `frontend/app/page.tsx`.
-- **TD-041** (Frontend TD-FE-013): E2E tests check for `bg-green-600` (old Descomplicita) but UI uses `bg-brand-navy`. `frontend/__tests__/e2e/01-happy-path.spec.ts:64`.
-- **TD-042** (Frontend TD-FE-015): All components statically imported. LoadingProgress (415 lines) and carouselData (368 lines) could use dynamic imports. `frontend/app/page.tsx`.
-- **TD-043** (Frontend TD-FE-016): Header lacks `<nav>` element for navigation area. `frontend/app/page.tsx`.
-- **TD-044** (Frontend TD-FE-017): SourceBadges and carouselData use raw Tailwind colors (`bg-green-100`, `bg-blue-50`) instead of design tokens. `frontend/app/components/SourceBadges.tsx`, `frontend/app/components/carouselData.ts`.
-- **TD-045** (Frontend TD-FE-018): `public/logo-descomplicita.png` exists but is unused. Will be resolved if TD-028 is implemented (self-host logo).
-- **TD-046** (Frontend TD-FE-019): Terms input helper text not linked via `aria-describedby`. `frontend/app/page.tsx`.
+| ID | Descricao | Areas | Severidade |
+|----|-----------|-------|------------|
+| XD-SEC-01 | **Headers de seguranca ausentes.** Sem CSP (TD-M07), sem HSTS (TD-M08), sem Referrer-Policy, sem Permissions-Policy. Afeta tanto a entrega do frontend (Vercel) quanto o backend (Railway). | Backend + Frontend | Media |
+| XD-SEC-02 | **Autenticacao fragil end-to-end.** API key unica compartilhada (TD-C02) combinada com bypass em dev. Frontend depende exclusivamente da BFF layer para seguranca. Sem rate limiting por usuario real. | Backend + Frontend | Critica |
+| XD-SEC-03 | **dangerouslySetInnerHTML + sem CSP.** Script inline para tema (TD-M10) combinado com ausencia de CSP (TD-M07) amplia superficie de ataque XSS. | Frontend (com impacto na seguranca geral) | Media |
+
+#### 4.2 Contratos de API
+
+| ID | Descricao | Areas | Severidade |
+|----|-----------|-------|------------|
+| XD-API-01 | **Sem versionamento de API (TD-M06).** Qualquer breaking change no backend quebra o frontend imediatamente. BFF mitiga parcialmente, mas nao elimina o risco. | Backend + Frontend | Media |
+| XD-API-02 | **Sem testes de contrato.** Tipos TypeScript no frontend e schemas Pydantic no backend nao sao validados entre si. Drift silencioso e possivel. | Backend + Frontend | Media |
+| XD-API-03 | **Codigos de erro nao estruturados (TD-L02).** Frontend faz parsing de mensagens de erro em texto livre do backend. Qualquer mudanca de wording quebra o tratamento de erros. | Backend + Frontend | Baixa |
+
+#### 4.3 Performance End-to-End
+
+| ID | Descricao | Areas | Severidade |
+|----|-----------|-------|------------|
+| XD-PERF-01 | **Download bufferizado em cadeia.** Backend gera Excel em memoria (TD-C01), envia para BFF, que faz buffer inteiro via `arrayBuffer()` (TD-H06), e entao envia para browser. Tres copias completas do arquivo em memoria simultaneamente. | Backend + Frontend | Alta |
+| XD-PERF-02 | **Sem paginacao end-to-end (TD-M02).** Backend retorna todos os resultados de uma vez, frontend renderiza tudo. Sem lazy loading ou virtualizacao. | Backend + Frontend | Media |
+| XD-PERF-03 | **Polling de intervalo fixo.** Frontend faz polling a cada 2s independentemente da duracao da busca. Sem backoff exponencial. Gera carga desnecessaria para buscas longas. | Frontend (com carga no Backend) | Baixa |
+
+#### 4.4 Cobertura de Testes Cross-cutting
+
+| ID | Descricao | Areas | Severidade |
+|----|-----------|-------|------------|
+| XD-TEST-01 | **Sem testes de integracao frontend-backend.** E2E tests dependem de backend live, sem mock server para CI. | Backend + Frontend | Media |
+| XD-TEST-02 | **Sem smoke tests pos-deploy.** Health endpoint existe mas sem suite de verificacao automatizada. | Infra + Backend + Frontend | Media |
+| XD-TEST-03 | **Sem testes de regressao visual.** Mudancas de tema (5 variantes) e responsividade nao verificadas automaticamente. | Frontend | Baixa |
 
 ---
 
-## 6. Cross-Cutting Concerns
+### 5. Matriz Preliminar de Priorizacao
 
-### 6.1 Security Posture (TD-001 + TD-002 + TD-003 + TD-006 + TD-036)
+| ID | Debito | Area | Severidade | Impacto | Esforco | Prioridade Preliminar |
+|----|--------|------|------------|---------|---------|----------------------|
+| TD-C02 | Sem autenticacao de usuario | Sistema | Critica | Critico | Alto | **P0** |
+| XD-SEC-02 | Autenticacao fragil end-to-end | Cross-cutting | Critica | Critico | Alto | **P0** |
+| TD-C01 | Excel bytes duplicados memoria + Redis | Sistema | Critica | Alto | Medio | **P1** |
+| XD-PERF-01 | Download bufferizado em cadeia (3 copias) | Cross-cutting | Alta | Alto | Medio | **P1** |
+| TD-H02 | Jobs como tasks asyncio nao duraveis | Sistema | Alta | Alto | Alto | **P1** |
+| TD-C03 | 3 de 5 fontes desabilitadas (codigo morto) | Sistema | Critica | Medio | Alto | **P1** |
+| UXD-001 | Termos multi-palavras impossiveis | Frontend/UX | Alta | Alto | Medio (3h) | **P1** |
+| TD-H01 | In-memory job store como primario | Sistema | Alta | Alto | Medio | **P1** |
+| TD-H03 | OpenAI API sincrona no thread pool | Sistema | Alta | Medio | Medio | **P2** |
+| TD-H06 | Timeout Vercel 10s em downloads grandes | Sistema | Alta | Medio | Medio | **P2** |
+| TD-H04 | Sem banco de dados (limita evolucao) | Sistema | Alta | Alto | Alto | **P2** |
+| XD-API-01 | Sem versionamento de API | Cross-cutting | Media | Medio | Medio | **P2** |
+| XD-API-02 | Sem testes de contrato | Cross-cutting | Media | Medio | Medio | **P2** |
+| TD-M01 | Filtro de deadline desabilitado | Sistema | Media | Medio | Medio | **P2** |
+| TD-M02 / XD-PERF-02 | Sem paginacao nos resultados | Sistema + Cross | Media | Medio | Medio | **P2** |
+| UXD-015 | Sem auditoria de contraste (5 temas) | Frontend/UX | Media | Medio | Medio (4h) | **P2** |
+| UXD-016 | LoadingProgress 450+ linhas | Frontend/UX | Media | Baixo | Grande (6h) | **P2** |
+| XD-SEC-01 | Headers de seguranca ausentes | Cross-cutting | Media | Medio | Baixo | **P2** |
+| XD-SEC-03 | dangerouslySetInnerHTML + sem CSP | Cross-cutting | Media | Medio | Baixo | **P2** |
+| UXD-005 | SavedSearchesDropdown sem ARIA listbox | Frontend/UX | Media | Baixo | Medio (3h) | **P3** |
+| UXD-006 | SaveSearchDialog sem `<dialog>` nativo | Frontend/UX | Media | Baixo | Medio (2h) | **P3** |
+| UXD-007 | Sem elemento `<form>` | Frontend/UX | Media | Medio | Pequeno (2h) | **P3** |
+| UXD-011 | Script FOUC duplica logica do ThemeProvider | Frontend/UX | Media | Baixo | Medio (3h) | **P3** |
+| UXD-012 | Sem indicador offline/rede | Frontend/UX | Media | Medio | Medio (4h) | **P3** |
+| UXD-002 | Sem loading state para fetch de setores | Frontend/UX | Media | Baixo | Pequeno (1h) | **P3** |
+| TD-M05 | Estado global mutavel para DI | Sistema | Media | Medio | Medio | **P3** |
+| TD-M06 | Sem versionamento de API | Sistema | Media | Medio | Medio | **P3** |
+| XD-TEST-01 | Sem testes integracao frontend-backend | Cross-cutting | Media | Medio | Medio | **P3** |
+| XD-TEST-02 | Sem smoke tests pos-deploy | Cross-cutting | Media | Medio | Baixo | **P3** |
+| TD-M03 | Modelo LLM hardcoded | Sistema | Media | Baixo | Baixo | **P4** |
+| TD-M04 | Sem timeout para chamadas LLM | Sistema | Media | Medio | Baixo | **P4** |
+| TD-M07 | Sem CSP header | Sistema | Media | Baixo | Baixo | **P4** |
+| TD-M08 | Sem HSTS header | Sistema | Media | Baixo | Baixo | **P4** |
+| TD-M09 | MD5 para chaves de dedup | Sistema | Media | Baixo | Baixo | **P4** |
+| TD-M10 | dangerouslySetInnerHTML para tema | Sistema | Media | Baixo | Baixo | **P4** |
+| TD-M11 | Versao hardcoded em multiplos locais | Sistema | Media | Baixo | Baixo | **P4** |
+| TD-H05 | CORS allow_headers=* | Sistema | Alta | Baixo | Baixo | **P4** |
+| UXD-003 | Sem pagina 404 | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-004 | Sem atalho teclado para busca | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-008 | Mixpanel importado incondicionalmente | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-009 | Sem confirmacao page unload durante busca | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-010 | ThemeProvider imperativo (30+ props CSS) | Frontend/UX | Baixa | Baixo | Grande (8h) | **P4** |
+| UXD-013 | Footer sem conteudo significativo | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-014 | SourceBadges sem acentos | Frontend/UX | Baixa | Trivial | Trivial (15min) | **P4** |
+| UXD-017 | Setores fallback hardcoded | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-018 | Cores hardcoded em SearchSummary | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
+| UXD-019 | carouselData com cores hardcoded | Frontend/UX | Baixa | Baixo | Medio (2h) | **P4** |
+| UXD-020 | Sem noValidate no form | Frontend/UX | Baixa | Trivial | Trivial (5min) | **P4** |
+| XD-API-03 | Codigos de erro nao estruturados | Cross-cutting | Baixa | Baixo | Baixo | **P4** |
+| XD-PERF-03 | Polling intervalo fixo (sem backoff) | Cross-cutting | Baixa | Baixo | Baixo | **P4** |
+| XD-TEST-03 | Sem testes regressao visual | Cross-cutting | Baixa | Baixo | Medio | **P4** |
+| TD-L01 | is_healthy() usa httpx sincrono | Sistema | Baixa | Baixo | Baixo | **P5** |
+| TD-L02 | Sem codigos de erro estruturados | Sistema | Baixa | Baixo | Baixo | **P5** |
+| TD-L03 | Buscas salvas apenas em localStorage | Sistema | Baixa | Baixo | Baixo | **P5** |
+| TD-L04 | test_placeholder.py existe | Sistema | Baixa | Trivial | Trivial | **P5** |
+| TD-L05 | Conjuntos grandes de keywords/exclusoes | Sistema | Baixa | Baixo | Baixo | **P5** |
+| TD-L06 | filter_batch no ThreadPoolExecutor padrao | Sistema | Baixa | Baixo | Baixo | **P5** |
 
-The backend has **no authentication, no per-client rate limiting, and accepts requests from any origin**. The container runs as root. These debts compound: an unauthenticated attacker from any origin can exhaust all 10 job slots, trigger unlimited PNCP API calls (incurring rate-limit penalties with the government API), and potentially exploit container-level vulnerabilities. These must be addressed as a group before any public launch or marketing.
-
-### 6.2 In-Memory Architecture Ceiling (TD-005 + TD-026 + TD-023)
-
-The job store, PNCP cache, and Excel download files all rely on ephemeral storage (Python dicts and filesystem tmpdir). This creates three problems:
-1. **Data loss on deploy** -- active jobs vanish, cache is cold
-2. **No horizontal scaling** -- cannot run multiple backend instances
-3. **Serverless incompatibility** -- tmpdir-based downloads fail on Vercel Edge
-
-Introducing Redis (for jobs + cache) and object storage (for Excel files) would resolve all three simultaneously.
-
-### 6.3 Accessibility Compliance (TD-008 + TD-009 + TD-010 + TD-027 + TD-031 + TD-043 + TD-046)
-
-Seven accessibility debts indicate that WCAG 2.1 AA compliance was not a design requirement. The issues range from structural (missing focus trap, no skip link) to perceptual (contrast ratios). These affect keyboard-only users, screen reader users, and low-vision users. Brazilian accessibility law (LBI -- Lei Brasileira de Inclusao, Law 13.146/2015) requires digital accessibility for government-facing tools.
-
-### 6.4 Branding Migration Completeness (TD-016 + TD-029 + TD-028 + TD-045)
-
-The Descomplicita-to-Descomplicita rebrand is incomplete across documentation, Docker configuration, favicon, and logo hosting. These are individually low-effort but collectively create a fragmented brand identity.
-
-### 6.5 Deprecated API Usage (TD-015 + TD-024 + TD-014 + TD-039)
-
-Four items use deprecated Python/JS APIs (`datetime.utcnow()`, `asyncio.get_event_loop()`, `@app.on_event`, `performance.timing`). While not immediately breaking, these will cause warnings and eventual failures as runtimes are upgraded.
+**Legenda de Prioridade:**
+- **P0:** Resolver antes de qualquer feature nova (bloqueador)
+- **P1:** Resolver na proxima sprint / ciclo
+- **P2:** Planejar para o proximo milestone
+- **P3:** Backlog priorizado
+- **P4:** Backlog geral
+- **P5:** Nice-to-have / oportunistico
 
 ---
 
-## 7. Dependency Map
+### 6. Estatisticas Resumidas
+
+| Metrica | Valor |
+|---------|-------|
+| **Total de debitos** | 52 |
+| **Criticos** | 4 (TD-C01, TD-C02, TD-C03, XD-SEC-02) |
+| **Altos** | 8 (TD-H01..H06, UXD-001, XD-PERF-01) |
+| **Medios** | 24 |
+| **Baixos** | 16 |
+| **Debitos de Sistema** | 20 |
+| **Debitos de Frontend/UX** | 20 |
+| **Debitos Cross-cutting** | 12 |
+| **Debitos de Database** | 0 (stateless) |
+
+#### Estimativa de Esforco
+
+| Area | Esforco Estimado |
+|------|-----------------|
+| Sistema (Backend) | 80-120 horas |
+| Frontend/UX | 40-55 horas |
+| Cross-cutting | 30-50 horas |
+| **Total** | **150-225 horas** |
+
+> **Nota:** Estimativas de esforco do frontend sao mais precisas (baseadas em horas especificas do frontend-spec.md). Estimativas do backend usam classificacao qualitativa (Baixo/Medio/Alto) do system-architecture.md, convertidas aproximadamente para: Baixo = 2-4h, Medio = 4-8h, Alto = 8-16h.
+
+---
+
+### 7. Perguntas para Especialistas
+
+#### Para @ux-design-expert:
+
+1. **UXD-001 (termos multi-palavras):** Qual a abordagem preferida -- suporte a aspas ("camisa polo"), delimitador diferente (virgula), ou combinacao? Impacto na curva de aprendizado do usuario?
+2. **UXD-015 (contraste dos temas):** Existe uma ferramenta/processo preferido para auditoria dos 5 temas? Temas Sepia e Paperwhite devem ser mantidos ou podem ser removidos para reduzir superficie de teste?
+3. **UXD-016 (LoadingProgress):** Qual decomposicao e recomendada? ProgressBar + StageList + UfGrid + Carousel como sub-componentes?
+4. **Design System:** Prioridade entre: (a) extrair componentes `<TextInput>` e `<Button>`, (b) setup Storybook, (c) documentacao de design system? O que agrega mais valor primeiro?
+5. **UXD-005/UXD-006:** Migracao para `<dialog>` nativo e prioritaria dado que focus traps manuais ja estao funcionando?
+6. **Acessibilidade geral:** A nota B+ e adequada para o estagio POC, ou existem bloqueadores de acessibilidade que deveriam ser P0?
+
+#### Para @qa:
+
+1. **Cobertura de testes:** O target de 75% de cobertura de statements e adequado para o proximo milestone? Ou deveriam focar em areas especificas (hooks, API routes)?
+2. **Testes de contrato (XD-API-02):** Qual abordagem e recomendada -- Pact, schema validation compartilhado, ou outra?
+3. **E2E sem backend live (XD-TEST-01):** Mock server (MSW, json-server) ou Docker Compose para CI? Qual tradeoff e aceitavel?
+4. **Testes de regressao visual (XD-TEST-03):** Vale o investimento para um POC com 5 temas, ou e prematuro?
+5. **Smoke tests pos-deploy (XD-TEST-02):** Escopo minimo recomendado -- health check, busca simples, download?
+6. **Quality gates:** Existem metricas de qualidade (alem de cobertura) que deveriam ser enforced no CI?
+7. **Componentes sem teste:** ThemeProvider, RegionSelector, AnalyticsProvider, carouselData -- qual e a prioridade de cobertura?
+
+---
+
+### 8. Dependencias entre Debitos
 
 ```
-TD-004 (God Component)
-  |
-  +-- UNBLOCKS --> TD-031 (Focus management -- easier after extraction)
-  +-- UNBLOCKS --> TD-008 (Modal a11y -- easier as separate component)
-  +-- UNBLOCKS --> TD-021 (UFS dedup -- natural during extraction)
-  +-- UNBLOCKS --> TD-042 (Code splitting -- requires separate components)
+TD-C02 (sem auth) ──────────────> TD-H04 (sem database)
+  "Auth requer persistencia           "Database e pre-requisito
+   de usuarios"                        para muitas features"
 
-TD-005 (Redis Job Store)
-  |
-  +-- ENABLES --> TD-026 (Shared cache via Redis)
-  +-- PAIRS WITH --> TD-023 (Excel storage -- both need external state)
+TD-C01 (Excel em memoria) ─────> TD-M02 (sem paginacao)
+  "Buffer grande porque                "Resultados grandes
+   retorna tudo de uma vez"             geram Excel grandes"
 
-TD-007 (Excel base64 removal)
-  |
-  +-- PAIRS WITH --> TD-023 (tmpdir Excel -- both about file delivery)
-  +-- REQUIRES --> Object storage decision (S3/R2/Supabase)
+TD-H06 (Vercel timeout) ───────> TD-C01 (Excel em memoria)
+  "Timeout causado por                 "Streaming resolveria
+   buffer completo"                     ambos os problemas"
 
-TD-003 (Authentication)
-  |
-  +-- ENHANCES --> TD-006 (Per-user rate limiting with identity)
-  +-- REQUIRES --> TD-001 (CORS must be restricted first)
+TD-M06 (sem API versioning) ───> XD-API-02 (sem contract tests)
+  "Versionamento sem contrato          "Contrato sem versao
+   e incompleto"                        e fragil"
 
-TD-013 (DI refactor)
-  |
-  +-- ENHANCES --> TD-005 (Redis migration cleaner with DI)
-  +-- ENHANCES --> TD-014 (Lifespan pattern aligns with DI)
+XD-SEC-01 (headers) ───────────> TD-M07 (sem CSP) + TD-M08 (sem HSTS)
+  "Resolver headers de seguranca       "CSP e HSTS sao subset
+   resolve ambos"                       do mesmo trabalho"
 
-TD-016 (Branding)
-  |
-  +-- INCLUDES --> TD-029 (Favicon)
-  +-- RESOLVES --> TD-045 (Unused logo -- use it for TD-028)
-  +-- PAIRS WITH --> TD-028 (Self-host logo)
+UXD-010 (ThemeProvider imperativo) ──> UXD-011 (FOUC script duplica logica)
+  "Refatorar ThemeProvider              "Resolveria a duplicacao
+   para data-attributes"                automaticamente"
+
+UXD-015 (auditoria contraste) ──> UXD-018 + UXD-019 (cores hardcoded)
+  "Auditar primeiro, depois            "Cores hardcoded so podem
+   migrar para tokens"                  ser corrigidas apos auditoria"
+
+TD-H02 (jobs nao duraveis) ────> TD-H01 (in-memory store)
+  "Fila de tarefas duravel             "Eliminaria necessidade
+   (Celery/RQ)                          de dual-write store"
 ```
 
----
+**Cadeia critica:** TD-C01 -> TD-M02 -> TD-H06 (resolver paginacao + streaming resolve 3 debitos)
 
-## 8. Preliminary Priority Matrix
-
-| Quadrant | IDs | Rationale |
-|----------|-----|-----------|
-| **High Impact + Low Effort (Quick Wins)** | TD-001, TD-002, TD-009, TD-012, TD-015, TD-020, TD-021, TD-024, TD-027 | 1-4 hours each, meaningful security/quality improvement |
-| **High Impact + High Effort (Strategic)** | TD-003, TD-004, TD-005, TD-007, TD-011, TD-023, TD-026 | Core architecture improvements, 16-40 hours each |
-| **Low Impact + Low Effort (Fill-ins)** | TD-016, TD-018, TD-029, TD-030, TD-033, TD-035, TD-038, TD-039, TD-040, TD-043, TD-045, TD-046 | Can be batched into a cleanup sprint, 1-4 hours each |
-| **Low Impact + High Effort (Deprioritize)** | TD-010 (requires full contrast audit), TD-019, TD-032, TD-042 | Important but not urgent; schedule for later |
-
-### Suggested Execution Order
-
-**Sprint 1 -- Security Hardening (Quick Wins):**
-TD-001, TD-002, TD-006, TD-012 (~10-16 hours)
-
-**Sprint 2 -- Accessibility Critical Path:**
-TD-008, TD-009, TD-010, TD-027, TD-031 (~12-20 hours)
-
-**Sprint 3 -- Frontend Architecture:**
-TD-004 (God component decomposition, ~24-40 hours)
-
-**Sprint 4 -- Backend Architecture:**
-TD-005, TD-026, TD-013, TD-014 (~34-56 hours)
-
-**Sprint 5 -- File Delivery Pipeline:**
-TD-007, TD-023 (~16-32 hours)
-
-**Sprint 6 -- Cleanup Batch:**
-TD-015, TD-016, TD-018, TD-020, TD-021, TD-024, TD-025, TD-028, TD-029, TD-030 (~20-40 hours)
-
-**Backlog:**
-TD-003 (auth), TD-011 (httpx migration), TD-019 (API versioning), remaining Low items
+**Cadeia de seguranca:** TD-C02 -> TD-H04 (auth requer persistencia, ambos P0-P1)
 
 ---
 
-## 9. Questions for Specialist Validation
+### 9. Quick Wins Identificados
 
-### For @ux-design-expert (Pixel):
+Debitos com baixo esforco e alto impacto relativo -- candidatos para acao imediata.
 
-1. **TD-004 (God Component):** The proposed decomposition splits into 5 components + 1 hook. Does the suggested component boundary (`SearchForm`, `UfSelector`, `DateRangeSelector`, `SearchResults`, `SaveSearchDialog`) align with how you envision the UX evolving? Are there alternative split points that would better support future features (e.g., comparison view, saved search management page)?
+| ID | Debito | Esforco | Impacto | Justificativa |
+|----|--------|---------|---------|---------------|
+| UXD-014 | SourceBadges sem acentos | Trivial (15min) | UX | Correcao de 1 linha, melhora percepcao de qualidade |
+| UXD-020 | Sem noValidate no form | Trivial (5min) | UX | 1 atributo, previne conflito de validacao |
+| TD-L04 | test_placeholder.py | Trivial (5min) | Higiene | Remover arquivo vazio |
+| TD-H05 | CORS allow_headers=* | Baixo (1h) | Seguranca | Listar headers explicitamente, reducao de superficie |
+| TD-M07 + TD-M08 | Headers CSP + HSTS | Baixo (2h) | Seguranca | Adicionar headers em vercel.json, protecao imediata |
+| TD-M11 | Versao hardcoded | Baixo (1h) | Manutencao | Extrair para constante unica |
+| UXD-002 | Loading state para setores | Pequeno (1h) | UX | Spinner simples no dropdown |
+| UXD-003 | Pagina 404 | Pequeno (1h) | UX | Arquivo `not-found.tsx` simples |
+| UXD-008 | Mixpanel import condicional | Pequeno (1h) | Performance | Dynamic import, -40KB quando desabilitado |
+| UXD-009 | Confirmacao page unload | Pequeno (1h) | UX | `beforeunload` event handler |
+| UXD-013 | Footer com conteudo | Pequeno (1h) | UX | Links basicos de footer |
+| UXD-017 | Remover setores fallback hardcoded | Pequeno (1h) | Manutencao | Simplificar logica |
+| UXD-018 | Migrar cores SearchSummary para tokens | Pequeno (1h) | UX | Corrigir quebra em temas Sepia/Paperwhite |
 
-2. **TD-010 (Color Contrast):** The proposed fix darkens `--ink-muted` to ~#5a6a7a. Does this align with the visual design intent? Would adjusting the muted role's purpose (e.g., only for decorative text) be preferable to changing the color value?
+**Total estimado para todos os Quick Wins: ~12-14 horas**
 
-3. **TD-FE-010 (i18n):** The frontend has no internationalization infrastructure. Given the target market is exclusively Brazilian, is i18n a realistic near-term need? Should we plan for it during the God Component decomposition (extracting string constants) or defer entirely?
-
-4. **TD-030 (Error Boundary):** The error page uses hardcoded Tailwind colors. Should the error page intentionally use a simple, reliable color scheme (avoiding CSS custom property failures in error states), or should it fully participate in the theme system?
-
-5. **TD-028 (Logo):** The local `logo-descomplicita.png` exists but is unused. Is this the current approved brand asset? Should we use it as-is or is there an updated version? What should the new favicon look like?
-
-6. **Frontend test coverage** is reported at 91.5% in the architecture doc but actual Jest thresholds show ~49% statements and ~39% branches. Can you clarify which measurement is canonical? What is the realistic target for the next milestone?
-
-7. **Large-screen optimization:** The current layout caps at 896px (`max-w-4xl`). Is there a design vision for wider displays, or is the narrow content column intentional?
-
-### For @qa (Cypress):
-
-1. **TD-041 (E2E Tests):** E2E tests reference `bg-green-600` but the UI uses `bg-brand-navy`. Are the E2E tests currently passing in CI? Are they being skipped? What is the actual state of the E2E test suite?
-
-2. **TD-020 (Frontend Coverage):** The discrepancy between claimed 91.5% and actual ~49% statement coverage needs investigation. Are there additional test suites not captured in `jest.config.js` thresholds? Is coverage being measured differently in CI?
-
-3. **Risk assessment for TD-004 (God Component decomposition):** What is the testing strategy for a major refactor of `page.tsx`? Should we establish a baseline E2E suite before the decomposition to catch regressions?
-
-4. **Accessibility testing:** axe-core is installed as a dependency but does not appear to be actively used in E2E tests. Is there an accessibility testing strategy? Should we gate PRs on axe-core violations?
-
-5. **Backend test fidelity:** The 99.2% backend coverage is impressive, but are the tests testing behavior or just code paths? Are there integration tests that exercise the full search pipeline (POST -> poll -> result)?
-
-6. **TD-037 (Date range max removed):** The date range validation was relaxed (no max days limit). Was this tested for resource consumption? What happens when a user queries 365 days across 27 UFs?
-
-7. **Circuit breaker / rate limiter testing:** Are the resilience patterns (in `pncp_client.py`) tested under realistic load conditions, or only unit-tested with mocks?
+Estes 13 itens representam ~25% dos debitos totais com ~7% do esforco total estimado.
 
 ---
 
-## 10. Preliminary Effort Summary
-
-| Area | Items | Hours (Low) | Hours (High) |
-|------|-------|-------------|--------------|
-| Security | 6 | 24 | 54 |
-| Accessibility | 8 | 15 | 28 |
-| Code Quality | 12 | 36 | 68 |
-| Performance | 6 | 33 | 62 |
-| Scalability | 3 | 25 | 42 |
-| Maintainability | 8 | 26 | 50 |
-| Design/UX | 3 | 5 | 10 |
-| **TOTAL** | **46** | **164** | **314** |
-
-**Notes on estimation:**
-- Hours assume a single developer per task
-- TD-003 (authentication) has the widest range (16-40h) depending on scope (API key vs. full user system)
-- TD-004 (God component) and TD-005 (Redis migration) are the largest individual items
-- Many Low items can be batched into a single cleanup session (estimated total: 20-30h)
-- The Security quick wins (TD-001, TD-002, TD-006, TD-012) total only ~8-16 hours and should be done immediately
-
----
-
-## Appendix A: De-Duplication Log
-
-| Merged Into | Original Items | Reason |
-|-------------|---------------|--------|
-| TD-016 | System TD-12, TD-13, TD-14; Frontend TD-FE-007 | All are Descomplicita branding remnants; consolidated into one branding debt |
-| TD-021 | System TD-19; Frontend TD-FE-009 | Identical issue: duplicate UFS array definition |
-| TD-029 | Frontend TD-FE-007 (also in TD-016) | Tracked separately for frontend team but acknowledged as part of branding |
-| TD-028 | Frontend TD-FE-006 + TD-FE-018 (related) | Logo hosting and unused local asset are two sides of the same fix |
-
-**Raw counts:** 31 (system) + 20 (frontend) = 51 raw items -> 46 unique debts after merging
-
-## Appendix B: ID Cross-Reference
-
-| Unified ID | System ID | Frontend ID | Short Name |
-|------------|-----------|-------------|------------|
-| TD-001 | TD-01 | -- | CORS wildcard |
-| TD-002 | TD-02 | -- | Root container |
-| TD-003 | TD-03 | -- | No auth |
-| TD-004 | -- | TD-FE-001 | God component |
-| TD-005 | TD-04 | -- | In-memory job store |
-| TD-006 | TD-05 | -- | No rate limiting |
-| TD-007 | TD-06 | -- | Excel base64 |
-| TD-008 | -- | TD-FE-003 | Modal a11y |
-| TD-009 | -- | TD-FE-002 | Escape key dropdowns |
-| TD-010 | -- | TD-FE-004 | Color contrast |
-| TD-011 | TD-11 | -- | Blocking requests lib |
-| TD-012 | TD-10 | -- | Dev deps in prod |
-| TD-013 | TD-07 | -- | Global singletons |
-| TD-014 | TD-08 | -- | Deprecated startup |
-| TD-015 | TD-09 | -- | datetime.utcnow |
-| TD-016 | TD-12+13+14 | TD-FE-007 | Branding remnants |
-| TD-017 | TD-15 | -- | No correlation ID |
-| TD-018 | TD-16 | -- | Hardcoded PNCP URL |
-| TD-019 | TD-17 | -- | No API versioning |
-| TD-020 | TD-18 | -- | Filter debug code |
-| TD-021 | TD-19 | TD-FE-009 | Duplicate UFS |
-| TD-022 | TD-20 | -- | No OpenAPI result |
-| TD-023 | TD-21 | -- | tmpdir Excel |
-| TD-024 | TD-22 | -- | get_event_loop |
-| TD-025 | TD-23 | -- | No graceful shutdown |
-| TD-026 | TD-24 | -- | Ephemeral cache |
-| TD-027 | -- | TD-FE-005 | Skip-to-content |
-| TD-028 | -- | TD-FE-006+018 | External logo |
-| TD-029 | -- | TD-FE-007 | Outdated favicon |
-| TD-030 | -- | TD-FE-008 | Error boundary colors |
-| TD-031 | -- | TD-FE-014 | Focus after search |
-| TD-032 | TD-26 | -- | No error codes |
-| TD-033 | TD-27 | -- | f-string in logger |
-| TD-034 | TD-28 | -- | Sectors pagination |
-| TD-035 | TD-29 | -- | Emoji in source |
-| TD-036 | TD-30 | -- | Download size limit |
-| TD-037 | TD-31 | -- | No date range max |
-| TD-038 | TD-25 | -- | Unused singleton |
-| TD-039 | -- | TD-FE-011 | Deprecated perf API |
-| TD-040 | -- | TD-FE-012 | Sector loading state |
-| TD-041 | -- | TD-FE-013 | E2E outdated classes |
-| TD-042 | -- | TD-FE-015 | No code splitting |
-| TD-043 | -- | TD-FE-016 | No nav element |
-| TD-044 | -- | TD-FE-017 | Hardcoded colors |
-| TD-045 | -- | TD-FE-018 | Unused public asset |
-| TD-046 | -- | TD-FE-019 | aria-describedby |
-
-## Appendix C: Items Not Carried Forward (from Frontend TD-FE-010)
-
-- **i18n infrastructure** (Frontend TD-FE-010): Noted as a potential future need but not classified as technical debt since the product targets a single-language market (Brazilian Portuguese). Listed as a question for @ux-design-expert validation in Section 9.
-- **Frontend test coverage target** (Frontend TD-FE-020): Folded into Section 9 questions for @qa rather than listed as a standalone debt, since the discrepancy between reported (91.5%) and measured (49.45%) coverage needs clarification before actionable work can be scoped.
-
----
-
-*Document generated: 2026-03-07*
-*Consolidated from system architecture and frontend specification analyses*
-*Based on codebase at commit `9fbd54d0` (main branch)*
-*Pending review by: @ux-design-expert (Pixel), @qa (Cypress)*
+*Documento gerado: 2026-03-09*
+*Fonte: Brownfield Discovery Fase 1 (system-architecture.md v3.0) + Fase 3 (frontend-spec.md v3.0)*
+*Fase 2 (Database): Pulada - arquitetura stateless*
+*Proximo passo: Revisao por @ux-design-expert e @qa*
