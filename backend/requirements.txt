@@ -11,7 +11,7 @@ starlette==0.52.1
 httpx==0.28.1
 
 # Redis (async)
-redis==5.2.1
+redis==5.3.1
 
 # Excel generation
 openpyxl==3.1.5
