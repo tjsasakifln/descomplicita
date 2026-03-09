@@ -496,22 +496,22 @@ def filter_licitacao(
     if not match:
         return False, "Não contém keywords do setor"
 
-    # 4. Deadline Filter - DESABILITADO
-    # O campo dataAberturaProposta representa a data de ABERTURA das propostas,
-    # NAO o prazo final para submissao. Licitacoes historicas sao validas para
-    # analise, planejamento e identificacao de oportunidades recorrentes.
-    #
-    # Para filtrar por prazo de submissao, seria necessario usar o campo
-    # dataFimReceberPropostas quando disponivel na API PNCP.
-    #
-    # Referencia: Investigacao 2026-01-28 - docs/investigations/
-    #
-    # TODO: Implementar filtro OPCIONAL por prazo quando usuario solicitar:
-    # data_fim_str = licitacao.get("dataFimReceberPropostas")
-    # if data_fim_str and filtrar_encerradas:
-    #     data_fim = datetime.fromisoformat(data_fim_str.replace("Z", "+00:00"))
-    #     if data_fim < datetime.now(data_fim.tzinfo):
-    #         return False, "Prazo de submissao encerrado"
+    # 4. Deadline Filter (TD-M01) — uses dataFimReceberPropostas
+    # The field dataAberturaProposta is the proposal OPENING date (not deadline).
+    # We use dataFimReceberPropostas (when available) to exclude bids whose
+    # submission deadline has already passed, filtering out historical bids
+    # that are no longer actionable.
+    data_fim_str = licitacao.get("dataFimReceberPropostas")
+    if data_fim_str:
+        try:
+            # Handle both "Z" suffix and "+00:00" offset
+            data_fim = datetime.fromisoformat(data_fim_str.replace("Z", "+00:00"))
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            if data_fim < now:
+                return False, "Prazo de submissão encerrado"
+        except (ValueError, TypeError):
+            pass  # Unparseable date — don't reject, let it through
 
     return True, None
 

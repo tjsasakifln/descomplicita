@@ -110,7 +110,7 @@ def mock_pipeline(monkeypatch):
     def _filter(bids, **kwargs):
         return list(bids), {}
 
-    def _resumo(bids, **kwargs):
+    async def _resumo(bids, **kwargs):
         return ResumoLicitacoes(
             resumo_executivo=f"{len(bids)} licitações encontradas",
             total_oportunidades=len(bids),

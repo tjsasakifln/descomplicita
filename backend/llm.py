@@ -5,15 +5,15 @@ This module uses OpenAI's GPT-4.1-nano model with structured output to create
 actionable summaries of filtered procurement opportunities. It includes:
 - Token-optimized input preparation (max 50 bids)
 - Structured output using Pydantic schemas
+- Async native client (TD-H03: no run_in_executor)
 - Error handling for API failures
 - Empty input handling
 
 Usage:
     from llm import gerar_resumo
-    from schemas import ResumoLicitacoes
 
     licitacoes = [...]  # List of filtered bids
-    resumo = gerar_resumo(licitacoes)
+    resumo = await gerar_resumo(licitacoes)
     print(resumo.resumo_executivo)
 """
 
@@ -22,50 +22,28 @@ from typing import Any
 import json
 import os
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from schemas import ResumoLicitacoes
 from excel import parse_datetime
 
 
-def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uniformes e fardamentos") -> ResumoLicitacoes:
+async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uniformes e fardamentos") -> ResumoLicitacoes:
     """
     Generate AI-powered executive summary of procurement bids using GPT-4.1-nano.
 
-    This function calls OpenAI's API with structured output to create a comprehensive
-    summary of filtered procurement opportunities. It optimizes for token usage by
-    limiting input to 50 bids and truncating long descriptions.
+    Uses AsyncOpenAI client natively (TD-H03) — no thread pool executor needed.
 
     Args:
         licitacoes: List of filtered procurement bid dictionaries from PNCP API.
-                   Each dict should contain keys: objetoCompra, nomeOrgao, uf,
-                   municipio, valorTotalEstimado, dataAberturaProposta
+        sector_name: Name of the procurement sector for context.
 
     Returns:
-        ResumoLicitacoes: Structured summary containing:
-            - resumo_executivo: 1-2 sentence overview
-            - total_oportunidades: Count of opportunities
-            - valor_total: Sum of all bid values in BRL
-            - destaques: 2-5 key highlights
-            - alerta_urgencia: Optional time-sensitive alert
+        ResumoLicitacoes: Structured summary.
 
     Raises:
-        ValueError: If OPENAI_API_KEY environment variable is not set
-        OpenAI API errors: Network issues, rate limits, auth failures
-
-    Examples:
-        >>> licitacoes = [
-        ...     {
-        ...         "objetoCompra": "Uniforme escolar",
-        ...         "nomeOrgao": "Prefeitura de São Paulo",
-        ...         "uf": "SP",
-        ...         "valorTotalEstimado": 100000.0,
-        ...         "dataAberturaProposta": "2025-02-15T10:00:00"
-        ...     }
-        ... ]
-        >>> resumo = gerar_resumo(licitacoes)
-        >>> resumo.total_oportunidades
-        1
+        ValueError: If OPENAI_API_KEY environment variable is not set.
+        openai.APIError: Network issues, rate limits, auth failures.
     """
     # Handle empty input
     if not licitacoes:
@@ -101,8 +79,8 @@ def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uniformes
             }
         )
 
-    # Initialize OpenAI client
-    client = OpenAI(api_key=api_key)
+    # Initialize async OpenAI client (TD-H03)
+    client = AsyncOpenAI(api_key=api_key)
 
     # System prompt with expert persona and rules
     system_prompt = f"""Você é um analista de licitações especializado em {sector_name}.
@@ -125,8 +103,8 @@ REGRAS:
 Data atual: {datetime.now().strftime("%d/%m/%Y")}
 """
 
-    # Call OpenAI API with structured output
-    response = client.beta.chat.completions.parse(
+    # Call OpenAI API with structured output (async)
+    response = await client.beta.chat.completions.parse(
         model="gpt-4.1-nano",
         messages=[
             {"role": "system", "content": system_prompt},
@@ -161,18 +139,6 @@ def format_resumo_html(resumo: ResumoLicitacoes) -> str:
 
     Returns:
         str: HTML string ready for frontend rendering
-
-    Examples:
-        >>> resumo = ResumoLicitacoes(
-        ...     resumo_executivo="Encontradas 15 licitações.",
-        ...     total_oportunidades=15,
-        ...     valor_total=2300000.00,
-        ...     destaques=["3 urgentes"],
-        ...     alerta_urgencia="⚠️ 5 encerram em 24h"
-        ... )
-        >>> html = format_resumo_html(resumo)
-        >>> "resumo-container" in html
-        True
     """
     # Build urgency alert HTML if present
     alerta_html = ""
@@ -221,52 +187,15 @@ def gerar_resumo_fallback(licitacoes: list[dict[str, Any]], sector_name: str = "
     """
     Generate basic executive summary without using LLM (fallback for OpenAI failures).
 
-    This function provides a statistical summary using pure Python logic when the
-    OpenAI API is unavailable due to network issues, rate limits, missing API key,
-    or any other errors. It maintains the same ResumoLicitacoes schema as gerar_resumo()
-    for seamless fallback integration.
-
-    Features:
-    - Calculates total opportunities and total value
-    - Computes UF distribution (state-wise breakdown)
-    - Highlights top 3 bids by value
-    - Detects urgent bids (deadline < 7 days)
-    - No external dependencies (works offline)
+    This is a sync function (no external API calls) used as fallback when
+    AsyncOpenAI is unavailable.
 
     Args:
-        licitacoes: List of filtered procurement bid dictionaries from PNCP API.
-                   Each dict should contain keys: objetoCompra, nomeOrgao, uf,
-                   valorTotalEstimado, dataAberturaProposta
+        licitacoes: List of filtered procurement bid dictionaries.
+        sector_name: Sector name for the summary text.
 
     Returns:
-        ResumoLicitacoes: Structured summary containing:
-            - resumo_executivo: Basic sentence with count and total value
-            - total_oportunidades: Count of opportunities
-            - valor_total: Sum of all bid values in BRL
-            - destaques: Top 3 bids by value
-            - alerta_urgencia: Alert if any bid closes within 7 days
-            - distribuicao_uf: Dict mapping UF codes to bid counts
-
-    Examples:
-        >>> licitacoes = [
-        ...     {
-        ...         "nomeOrgao": "Prefeitura de SP",
-        ...         "uf": "SP",
-        ...         "valorTotalEstimado": 150000.0,
-        ...         "dataAberturaProposta": "2025-03-01T10:00:00"
-        ...     },
-        ...     {
-        ...         "nomeOrgao": "Prefeitura do RJ",
-        ...         "uf": "RJ",
-        ...         "valorTotalEstimado": 200000.0,
-        ...         "dataAberturaProposta": "2025-03-15T14:00:00"
-        ...     }
-        ... ]
-        >>> resumo = gerar_resumo_fallback(licitacoes)
-        >>> resumo.total_oportunidades
-        2
-        >>> resumo.valor_total
-        350000.0
+        ResumoLicitacoes: Statistical summary (no AI).
     """
     # Handle empty input
     if not licitacoes:

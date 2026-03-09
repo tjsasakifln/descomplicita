@@ -274,7 +274,7 @@ class TestBuscarEndpoint:
         import main as main_module
         original_run_search_job = main_module.run_search_job
 
-        async def _inline_run_search_job(job_id, request, job_store, orchestrator):
+        async def _inline_run_search_job(job_id, request, job_store, orchestrator, database=None):
             loop = asyncio.get_running_loop()
             original_rie = loop.run_in_executor
 
@@ -289,7 +289,7 @@ class TestBuscarEndpoint:
 
             loop.run_in_executor = _sync_run_in_executor
             try:
-                await original_run_search_job(job_id, request, job_store, orchestrator)
+                await original_run_search_job(job_id, request, job_store, orchestrator, database)
             finally:
                 loop.run_in_executor = original_rie
 
@@ -350,7 +350,7 @@ class TestBuscarEndpoint:
             buf.seek(0)
             return buf
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
                 resumo_executivo="1 licitação encontrada",
@@ -379,7 +379,7 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
                 resumo_executivo="Test summary",
@@ -408,7 +408,7 @@ class TestBuscarEndpoint:
         excel_content = b"PK\x03\x04fake-excel-header"
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(excel_content))
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
                 resumo_executivo="Test",
@@ -432,7 +432,7 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             raise Exception("OpenAI API error")
 
         def mock_gerar_resumo_fallback(bids, **kwargs):
@@ -478,8 +478,8 @@ class TestBuscarEndpoint:
         assert result_resp.status_code == 500
         data = result_resp.json()
         assert data["status"] == "failed"
-        assert "Erro interno" in data["error"]
-        assert "sensitive data" not in data["error"]
+        assert "Erro interno" in data["error"]["message"]
+        assert "sensitive data" not in data["error"]["message"]
 
     def test_buscar_empty_results(self, client, valid_request, monkeypatch, run_sync):
         self._override_orchestrator(make_mock_orchestrator([]))
@@ -497,7 +497,7 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: (bids[:3], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
                 resumo_executivo="3 licitações",
@@ -517,7 +517,7 @@ class TestBuscarEndpoint:
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel"))
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
                 resumo_executivo="Test",
@@ -581,7 +581,7 @@ class TestJobResultEndpoint:
         import main as main_module
         original_run_search_job = main_module.run_search_job
 
-        async def _inline_run_search_job(job_id, request, job_store, orchestrator):
+        async def _inline_run_search_job(job_id, request, job_store, orchestrator, database=None):
             loop = asyncio.get_running_loop()
             original_rie = loop.run_in_executor
 
@@ -596,7 +596,7 @@ class TestJobResultEndpoint:
 
             loop.run_in_executor = _sync_rie
             try:
-                await original_run_search_job(job_id, request, job_store, orchestrator)
+                await original_run_search_job(job_id, request, job_store, orchestrator, database)
             finally:
                 loop.run_in_executor = original_rie
 
@@ -643,7 +643,7 @@ class TestJobResultEndpoint:
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([bids[0]], {}))
         monkeypatch.setattr("main.create_excel", lambda bids: BytesIO(b"excel-data"))
 
-        def mock_gerar_resumo(bids, **kwargs):
+        async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
             return ResumoLicitacoes(
                 resumo_executivo="Found 1 bid",

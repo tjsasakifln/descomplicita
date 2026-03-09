@@ -13,11 +13,12 @@ import os
 import signal
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from slowapi import Limiter
@@ -26,6 +27,7 @@ from slowapi.errors import RateLimitExceeded
 
 from auth.jwt import JWTError, generate_token, validate_token
 from config import setup_logging, MAX_DATE_RANGE_DAYS, MAX_DOWNLOAD_SIZE
+from error_codes import ErrorCode, error_response
 from middleware.auth import APIKeyMiddleware
 from middleware.correlation_id import CorrelationIdMiddleware
 from schemas import (
@@ -44,6 +46,7 @@ from dependencies import (
     get_redis,
     get_redis_cache,
     get_task_runner,
+    get_database,
 )
 from sources.base import SearchQuery
 from exceptions import PNCPAPIError, PNCPRateLimitError
@@ -58,6 +61,10 @@ logger = logging.getLogger(__name__)
 
 # Feature flag: streaming download (TD-C01/XD-PERF-01)
 ENABLE_STREAMING_DOWNLOAD = os.getenv("ENABLE_STREAMING_DOWNLOAD", "true").lower() == "true"
+
+# TD-L06: Dedicated thread pool for CPU-bound filter_batch, separated from default
+# executor used by other tasks. Prevents thread pool starvation under load.
+_filter_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="filter")
 
 # ---------------------------------------------------------------------------
 # Sentry integration (TD-057)
@@ -169,7 +176,7 @@ app.state.limiter = limiter
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
-        content={"detail": "Rate limit exceeded. Try again later."},
+        content=ErrorCode.RATE_LIMIT_EXCEEDED.to_dict(),
     )
 
 
@@ -300,18 +307,15 @@ async def auth_token(request: Request):
     jwt_secret = os.getenv("JWT_SECRET")
 
     if not jwt_secret:
-        raise HTTPException(
-            status_code=503,
-            detail="JWT authentication not configured on this server.",
-        )
+        raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
 
     # Validate API key
     request_key = request.headers.get("X-API-Key")
     if not request_key:
-        raise HTTPException(status_code=401, detail="Provide X-API-Key header to obtain JWT token.")
+        raise error_response(ErrorCode.AUTH_REQUIRED, status_code=401)
 
     if api_key and request_key != api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key.")
+        raise error_response(ErrorCode.AUTH_INVALID_KEY, status_code=401)
 
     # Generate JWT
     subject = "api_client"
@@ -395,18 +399,27 @@ async def buscar_licitacoes(
     job_store=Depends(get_job_store),
     orchestrator=Depends(get_orchestrator),
     task_runner=Depends(get_task_runner),
+    database=Depends(get_database),
 ):
     """Start an asynchronous procurement search job."""
     await job_store.cleanup_expired()
 
     if job_store.is_full:
-        raise HTTPException(
-            status_code=429,
-            detail="Muitas buscas simultâneas. Aguarde a conclusão de uma busca anterior.",
-        )
+        raise error_response(ErrorCode.TOO_MANY_JOBS, status_code=429)
 
     job_id = str(uuid.uuid4())
     await job_store.create(job_id)
+
+    # TD-H04: Record search in persistent history
+    if database:
+        await database.record_search(
+            job_id=job_id,
+            ufs=body.ufs,
+            data_inicial=body.data_inicial,
+            data_final=body.data_final,
+            setor_id=body.setor_id,
+            termos_busca=body.termos_busca,
+        )
 
     # Enqueue via durable task runner (TD-H02) instead of asyncio.create_task
     await task_runner.enqueue(
@@ -418,7 +431,7 @@ async def buscar_licitacoes(
             "setor_id": body.setor_id,
             "termos_busca": body.termos_busca,
         },
-        coro_factory=lambda: run_search_job(job_id, body, job_store, orchestrator),
+        coro_factory=lambda: run_search_job(job_id, body, job_store, orchestrator, database),
     )
 
     logger.info(
@@ -434,9 +447,11 @@ async def run_search_job(
     request: BuscaRequest,
     job_store,
     orchestrator,
+    database=None,
 ) -> None:
     """Execute the full search pipeline as a background async task."""
     loop = asyncio.get_running_loop()
+    _search_start = time.time()
 
     try:
         # --- Validate sector ---
@@ -516,8 +531,9 @@ async def run_search_job(
 
         logger.info("[job=%s] Applying filters to raw bids", job_id)
 
+        # TD-L06: Use dedicated executor for CPU-bound filtering
         licitacoes_filtradas, stats = await loop.run_in_executor(
-            None,
+            _filter_executor,
             lambda: filter_batch(
                 licitacoes_raw,
                 ufs_selecionadas=set(request.ufs),
@@ -609,9 +625,10 @@ async def run_search_job(
             )
             return
 
-        def _generate_resumo():
+        # TD-H03: gerar_resumo is now async (uses AsyncOpenAI natively)
+        async def _generate_resumo():
             try:
-                r = gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
+                r = await gerar_resumo(licitacoes_filtradas, sector_name=sector.name)
                 logger.info("[job=%s] LLM summary generated successfully", job_id)
                 return r
             except Exception as e:
@@ -633,9 +650,10 @@ async def run_search_job(
 
         await job_store.update_progress(job_id, phase="generating_excel")
 
-        resumo_future = loop.run_in_executor(None, _generate_resumo)
-        excel_future = loop.run_in_executor(None, _generate_excel)
-        resumo, excel_bytes = await asyncio.gather(resumo_future, excel_future)
+        # TD-H03: LLM is now fully async, Excel still runs in executor
+        resumo_coro = _generate_resumo()
+        excel_future = loop.run_in_executor(_filter_executor, _generate_excel)
+        resumo, excel_bytes = await asyncio.gather(resumo_coro, excel_future)
 
         actual_total = len(licitacoes_filtradas)
         actual_valor = sum(
@@ -687,6 +705,15 @@ async def run_search_job(
 
         await job_store.complete(job_id, result)
 
+        # TD-H04: Record completion in persistent database
+        if database:
+            await database.complete_search(
+                job_id=job_id,
+                total_raw=len(licitacoes_raw),
+                total_filtrado=len(licitacoes_filtradas),
+                elapsed_seconds=time.time() - _search_start,
+            )
+
         logger.info(
             "[job=%s] Search completed successfully", job_id,
             extra={
@@ -699,27 +726,27 @@ async def run_search_job(
     except PNCPRateLimitError as e:
         logger.error("[job=%s] PNCP rate limit exceeded: %s", job_id, e, exc_info=True)
         retry_after = getattr(e, "retry_after", 60)
-        await job_store.fail(
-            job_id,
-            f"O PNCP está limitando requisições. "
-            f"Aguarde {retry_after} segundos e tente novamente.",
+        err = ErrorCode.PNCP_RATE_LIMITED.to_dict(
+            message=f"O PNCP está limitando requisições. Aguarde {retry_after} segundos e tente novamente.",
+            details={"retry_after": retry_after},
         )
+        await job_store.fail(job_id, err["error"]["message"])
+        if database:
+            await database.fail_search(job_id)
 
     except PNCPAPIError as e:
         logger.error("[job=%s] PNCP API error: %s", job_id, e, exc_info=True)
-        await job_store.fail(
-            job_id,
-            "O Portal Nacional de Contratações (PNCP) está temporariamente "
-            "indisponível ou retornou um erro. Tente novamente em alguns "
-            "instantes ou reduza o número de estados selecionados.",
-        )
+        err = ErrorCode.PNCP_UNAVAILABLE.to_dict()
+        await job_store.fail(job_id, err["error"]["message"])
+        if database:
+            await database.fail_search(job_id)
 
     except Exception:
         logger.exception("[job=%s] Internal server error during search", job_id)
-        await job_store.fail(
-            job_id,
-            "Erro interno do servidor. Tente novamente em alguns instantes.",
-        )
+        err = ErrorCode.INTERNAL_ERROR.to_dict()
+        await job_store.fail(job_id, err["error"]["message"])
+        if database:
+            await database.fail_search(job_id)
 
 
 # ---------------------------------------------------------------------------
@@ -736,7 +763,7 @@ async def job_status(
     """Return current status and progress of a search job."""
     job = await job_store.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
 
     elapsed = time.time() - job.created_at
     return JobStatusResponse(
@@ -761,7 +788,7 @@ async def job_result(
     """
     job = await job_store.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
 
     if job.status == "completed":
         # Return result WITHOUT excel_bytes (use download endpoint)
@@ -769,7 +796,11 @@ async def job_result(
         return JSONResponse(content={"job_id": job_id, "status": "completed", **result_data})
     elif job.status == "failed":
         return JSONResponse(
-            content={"job_id": job_id, "status": "failed", "error": job.error},
+            content={
+                "job_id": job_id,
+                "status": "failed",
+                **ErrorCode.SEARCH_FAILED.to_dict(message=job.error),
+            },
             status_code=500,
         )
     else:
@@ -790,17 +821,21 @@ async def job_items(
 ):
     """Return paginated items from a completed search job (TD-M02)."""
     if page < 1:
-        raise HTTPException(status_code=400, detail="page must be >= 1")
+        raise error_response(
+            ErrorCode.VALIDATION_ERROR, status_code=400,
+            message="page must be >= 1",
+        )
     if page_size < 1 or page_size > 100:
-        raise HTTPException(
-            status_code=400, detail="page_size must be between 1 and 100"
+        raise error_response(
+            ErrorCode.VALIDATION_ERROR, status_code=400,
+            message="page_size must be between 1 and 100",
         )
 
     job = await job_store.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
     if job.status != "completed":
-        raise HTTPException(status_code=409, detail="Job not yet completed")
+        raise error_response(ErrorCode.JOB_NOT_COMPLETED, status_code=409)
 
     items, total = await job_store.get_items_page(job_id, page, page_size)
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
@@ -824,10 +859,10 @@ async def job_download(
     """Download the Excel file for a completed search job as a streaming response."""
     job = await job_store.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
 
     if job.status != "completed":
-        raise HTTPException(status_code=409, detail="Job not yet completed")
+        raise error_response(ErrorCode.JOB_NOT_COMPLETED, status_code=409)
 
     # TD-C01/XD-PERF-01: Retrieve Excel from dedicated storage (no memory duplication)
     if ENABLE_STREAMING_DOWNLOAD:
@@ -837,21 +872,70 @@ async def job_download(
         excel_bytes = job.result.get("excel_bytes", b"")
 
     if not excel_bytes:
-        raise HTTPException(status_code=404, detail="No Excel data available")
+        raise error_response(ErrorCode.DOWNLOAD_NOT_AVAILABLE, status_code=404)
 
     if len(excel_bytes) > MAX_DOWNLOAD_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail="File exceeds maximum download size (%s MB)" % (MAX_DOWNLOAD_SIZE // (1024 * 1024)),
+        raise error_response(
+            ErrorCode.DOWNLOAD_TOO_LARGE, status_code=413,
+            details={"max_size_mb": MAX_DOWNLOAD_SIZE // (1024 * 1024)},
         )
 
     filename = f"descomplicita_{job_id[:8]}.xlsx"
 
+    # TD-H06: Chunked streaming to avoid Vercel timeout on large files.
+    # Yields 64KB chunks instead of buffering the entire response,
+    # keeping the connection alive within Vercel's 10s (free) / 60s (pro) limit.
+    async def _stream_chunks():
+        stream = BytesIO(excel_bytes)
+        while True:
+            chunk = stream.read(65536)  # 64KB chunks
+            if not chunk:
+                break
+            yield chunk
+
     return StreamingResponse(
-        BytesIO(excel_bytes),
+        _stream_chunks(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(len(excel_bytes)),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Search history endpoint (TD-H04)
+# ---------------------------------------------------------------------------
+
+@app.get("/search-history")
+async def search_history(
+    limit: int = 20,
+    database=Depends(get_database),
+):
+    """Return recent search history from persistent database."""
+    if not database:
+        return {"searches": [], "message": "Database not configured"}
+    searches = await database.get_recent_searches(limit=min(limit, 100))
+    return {"searches": searches}
+
+
+# ---------------------------------------------------------------------------
+# API Versioning (TD-M06/XD-API-01)
+# ---------------------------------------------------------------------------
+# All routes above are mounted directly on the app for backward compatibility.
+# Additionally, mount them under /api/v1/ for versioned access.
+# Both /buscar and /api/v1/buscar resolve to the same handler.
+
+v1_router = APIRouter(prefix="/api/v1")
+
+v1_router.add_api_route("/buscar", buscar_licitacoes, methods=["POST"], response_model=JobCreatedResponse)
+v1_router.add_api_route("/buscar/{job_id}/status", job_status, methods=["GET"], response_model=JobStatusResponse)
+v1_router.add_api_route("/buscar/{job_id}/result", job_result, methods=["GET"], response_model=JobResultResponse)
+v1_router.add_api_route("/buscar/{job_id}/items", job_items, methods=["GET"])
+v1_router.add_api_route("/buscar/{job_id}/download", job_download, methods=["GET"])
+v1_router.add_api_route("/setores", listar_setores, methods=["GET"])
+v1_router.add_api_route("/health", health, methods=["GET"])
+v1_router.add_api_route("/auth/token", auth_token, methods=["POST"])
+v1_router.add_api_route("/search-history", search_history, methods=["GET"])
+
+app.include_router(v1_router)

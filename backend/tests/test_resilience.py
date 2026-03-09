@@ -61,7 +61,7 @@ def _make_licitacao(numero: str = "2025NCP000001", uf: str = "SP") -> dict:
     }
 
 
-def _mock_gerar_resumo(bids, **kwargs):
+async def _mock_gerar_resumo(bids, **kwargs):
     from schemas import ResumoLicitacoes
     return ResumoLicitacoes(
         resumo_executivo=f"{len(bids)} licitacao(es) encontrada(s)",
@@ -135,7 +135,7 @@ class TestPNCPErrorResilience:
 
         assert result["status"] == "failed"
         assert "error" in result
-        error_msg = result["error"]
+        error_msg = result["error"]["message"]
         assert "PNCP" in error_msg or "Portal" in error_msg or "indispon" in error_msg
         assert "Traceback" not in error_msg
         assert "PNCPAPIError" not in error_msg
@@ -154,13 +154,13 @@ class TestPNCPErrorResilience:
 
         assert result["status"] == "failed"
         assert "error" in result
-        error_msg = result["error"].lower()
+        error_msg = result["error"]["message"].lower()
         assert any(
             keyword in error_msg
             for keyword in ("limitando", "aguarde", "rate", "60", "requisic")
         )
-        assert "Traceback" not in result["error"]
-        assert "PNCPRateLimitError" not in result["error"]
+        assert "Traceback" not in result["error"]["message"]
+        assert "PNCPRateLimitError" not in result["error"]["message"]
 
         app.dependency_overrides.pop(get_orchestrator, None)
 

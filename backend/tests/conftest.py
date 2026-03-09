@@ -51,13 +51,14 @@ def _disable_auth_for_tests(monkeypatch):
 def _override_dependencies():
     """Override DI dependencies for testing (no Redis, in-memory stores)."""
     from main import app
-    from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_redis, get_redis_cache, get_task_runner
+    from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_redis, get_redis_cache, get_task_runner, get_database
 
     # Use test job store and task runner
     app.dependency_overrides[get_job_store] = get_test_job_store
     app.dependency_overrides[get_task_runner] = get_test_task_runner
     app.dependency_overrides[get_redis] = lambda: None
     app.dependency_overrides[get_redis_cache] = lambda: None
+    app.dependency_overrides[get_database] = lambda: None  # No DB in tests by default
 
     yield
 
@@ -84,13 +85,13 @@ def run_sync(monkeypatch):
     Patches the DurableTaskRunner.enqueue to run the coroutine inline
     instead of using asyncio.create_task.
 
-    Updated for the task_runner architecture (TD-H02).
+    Updated for the task_runner architecture (TD-H02) and async gerar_resumo (TD-H03).
     """
     import main as main_module
 
     original_run_search_job = main_module.run_search_job
 
-    async def _inline_run_search_job(job_id, request, job_store, orchestrator):
+    async def _inline_run_search_job(job_id, request, job_store, orchestrator, database=None):
         loop = asyncio.get_running_loop()
         original_rie = loop.run_in_executor
 
@@ -104,7 +105,7 @@ def run_sync(monkeypatch):
 
         loop.run_in_executor = _sync_rie
         try:
-            await original_run_search_job(job_id, request, job_store, orchestrator)
+            await original_run_search_job(job_id, request, job_store, orchestrator, database=database)
         finally:
             loop.run_in_executor = original_rie
 

@@ -72,7 +72,7 @@ def _fake_filter_batch(bids, **kwargs):
     return bids, stats
 
 
-def _fake_gerar_resumo(bids, **kwargs):
+async def _fake_gerar_resumo(bids, **kwargs):
     total = len(bids)
     valor = sum(b.get("valorTotalEstimado", 0) or 0 for b in bids)
     return ResumoLicitacoes(

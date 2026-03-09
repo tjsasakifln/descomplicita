@@ -72,7 +72,7 @@ class TestJobItemsEndpoint:
 
         response = client.get("/buscar/job-pag-4/items?page=0")
         assert response.status_code == 400
-        assert "page must be >= 1" in response.json()["detail"]
+        assert "page must be >= 1" in response.json()["detail"]["error"]["message"]
 
     def test_negative_page_returns_400(self, client, job_store):
         items = [{"objeto": "test"}]
@@ -87,7 +87,7 @@ class TestJobItemsEndpoint:
 
         response = client.get("/buscar/job-pag-5/items?page_size=0")
         assert response.status_code == 400
-        assert "page_size must be between 1 and 100" in response.json()["detail"]
+        assert "page_size must be between 1 and 100" in response.json()["detail"]["error"]["message"]
 
     def test_page_size_over_100_returns_400(self, client, job_store):
         items = [{"objeto": "test"}]
@@ -95,12 +95,12 @@ class TestJobItemsEndpoint:
 
         response = client.get("/buscar/job-pag-6/items?page_size=101")
         assert response.status_code == 400
-        assert "page_size must be between 1 and 100" in response.json()["detail"]
+        assert "page_size must be between 1 and 100" in response.json()["detail"]["error"]["message"]
 
     def test_job_not_found_returns_404(self, client):
         response = client.get("/buscar/nonexistent-job/items")
         assert response.status_code == 404
-        assert "Job not found" in response.json()["detail"]
+        assert response.json()["detail"]["error"]["code"] == "JOB_NOT_FOUND"
 
     def test_incomplete_job_returns_409(self, client, job_store):
         job = SearchJob(job_id="job-pag-7")
@@ -108,7 +108,7 @@ class TestJobItemsEndpoint:
 
         response = client.get("/buscar/job-pag-7/items")
         assert response.status_code == 409
-        assert "not yet completed" in response.json()["detail"]
+        assert response.json()["detail"]["error"]["code"] == "JOB_NOT_COMPLETED"
 
     def test_running_job_returns_409(self, client, job_store):
         job = SearchJob(job_id="job-pag-running")

@@ -1,19 +1,20 @@
 """
 Tests for LLM integration module (backend/llm.py).
 
-Coverage requirements: ≥70% (enforced by pytest-cov)
+Updated for TD-H03: gerar_resumo() is now async using AsyncOpenAI.
 
 Test categories:
 1. Empty input handling
 2. Valid input with various sizes (1, 50, 100+ bids)
 3. API key validation
-4. OpenAI API error scenarios
+4. OpenAI API error scenarios (async)
 5. HTML formatting
 6. Schema validation
+7. Timeout handling
 """
 
 import os
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from llm import gerar_resumo, format_resumo_html
@@ -25,9 +26,10 @@ from schemas import ResumoLicitacoes
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_gerar_resumo_empty_input():
+@pytest.mark.asyncio
+async def test_gerar_resumo_empty_input():
     """Should return empty summary when no bids provided."""
-    resumo = gerar_resumo([])
+    resumo = await gerar_resumo([])
 
     assert isinstance(resumo, ResumoLicitacoes)
     assert resumo.total_oportunidades == 0
@@ -42,7 +44,8 @@ def test_gerar_resumo_empty_input():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_gerar_resumo_missing_api_key():
+@pytest.mark.asyncio
+async def test_gerar_resumo_missing_api_key():
     """Should raise ValueError when OPENAI_API_KEY is not set."""
     licitacoes = [
         {
@@ -56,19 +59,19 @@ def test_gerar_resumo_missing_api_key():
 
     with patch.dict(os.environ, {}, clear=True):
         with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-            gerar_resumo(licitacoes)
+            await gerar_resumo(licitacoes)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. Valid Input Tests (Mocked OpenAI API)
+# 3. Valid Input Tests (Mocked AsyncOpenAI)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_single_bid(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_single_bid(mock_openai):
     """Should generate summary for single bid."""
-    # Mock OpenAI response
     mock_resumo = ResumoLicitacoes(
         resumo_executivo="Encontrada 1 licitação de uniformes em SP.",
         total_oportunidades=1,
@@ -79,9 +82,9 @@ def test_gerar_resumo_single_bid(mock_openai):
 
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.return_value.choices = [
-        Mock(message=Mock(parsed=mock_resumo))
-    ]
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
 
     licitacoes = [
         {
@@ -94,7 +97,7 @@ def test_gerar_resumo_single_bid(mock_openai):
         }
     ]
 
-    resumo = gerar_resumo(licitacoes)
+    resumo = await gerar_resumo(licitacoes)
 
     assert isinstance(resumo, ResumoLicitacoes)
     assert resumo.total_oportunidades == 1
@@ -102,16 +105,17 @@ def test_gerar_resumo_single_bid(mock_openai):
     assert len(resumo.destaques) == 1
 
     # Verify API was called
-    mock_client.beta.chat.completions.parse.assert_called_once()
+    mock_client.beta.chat.completions.parse.assert_awaited_once()
     call_args = mock_client.beta.chat.completions.parse.call_args
     assert call_args.kwargs["model"] == "gpt-4.1-nano"
     assert call_args.kwargs["temperature"] == 0.3
     assert call_args.kwargs["max_tokens"] == 500
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_50_bids_limit(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_50_bids_limit(mock_openai):
     """Should limit input to 50 bids to avoid token overflow."""
     mock_resumo = ResumoLicitacoes(
         resumo_executivo="Encontradas 50 licitações.",
@@ -123,9 +127,9 @@ def test_gerar_resumo_50_bids_limit(mock_openai):
 
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.return_value.choices = [
-        Mock(message=Mock(parsed=mock_resumo))
-    ]
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
 
     # Create 100 bids (should be limited to 50)
     licitacoes = [
@@ -140,7 +144,7 @@ def test_gerar_resumo_50_bids_limit(mock_openai):
         for i in range(100)
     ]
 
-    resumo = gerar_resumo(licitacoes)
+    resumo = await gerar_resumo(licitacoes)
 
     assert isinstance(resumo, ResumoLicitacoes)
 
@@ -152,9 +156,10 @@ def test_gerar_resumo_50_bids_limit(mock_openai):
     assert "100 licitações" in user_prompt or "100" in user_prompt
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_truncates_objeto_compra(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_truncates_objeto_compra(mock_openai):
     """Should truncate objetoCompra to 200 chars to save tokens."""
     mock_resumo = ResumoLicitacoes(
         resumo_executivo="Resumo OK",
@@ -166,9 +171,9 @@ def test_gerar_resumo_truncates_objeto_compra(mock_openai):
 
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.return_value.choices = [
-        Mock(message=Mock(parsed=mock_resumo))
-    ]
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
 
     # Create bid with very long objetoCompra (>200 chars)
     long_texto = "A" * 500  # 500 characters
@@ -183,7 +188,7 @@ def test_gerar_resumo_truncates_objeto_compra(mock_openai):
         }
     ]
 
-    gerar_resumo(licitacoes)
+    await gerar_resumo(licitacoes)
 
     # Verify API was called
     call_args = mock_client.beta.chat.completions.parse.call_args
@@ -195,9 +200,10 @@ def test_gerar_resumo_truncates_objeto_compra(mock_openai):
     assert long_texto[:200] in user_prompt
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_handles_none_values(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_handles_none_values(mock_openai):
     """Should handle None values in bid data gracefully."""
     mock_resumo = ResumoLicitacoes(
         resumo_executivo="Resumo OK",
@@ -209,9 +215,9 @@ def test_gerar_resumo_handles_none_values(mock_openai):
 
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.return_value.choices = [
-        Mock(message=Mock(parsed=mock_resumo))
-    ]
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
 
     # Bid with None values
     licitacoes = [
@@ -225,26 +231,27 @@ def test_gerar_resumo_handles_none_values(mock_openai):
         }
     ]
 
-    resumo = gerar_resumo(licitacoes)
+    resumo = await gerar_resumo(licitacoes)
 
     assert isinstance(resumo, ResumoLicitacoes)
 
     # Should not crash - API was called successfully
-    mock_client.beta.chat.completions.parse.assert_called_once()
+    mock_client.beta.chat.completions.parse.assert_awaited_once()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. API Error Scenarios
+# 4. API Error Scenarios (async)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_api_error(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_api_error(mock_openai):
     """Should propagate OpenAI API errors."""
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.side_effect = Exception("API Error")
+    mock_client.beta.chat.completions.parse = AsyncMock(side_effect=Exception("API Error"))
 
     licitacoes = [
         {
@@ -257,18 +264,19 @@ def test_gerar_resumo_api_error(mock_openai):
     ]
 
     with pytest.raises(Exception, match="API Error"):
-        gerar_resumo(licitacoes)
+        await gerar_resumo(licitacoes)
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_empty_api_response(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_empty_api_response(mock_openai):
     """Should raise error when API returns empty response."""
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.return_value.choices = [
-        Mock(message=Mock(parsed=None))
-    ]
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=None))])
+    )
 
     licitacoes = [
         {
@@ -281,7 +289,34 @@ def test_gerar_resumo_empty_api_response(mock_openai):
     ]
 
     with pytest.raises(ValueError, match="empty response"):
-        gerar_resumo(licitacoes)
+        await gerar_resumo(licitacoes)
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_timeout(mock_openai):
+    """Should propagate timeout errors from async OpenAI client."""
+    import asyncio
+
+    mock_client = Mock()
+    mock_openai.return_value = mock_client
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        side_effect=asyncio.TimeoutError("Request timed out")
+    )
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme",
+            "nomeOrgao": "Prefeitura",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": "2025-02-15T10:00:00",
+        }
+    ]
+
+    with pytest.raises(asyncio.TimeoutError):
+        await gerar_resumo(licitacoes)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -316,13 +351,13 @@ def test_format_resumo_html_with_alerta():
         total_oportunidades=5,
         valor_total=100000.0,
         destaques=[],
-        alerta_urgencia="⚠️ 5 licitações encerram em 24 horas",
+        alerta_urgencia="5 licitações encerram em 24 horas",
     )
 
     html = format_resumo_html(resumo)
 
     assert "alerta-urgencia" in html
-    assert "⚠️ 5 licitações encerram em 24 horas" in html
+    assert "5 licitações encerram em 24 horas" in html
 
 
 def test_format_resumo_html_empty_destaques():
@@ -405,9 +440,10 @@ def test_resumo_schema_validation_negative_values():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
-@patch("llm.OpenAI")
-def test_gerar_resumo_missing_optional_fields(mock_openai):
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_missing_optional_fields(mock_openai):
     """Should handle bids with missing optional fields."""
     mock_resumo = ResumoLicitacoes(
         resumo_executivo="Resumo OK",
@@ -419,9 +455,9 @@ def test_gerar_resumo_missing_optional_fields(mock_openai):
 
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse.return_value.choices = [
-        Mock(message=Mock(parsed=mock_resumo))
-    ]
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
 
     # Minimal bid data (only objetoCompra)
     licitacoes = [
@@ -431,7 +467,7 @@ def test_gerar_resumo_missing_optional_fields(mock_openai):
         }
     ]
 
-    resumo = gerar_resumo(licitacoes)
+    resumo = await gerar_resumo(licitacoes)
 
     assert isinstance(resumo, ResumoLicitacoes)
-    mock_client.beta.chat.completions.parse.assert_called_once()
+    mock_client.beta.chat.completions.parse.assert_awaited_once()
