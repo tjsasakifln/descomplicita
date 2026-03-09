@@ -8,5 +8,5 @@ pytest-benchmark==5.1.0
 faker==37.1.0
 
 # Code quality
-ruff==0.9.6
+ruff==0.15.5
 mypy==1.19.1
