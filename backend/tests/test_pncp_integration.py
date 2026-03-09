@@ -10,7 +10,10 @@ WARNING: These tests make real API calls and may be rate-limited.
 import pytest
 from datetime import datetime, timedelta
 
-from pncp_client import PNCPClient
+try:
+    from pncp_client import PNCPClient
+except ImportError:
+    PNCPClient = None  # requests not installed in CI
 
 
 @pytest.mark.integration
