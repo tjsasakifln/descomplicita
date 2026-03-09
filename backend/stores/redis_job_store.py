@@ -1,4 +1,11 @@
-"""Redis-backed job store for async search jobs (TD-005)."""
+"""Redis-backed job store for async search jobs (TD-005 + TD-H01 + TD-C01).
+
+Redis is the sole source of truth for job state. In-memory cache is used
+only as a read-through optimization for the current process.
+
+Excel bytes are stored in a separate Redis key (not base64-encoded in the
+job JSON) to eliminate memory duplication (TD-C01/XD-PERF-01).
+"""
 
 import json
 import logging
@@ -9,15 +16,17 @@ from job_store import JobStore, SearchJob
 
 logger = logging.getLogger(__name__)
 
-# Default TTL for jobs in Redis: 24 hours
+# Default TTL for jobs in Redis: 24 hours (TD-H01)
 REDIS_JOB_TTL = 86400
+
+# Default TTL for Excel data: 2 hours (shorter than job metadata)
+REDIS_EXCEL_TTL = 7200
 
 
 class RedisJobStore(JobStore):
-    """Redis-backed job store with graceful fallback to in-memory.
+    """Redis-backed job store — Redis as sole source of truth (TD-H01).
 
-    Implements the same interface as JobStore but persists data to Redis.
-    On Redis connection failure, falls back to in-memory storage and logs warnings.
+    In-memory dict is used only as a process-local cache. Redis is canonical.
 
     Args:
         redis: An async Redis client instance (redis.asyncio.Redis).
@@ -40,13 +49,22 @@ class RedisJobStore(JobStore):
     def _key(self, job_id: str) -> str:
         return f"job:{job_id}"
 
+    def _excel_key(self, job_id: str) -> str:
+        return f"excel:{job_id}"
+
     @staticmethod
     def _serialize_job(job: SearchJob) -> str:
+        """Serialize job to JSON. Excel bytes are NOT included (stored separately)."""
+        result = job.result
+        if result and "excel_bytes" in result:
+            # Strip excel_bytes from the serialized result
+            result = {k: v for k, v in result.items() if k != "excel_bytes"}
+
         return json.dumps({
             "job_id": job.job_id,
             "status": job.status,
             "progress": job.progress,
-            "result": job.result,
+            "result": result,
             "error": job.error,
             "created_at": job.created_at,
             "completed_at": job.completed_at,
@@ -87,13 +105,13 @@ class RedisJobStore(JobStore):
             return None
 
     async def create(self, job_id: str) -> SearchJob:
-        """Create a new job in both in-memory and Redis."""
+        """Create a new job in both in-memory cache and Redis."""
         job = await super().create(job_id)
         await self._redis_set(job)
         return job
 
     async def update_progress(self, job_id: str, **kwargs: object) -> None:
-        """Update progress in both in-memory and Redis."""
+        """Update progress in both in-memory cache and Redis."""
         await super().update_progress(job_id, **kwargs)
         async with self._lock:
             job = self._jobs.get(job_id)
@@ -101,7 +119,7 @@ class RedisJobStore(JobStore):
             await self._redis_set(job)
 
     async def complete(self, job_id: str, result: Dict) -> None:
-        """Mark job complete in both in-memory and Redis."""
+        """Mark job complete in both in-memory cache and Redis."""
         await super().complete(job_id, result)
         async with self._lock:
             job = self._jobs.get(job_id)
@@ -109,7 +127,7 @@ class RedisJobStore(JobStore):
             await self._redis_set(job)
 
     async def fail(self, job_id: str, error: str) -> None:
-        """Mark job failed in both in-memory and Redis."""
+        """Mark job failed in both in-memory cache and Redis."""
         await super().fail(job_id, error)
         async with self._lock:
             job = self._jobs.get(job_id)
@@ -117,7 +135,7 @@ class RedisJobStore(JobStore):
             await self._redis_set(job)
 
     async def get(self, job_id: str) -> Optional[SearchJob]:
-        """Get job from in-memory first, fallback to Redis."""
+        """Get job from in-memory cache first, fallback to Redis."""
         job = await super().get(job_id)
         if job is not None:
             return job
@@ -129,5 +147,40 @@ class RedisJobStore(JobStore):
         return job
 
     async def cleanup_expired(self) -> int:
-        """Clean up expired jobs from in-memory. Redis handles its own TTL."""
+        """Clean up expired jobs from in-memory cache. Redis handles its own TTL."""
         return await super().cleanup_expired()
+
+    # ------------------------------------------------------------------
+    # Excel storage (TD-C01/XD-PERF-01) — separate from job JSON
+    # ------------------------------------------------------------------
+
+    async def store_excel(self, job_id: str, excel_bytes: bytes) -> None:
+        """Store Excel bytes in a dedicated Redis key (not in job JSON).
+
+        This eliminates the 3-copy memory duplication issue:
+        - Excel bytes are written directly to Redis as raw bytes
+        - NOT base64-encoded inside the job JSON
+        - NOT kept in the in-memory job result dict
+        """
+        try:
+            await self._redis.setex(
+                self._excel_key(job_id),
+                REDIS_EXCEL_TTL,
+                excel_bytes,
+            )
+            logger.debug("Excel stored for job %s (%d bytes)", job_id, len(excel_bytes))
+        except Exception as e:
+            logger.warning("Failed to store Excel for job %s: %s", job_id, e)
+
+    async def get_excel(self, job_id: str) -> Optional[bytes]:
+        """Retrieve Excel bytes from dedicated Redis key.
+
+        Returns:
+            Raw Excel bytes, or None if not found/expired.
+        """
+        try:
+            data = await self._redis.get(self._excel_key(job_id))
+            return data if isinstance(data, bytes) else (data.encode() if data else None)
+        except Exception as e:
+            logger.warning("Failed to retrieve Excel for job %s: %s", job_id, e)
+            return None

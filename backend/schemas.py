@@ -54,9 +54,10 @@ class BuscaRequest(BaseModel):
     termos_busca: Optional[str] = Field(
         default=None,
         max_length=500,
-        description="Custom search terms separated by spaces (e.g., 'jaleco avental'). "
-                    "Each space-separated word is treated as an additional keyword.",
-        examples=["jaleco avental"],
+        description="Custom search terms. Supports quoted multi-word terms and comma "
+                    "delimiters (e.g., '\"camisa polo\", uniforme'). "
+                    "Space-separated words without quotes are treated as individual terms.",
+        examples=['"camisa polo", uniforme', "jaleco avental"],
     )
 
     @model_validator(mode="after")

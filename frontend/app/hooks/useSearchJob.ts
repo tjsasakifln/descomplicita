@@ -238,7 +238,9 @@ export function useSearchJob(
           data_inicial: params.dataInicial,
           data_final: params.dataFinal,
           setor_id: params.searchMode === "setor" ? params.setorId : null,
-          termos_busca: params.searchMode === "termos" ? params.termosArray.join(" ") : null,
+          termos_busca: params.searchMode === "termos"
+            ? params.termosArray.map(t => t.includes(" ") ? `"${t}"` : t).join(", ")
+            : null,
         }),
       });
 

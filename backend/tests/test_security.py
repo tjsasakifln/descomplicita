@@ -74,7 +74,7 @@ class TestAPIKeyAuth:
         client = TestClient(app)
         response = client.get("/setores")
         assert response.status_code == 401
-        assert "Missing API key" in response.json()["detail"]
+        assert "Authentication required" in response.json()["detail"]
 
     def test_invalid_api_key_returns_401(self, monkeypatch):
         monkeypatch.setenv("API_KEY", "test-secret-key")

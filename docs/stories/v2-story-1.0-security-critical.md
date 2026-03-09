@@ -35,67 +35,67 @@ Fechar todos os debitos criticos (P0) e altos (P1) que representam riscos de seg
 
 #### Seguranca (P0)
 
-- [ ] Task 1: TD-C02/XD-SEC-02 -- Implementar autenticacao JWT stateless. Criar `backend/auth/jwt.py` com gerador/validador de tokens. Manter API key como fallback durante transicao.
-- [ ] Task 2: TD-C02 -- Configurar middleware JWT no FastAPI. Endpoints protegidos retornam 401 sem token valido. Health check permanece aberto.
-- [ ] Task 3: TD-C02 -- Atualizar frontend para obter e enviar JWT em todas as requests.
+- [x] Task 1: TD-C02/XD-SEC-02 -- Implementar autenticacao JWT stateless. Criar `backend/auth/jwt.py` com gerador/validador de tokens. Manter API key como fallback durante transicao.
+- [x] Task 2: TD-C02 -- Configurar middleware JWT no FastAPI. Endpoints protegidos retornam 401 sem token valido. Health check permanece aberto.
+- [x] Task 3: TD-C02 -- Atualizar frontend para obter e enviar JWT em todas as requests.
 
 #### Bloqueador Funcional (P1)
 
-- [ ] Task 4: UXD-001 -- Implementar suporte a termos multi-palavras no input de busca. Solucao: aspas para agrupar + virgula como delimitador. Ex: `"camisa polo", uniforme`.
-- [ ] Task 5: UXD-001 -- Atualizar parsing de termos no backend para aceitar formato com aspas/virgulas.
-- [ ] Task 6: UXD-001 -- Testar compatibilidade com saved searches existentes em localStorage.
+- [x] Task 4: UXD-001 -- Implementar suporte a termos multi-palavras no input de busca. Solucao: aspas para agrupar + virgula como delimitador. Ex: `"camisa polo", uniforme`.
+- [x] Task 5: UXD-001 -- Atualizar parsing de termos no backend para aceitar formato com aspas/virgulas.
+- [x] Task 6: UXD-001 -- Testar compatibilidade com saved searches existentes em localStorage.
 
 #### Cadeia Critica: Streaming/Memoria (P1)
 
-- [ ] Task 7: TD-C01 -- Eliminar armazenamento de bytes Excel brutos no dict Python do job result. Armazenar referencia ou gerar on-demand.
-- [ ] Task 8: TD-C01 -- Reduzir duplicacao de dados no Redis (nao serializar bytes Excel como JSON base64).
-- [ ] Task 9: XD-PERF-01 -- Implementar download streaming (StreamingResponse) eliminando as 3 copias em memoria.
-- [ ] Task 10: XD-PERF-01 -- Implementar com feature flag para rollback seguro.
+- [x] Task 7: TD-C01 -- Eliminar armazenamento de bytes Excel brutos no dict Python do job result. Armazenar referencia ou gerar on-demand.
+- [x] Task 8: TD-C01 -- Reduzir duplicacao de dados no Redis (nao serializar bytes Excel como JSON base64).
+- [x] Task 9: XD-PERF-01 -- Implementar download streaming (StreamingResponse) eliminando as 3 copias em memoria.
+- [x] Task 10: XD-PERF-01 -- Implementar com feature flag para rollback seguro.
 
 #### Durabilidade de Jobs (P1)
 
-- [ ] Task 11: TD-H02 -- Substituir `asyncio.create_task` por fila de tarefas duravel (avaliar Celery com Redis broker, ou RQ, ou arq).
-- [ ] Task 12: TD-H02 -- Jobs em execucao durante shutdown sao salvos com status interrompido (nao perdidos).
-- [ ] Task 13: TD-H01 -- Eliminar in-memory job store; Redis como unica fonte de verdade (remove necessidade de dual-write).
-- [ ] Task 14: TD-H01 -- Adicionar TTL para jobs no Redis (24h) para prevenir crescimento ilimitado.
+- [x] Task 11: TD-H02 -- Substituir `asyncio.create_task` por fila de tarefas duravel (avaliar Celery com Redis broker, ou RQ, ou arq).
+- [x] Task 12: TD-H02 -- Jobs em execucao durante shutdown sao salvos com status interrompido (nao perdidos).
+- [x] Task 13: TD-H01 -- Eliminar in-memory job store; Redis como unica fonte de verdade (remove necessidade de dual-write).
+- [x] Task 14: TD-H01 -- Adicionar TTL para jobs no Redis (24h) para prevenir crescimento ilimitado.
 
 #### Codigo Morto (P1)
 
-- [ ] Task 15: TD-C03 -- Escrever testes de integracao do orquestrador de fontes antes de qualquer remocao.
-- [ ] Task 16: TD-C03 -- Remover codigo de ComprasGov (API deprecada), Querido Diario (retorna HTML), TCE-RJ (404).
-- [ ] Task 17: TD-C03 -- Atualizar source registry para refletir apenas as 2 fontes ativas.
-- [ ] Task 18: TD-C03 -- Documentar processo para adicionar novas fontes no futuro.
+- [x] Task 15: TD-C03 -- Escrever testes de integracao do orquestrador de fontes antes de qualquer remocao.
+- [x] Task 16: TD-C03 -- Remover codigo de ComprasGov (API deprecada), Querido Diario (retorna HTML), TCE-RJ (404).
+- [x] Task 17: TD-C03 -- Atualizar source registry para refletir apenas as 2 fontes ativas.
+- [x] Task 18: TD-C03 -- Documentar processo para adicionar novas fontes no futuro.
 
 #### Acessibilidade Legal (P2)
 
-- [ ] Task 19: UXD-015 -- Rodar auditoria de contraste com axe DevTools em todos os 5 temas (Default Light, Default Dark, Paperwhite, Sepia, High Contrast).
-- [ ] Task 20: UXD-015 -- Corrigir violacoes de contraste encontradas, especialmente em temas Sepia e Paperwhite.
-- [ ] Task 21: UXD-015 -- Integrar @axe-core/playwright nos testes E2E como quality gate.
+- [x] Task 19: UXD-015 -- Rodar auditoria de contraste com axe DevTools em todos os 5 temas (Default Light, Default Dark, Paperwhite, Sepia, High Contrast).
+- [x] Task 20: UXD-015 -- Corrigir violacoes de contraste encontradas, especialmente em temas Sepia e Paperwhite.
+- [x] Task 21: UXD-015 -- Integrar @axe-core/playwright nos testes E2E como quality gate.
 
 ### Criterios de Aceite
 
-- [ ] Endpoints protegidos retornam 401 sem JWT valido
-- [ ] JWT e stateless (sem consulta a DB para validacao)
-- [ ] Busca com "camisa polo" retorna resultados corretos (nao split em dois tokens)
-- [ ] Download de Excel funciona sem acumular 3 copias em memoria (verificar memory profiling)
-- [ ] Jobs sobrevivem restart do container (criar job, restart, poll -- estado preservado)
-- [ ] `asyncio.create_task` nao e mais usado para jobs de busca
-- [ ] Codigo de ComprasGov, Querido Diario, TCE-RJ removido (verificar com grep)
-- [ ] Source registry lista apenas 2 fontes ativas
-- [ ] Auditoria axe-core passa sem violacoes criticas/serias em todos os 5 temas
-- [ ] Feature flag permite rollback do streaming de download
+- [x] Endpoints protegidos retornam 401 sem JWT valido
+- [x] JWT e stateless (sem consulta a DB para validacao)
+- [x] Busca com "camisa polo" retorna resultados corretos (nao split em dois tokens)
+- [x] Download de Excel funciona sem acumular 3 copias em memoria (verificar memory profiling)
+- [x] Jobs sobrevivem restart do container (criar job, restart, poll -- estado preservado)
+- [x] `asyncio.create_task` nao e mais usado para jobs de busca
+- [x] Codigo de ComprasGov, Querido Diario, TCE-RJ removido (verificar com grep)
+- [x] Source registry lista apenas 2 fontes ativas
+- [x] Auditoria axe-core passa sem violacoes criticas/serias em todos os 5 temas
+- [x] Feature flag permite rollback do streaming de download
 
 ### Testes Requeridos
 
-- [ ] Teste unitario: JWT -- geracao, validacao, expiracao, token invalido
-- [ ] Teste unitario: middleware JWT retorna 401 para requests sem/com token invalido
-- [ ] Teste unitario: parsing de termos multi-palavras com aspas e virgulas
-- [ ] Teste de integracao: orquestrador de fontes funciona com 2 fontes ativas
-- [ ] Teste de integracao: fila duravel -- job criado, processado, resultado disponivel apos restart
-- [ ] Teste de integracao: download streaming -- resposta valida .xlsx sem acumulacao de memoria
-- [ ] Teste E2E: fluxo completo de busca com JWT
-- [ ] Teste E2E: axe-core em todos os 5 temas -- zero violacoes criticas/serias
-- [ ] Teste de carga: 10 buscas concorrentes com fila duravel (sem corrupcao)
+- [x] Teste unitario: JWT -- geracao, validacao, expiracao, token invalido
+- [x] Teste unitario: middleware JWT retorna 401 para requests sem/com token invalido
+- [x] Teste unitario: parsing de termos multi-palavras com aspas e virgulas
+- [x] Teste de integracao: orquestrador de fontes funciona com 2 fontes ativas
+- [x] Teste de integracao: fila duravel -- job criado, processado, resultado disponivel apos restart
+- [x] Teste de integracao: download streaming -- resposta valida .xlsx sem acumulacao de memoria
+- [x] Teste E2E: fluxo completo de busca com JWT
+- [x] Teste E2E: axe-core em todos os 5 temas -- zero violacoes criticas/serias
+- [x] Teste de carga: 10 buscas concorrentes com fila duravel (sem corrupcao)
 
 ### Estimativa
 
@@ -112,8 +112,8 @@ Fechar todos os debitos criticos (P0) e altos (P1) que representam riscos de seg
 
 ### Definition of Done
 
-- [ ] Codigo implementado
-- [ ] Testes passando
+- [x] Codigo implementado
+- [x] Testes passando
 - [ ] Review aprovado
 - [ ] Deploy em staging
 - [ ] QA aprovado

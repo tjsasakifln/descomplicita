@@ -172,7 +172,14 @@ export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
     if (params.searchMode === "setor" && params.setorId) {
       setSetorIdState(params.setorId);
     } else if (params.searchMode === "termos" && params.termosBusca) {
-      setTermosArray(params.termosBusca.split(" "));
+      // Parse saved terms: support both comma-delimited and space-delimited
+      const raw = params.termosBusca;
+      if (raw.includes(",") || raw.includes('"')) {
+        const terms = raw.split(",").map((t: string) => t.trim().replace(/^"|"$/g, "")).filter(Boolean);
+        setTermosArray(terms);
+      } else {
+        setTermosArray(raw.split(" ").filter(Boolean));
+      }
     }
     notifyChange();
   }, [notifyChange]);

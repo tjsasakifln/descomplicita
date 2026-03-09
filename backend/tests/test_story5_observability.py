@@ -208,10 +208,9 @@ class TestContentLengthValidation:
         job_id = str(uuid.uuid4())
         loop = asyncio.new_event_loop()
         loop.run_until_complete(job_store.create(job_id))
-        loop.run_until_complete(job_store.complete(job_id, {
-            "excel_bytes": b"x" * (MAX_DOWNLOAD_SIZE + 1),
-            "resumo": {},
-        }))
+        loop.run_until_complete(job_store.complete(job_id, {"resumo": {}}))
+        # Store oversized Excel via streaming path (TD-C01/XD-PERF-01)
+        job_store._excel[job_id] = b"x" * (MAX_DOWNLOAD_SIZE + 1)
         loop.close()
 
         response = client.get(f"/buscar/{job_id}/download")

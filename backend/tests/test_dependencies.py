@@ -34,6 +34,11 @@ class TestDIProviders:
         source = dependencies.get_pncp_source()
         assert source is not None
 
+        # Task runner should exist (TD-H02)
+        from task_queue import DurableTaskRunner
+        runner = dependencies.get_task_runner()
+        assert isinstance(runner, DurableTaskRunner)
+
         # Cleanup
         await dependencies.shutdown_dependencies()
 

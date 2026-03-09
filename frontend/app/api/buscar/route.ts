@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendHeaders } from "../../lib/backendAuth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-    const apiKey = process.env.BACKEND_API_KEY || "";
+    const headers = await getBackendHeaders();
 
     let jobResponse: Response;
     try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(apiKey && { "X-API-Key": apiKey }),
+          ...headers,
         },
         body: JSON.stringify({
           ufs,

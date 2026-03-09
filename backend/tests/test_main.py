@@ -31,7 +31,7 @@ class TestApplicationSetup:
         assert app.title == "Descomplicita API"
 
     def test_app_version(self):
-        assert app.version == "0.3.0"
+        assert app.version == "0.4.0"
 
     def test_app_has_docs_endpoint(self):
         assert app.docs_url == "/docs"
@@ -62,7 +62,7 @@ class TestRootEndpoint:
     def test_root_version_matches(self, client):
         response = client.get("/")
         data = response.json()
-        assert data["version"] == "0.3.0"
+        assert data["version"] == "0.4.0"
 
     def test_root_endpoints_links(self, client):
         response = client.get("/")
@@ -122,7 +122,7 @@ class TestHealthEndpoint:
     def test_health_version_matches(self, client):
         response = client.get("/health")
         data = response.json()
-        assert data["version"] == "0.3.0"
+        assert data["version"] == "0.4.0"
 
     def test_health_response_time(self, client):
         import time
@@ -204,7 +204,7 @@ class TestOpenAPIDocumentation:
         schema = response.json()
         info = schema["info"]
         assert info["title"] == "Descomplicita API"
-        assert info["version"] == "0.3.0"
+        assert info["version"] == "0.4.0"
 
     def test_openapi_has_health_endpoint(self, client):
         response = client.get("/openapi.json")
@@ -698,10 +698,12 @@ class TestJobDownloadEndpoint:
         job = SearchJob(
             job_id="completed-job",
             status="completed",
-            result={"excel_bytes": excel_data, "resumo": {}},
+            result={"resumo": {}},
             completed_at=time.time(),
         )
         job_store._jobs["completed-job"] = job
+        # Store Excel via streaming path (TD-C01/XD-PERF-01)
+        job_store._excel["completed-job"] = excel_data
 
         response = client.get("/buscar/completed-job/download")
         assert response.status_code == 200

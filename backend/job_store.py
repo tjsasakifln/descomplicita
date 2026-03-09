@@ -41,6 +41,7 @@ class JobStore:
         self.max_jobs = max_jobs
         self.ttl = ttl
         self._jobs: Dict[str, SearchJob] = {}
+        self._excel: Dict[str, bytes] = {}
         self._lock = asyncio.Lock()
 
     async def create(self, job_id: str) -> SearchJob:
@@ -152,3 +153,13 @@ class JobStore:
     def is_full(self) -> bool:
         """Whether the store has reached its max active jobs limit."""
         return self.active_count >= self.max_jobs
+
+    async def store_excel(self, job_id: str, excel_bytes: bytes) -> None:
+        """Store Excel bytes separately from job data (TD-C01)."""
+        async with self._lock:
+            self._excel[job_id] = excel_bytes
+
+    async def get_excel(self, job_id: str) -> Optional[bytes]:
+        """Retrieve stored Excel bytes for a job."""
+        async with self._lock:
+            return self._excel.get(job_id)

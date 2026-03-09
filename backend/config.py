@@ -109,17 +109,8 @@ SOURCES_CONFIG = {
         "timeout": 300,  # 7 UFs x 7 modalidades = 49 combos; with max_pages cap, ~120-180s typical
         "priority": 1,
     },
-    # Disabled 2026-03-07: licitacoes/v1 endpoint returns 404.
-    # API migrated to compras.dados.gov.br (contracts only, no licitacoes).
-    # Licitacoes data consolidated into PNCP. See story SR-001.3.
-    "comprasgov": {
-        "enabled": False,
-        "base_url": "https://dadosabertos.compras.gov.br",
-        "auth": None,
-        "rate_limit_rps": 5,
-        "timeout": 60,
-        "priority": 2,
-    },
+    # ComprasGov removed in v2-story-1.0 (TD-C03): API deprecated, returns 404.
+    # Licitacoes data consolidated into PNCP. See SR-001.3.
     "transparencia": {
         "enabled": True,
         "base_url": "https://api.portaldatransparencia.gov.br",
@@ -128,23 +119,8 @@ SOURCES_CONFIG = {
         "timeout": 90,
         "priority": 3,
     },
-    "querido_diario": {
-        "enabled": False,  # SR-001.4: API returns HTML instead of JSON since ~2026-03; endpoint deprecated
-        "base_url": "https://queridodiario.ok.org.br/api/",
-        "auth": None,
-        "rate_limit_rps": 5,
-        "timeout": 60,
-        "priority": 4,
-    },
-    # SR-001.5: API endpoint /api/v1/compras-diretas returns 404 since ~2026-03; endpoint deprecated
-    "tce_rj": {
-        "enabled": False,
-        "base_url": "https://dados.tcerj.tc.br",
-        "auth": None,
-        "rate_limit_rps": 3,
-        "timeout": 90,
-        "priority": 5,
-    },
+    # Querido Diario removed in v2-story-1.0 (TD-C03): API returns HTML, endpoint deprecated.
+    # TCE-RJ removed in v2-story-1.0 (TD-C03): API returns 404, endpoint deprecated.
 }
 
 

@@ -6,6 +6,8 @@ from Brazil's PNCP (Portal Nacional de Contratações Públicas).
 """
 
 import asyncio
+import csv
+import io
 import logging
 import os
 import signal
@@ -22,6 +24,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+from auth.jwt import JWTError, generate_token, validate_token
 from config import setup_logging, MAX_DATE_RANGE_DAYS, MAX_DOWNLOAD_SIZE
 from middleware.auth import APIKeyMiddleware
 from middleware.correlation_id import CorrelationIdMiddleware
@@ -40,6 +43,7 @@ from dependencies import (
     get_pncp_source,
     get_redis,
     get_redis_cache,
+    get_task_runner,
 )
 from sources.base import SearchQuery
 from exceptions import PNCPAPIError, PNCPRateLimitError
@@ -51,6 +55,9 @@ from sectors import get_sector, list_sectors
 # Configure structured logging
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+
+# Feature flag: streaming download (TD-C01/XD-PERF-01)
+ENABLE_STREAMING_DOWNLOAD = os.getenv("ENABLE_STREAMING_DOWNLOAD", "true").lower() == "true"
 
 # ---------------------------------------------------------------------------
 # Sentry integration (TD-057)
@@ -96,7 +103,7 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(_periodic_cleanup())
     logger.info("Periodic job cleanup task started")
 
-    # --- SIGTERM graceful shutdown handler (TD-025) ---
+    # --- SIGTERM graceful shutdown handler (TD-025 + TD-H02) ---
     _shutdown_event = asyncio.Event()
 
     def _sigterm_handler():
@@ -111,7 +118,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown — interrupt running search jobs (TD-H02)
+    task_runner = get_task_runner()
+    if task_runner:
+        await task_runner.shutdown(job_store=job_store)
+
     cleanup_task.cancel()
     try:
         await cleanup_task
@@ -142,7 +153,7 @@ app = FastAPI(
         "Permite filtrar oportunidades por estado, valor e keywords, "
         "gerando relatórios Excel e resumos executivos via IA."
     ),
-    version="0.3.0",
+    version="0.4.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -177,7 +188,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API key authentication middleware
+# Authentication middleware (JWT + API key fallback)
 app.add_middleware(APIKeyMiddleware)
 
 # Correlation ID middleware (TD-017)
@@ -190,6 +201,45 @@ logger.info(
 
 
 # ---------------------------------------------------------------------------
+# Multi-word term parsing (UXD-001)
+# ---------------------------------------------------------------------------
+
+def parse_multi_word_terms(raw: str) -> list[str]:
+    """Parse search terms supporting quoted multi-word phrases and comma delimiters.
+
+    Supports:
+    - Quoted terms: "camisa polo" → camisa polo
+    - Comma-separated: "camisa polo", uniforme → [camisa polo, uniforme]
+    - Mixed: "camisa polo", uniforme, "calça social" → 3 terms
+    - Simple space-separated (backward compat): jaleco avental → [jaleco, avental]
+
+    Args:
+        raw: Raw search terms string from user input.
+
+    Returns:
+        List of parsed terms (lowercase, stripped).
+    """
+    if not raw or not raw.strip():
+        return []
+
+    raw = raw.strip()
+
+    # If input contains quotes or commas, use CSV-style parsing
+    if '"' in raw or "," in raw:
+        terms = []
+        reader = csv.reader(io.StringIO(raw), skipinitialspace=True)
+        for row in reader:
+            for term in row:
+                cleaned = term.strip().lower()
+                if cleaned:
+                    terms.append(cleaned)
+        return terms
+
+    # Fallback: space-separated (backward compatibility)
+    return [t.strip().lower() for t in raw.split() if t.strip()]
+
+
+# ---------------------------------------------------------------------------
 # Public endpoints
 # ---------------------------------------------------------------------------
 
@@ -197,13 +247,14 @@ logger.info(
 async def root():
     return {
         "name": "Descomplicita API",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "description": "API para busca de licitações de uniformes no PNCP",
         "endpoints": {
             "docs": "/docs",
             "redoc": "/redoc",
             "health": "/health",
             "openapi": "/openapi.json",
+            "auth_token": "/auth/token",
         },
         "status": "operational",
     }
@@ -232,6 +283,46 @@ async def health(redis=Depends(get_redis)):
 async def listar_setores():
     """Return available procurement sectors for frontend dropdown."""
     return {"setores": list_sectors()}
+
+
+# ---------------------------------------------------------------------------
+# JWT token endpoint (TD-C02/XD-SEC-02)
+# ---------------------------------------------------------------------------
+
+@app.post("/auth/token")
+async def auth_token(request: Request):
+    """Exchange API key for a JWT token.
+
+    Send X-API-Key header to receive a stateless JWT Bearer token.
+    The JWT can then be used for all subsequent API requests.
+    """
+    api_key = os.getenv("API_KEY")
+    jwt_secret = os.getenv("JWT_SECRET")
+
+    if not jwt_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="JWT authentication not configured on this server.",
+        )
+
+    # Validate API key
+    request_key = request.headers.get("X-API-Key")
+    if not request_key:
+        raise HTTPException(status_code=401, detail="Provide X-API-Key header to obtain JWT token.")
+
+    if api_key and request_key != api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key.")
+
+    # Generate JWT
+    subject = "api_client"
+    exp_hours = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
+    token = generate_token(subject=subject, secret=jwt_secret, expiration_hours=exp_hours)
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": exp_hours * 3600,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +384,7 @@ async def debug_pncp_test(pncp_source=Depends(get_pncp_source)):
 
 
 # ---------------------------------------------------------------------------
-# Async job-based search (SP-001.3)
+# Async job-based search (SP-001.3 + TD-H02)
 # ---------------------------------------------------------------------------
 
 @app.post("/buscar", response_model=JobCreatedResponse)
@@ -303,6 +394,7 @@ async def buscar_licitacoes(
     body: BuscaRequest,
     job_store=Depends(get_job_store),
     orchestrator=Depends(get_orchestrator),
+    task_runner=Depends(get_task_runner),
 ):
     """Start an asynchronous procurement search job."""
     await job_store.cleanup_expired()
@@ -316,7 +408,18 @@ async def buscar_licitacoes(
     job_id = str(uuid.uuid4())
     await job_store.create(job_id)
 
-    asyncio.create_task(run_search_job(job_id, body, job_store, orchestrator))
+    # Enqueue via durable task runner (TD-H02) instead of asyncio.create_task
+    await task_runner.enqueue(
+        job_id=job_id,
+        params={
+            "ufs": body.ufs,
+            "data_inicial": body.data_inicial,
+            "data_final": body.data_final,
+            "setor_id": body.setor_id,
+            "termos_busca": body.termos_busca,
+        },
+        coro_factory=lambda: run_search_job(job_id, body, job_store, orchestrator),
+    )
 
     logger.info(
         "Search job created",
@@ -348,13 +451,10 @@ async def run_search_job(
             job_id, sector.name, len(sector.keywords),
         )
 
+        # --- Parse search terms (UXD-001: multi-word support) ---
         custom_terms: list[str] = []
         if request.termos_busca and request.termos_busca.strip():
-            custom_terms = [
-                t.strip().lower()
-                for t in request.termos_busca.strip().split()
-                if t.strip()
-            ]
+            custom_terms = parse_multi_word_terms(request.termos_busca)
 
         if custom_terms:
             active_keywords = set(custom_terms)
@@ -480,7 +580,6 @@ async def run_search_job(
             }
             result = {
                 "resumo": resumo_dict,
-                "excel_bytes": b"",
                 "total_raw": len(licitacoes_raw),
                 "total_filtrado": 0,
                 "total_atas": 0,
@@ -549,9 +648,16 @@ async def run_search_job(
 
         resumo_dict = resumo.model_dump()
 
+        # TD-C01/XD-PERF-01: Store Excel bytes separately to avoid memory duplication
+        # Excel bytes are stored directly in Redis (not base64-encoded in JSON)
+        if ENABLE_STREAMING_DOWNLOAD:
+            await job_store.store_excel(job_id, excel_bytes)
+        else:
+            # Legacy: store in result dict (feature flag rollback)
+            pass
+
         result = {
             "resumo": resumo_dict,
-            "excel_bytes": excel_bytes,
             "total_raw": len(licitacoes_raw),
             "total_filtrado": len(licitacoes_filtradas),
             "total_atas": total_atas,
@@ -571,6 +677,11 @@ async def run_search_job(
             "dedup_removed": orch_result.dedup_removed,
             "truncated_combos": orch_result.truncated_combos,
         }
+
+        # Legacy fallback: include excel_bytes in result if streaming is disabled
+        if not ENABLE_STREAMING_DOWNLOAD:
+            result["excel_bytes"] = excel_bytes
+
         await job_store.complete(job_id, result)
 
         logger.info(
@@ -680,7 +791,13 @@ async def job_download(
     if job.status != "completed":
         raise HTTPException(status_code=409, detail="Job not yet completed")
 
-    excel_bytes = job.result.get("excel_bytes", b"")
+    # TD-C01/XD-PERF-01: Retrieve Excel from dedicated storage (no memory duplication)
+    if ENABLE_STREAMING_DOWNLOAD:
+        excel_bytes = await job_store.get_excel(job_id)
+    else:
+        # Legacy fallback
+        excel_bytes = job.result.get("excel_bytes", b"")
+
     if not excel_bytes:
         raise HTTPException(status_code=404, detail="No Excel data available")
 

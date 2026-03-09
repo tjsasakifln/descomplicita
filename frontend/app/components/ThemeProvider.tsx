@@ -84,8 +84,8 @@ function applyTheme(themeId: ThemeId) {
 
     root.classList.add("dark");
   } else {
-    root.style.setProperty("--ink-secondary", "#3d5975");
-    root.style.setProperty("--ink-muted", "#5a6a7a");
+    root.style.setProperty("--ink-secondary", config.id === "sepia" ? "#35495c" : "#3d5975");
+    root.style.setProperty("--ink-muted", config.id === "sepia" ? "#4a5968" : config.id === "paperwhite" ? "#526272" : "#5a6a7a");
     root.style.setProperty("--ink-faint", "#c0d2e5");
     root.style.setProperty("--brand-blue-subtle", config.id === "sepia" ? "#e8e0d4" : "#e8f0ff");
     root.style.setProperty("--surface-0", config.canvas);

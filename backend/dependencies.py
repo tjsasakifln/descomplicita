@@ -7,11 +7,9 @@ from typing import Optional
 
 from clients.async_pncp_client import AsyncPNCPClient
 from sources.pncp_source import PNCPSource
-from sources.comprasgov_source import ComprasGovSource
 from sources.transparencia_source import TransparenciaSource
-from sources.querido_diario_source import QueridoDiarioSource
-from sources.tce_rj_source import TCERJSource
 from sources.orchestrator import MultiSourceOrchestrator
+from task_queue import DurableTaskRunner
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +20,12 @@ _pncp_client = None
 _pncp_source = None
 _orchestrator = None
 _redis_cache = None
+_task_runner = None
 
 
 async def init_dependencies() -> None:
     """Initialize all application dependencies. Called from lifespan startup."""
-    global _redis, _job_store, _pncp_client, _pncp_source, _orchestrator, _redis_cache
+    global _redis, _job_store, _pncp_client, _pncp_source, _orchestrator, _redis_cache, _task_runner
 
     # --- Redis ---
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -69,15 +68,15 @@ async def init_dependencies() -> None:
     # --- PNCP Source ---
     _pncp_source = PNCPSource(async_client=_pncp_client, cache=_redis_cache)
 
-    # --- Orchestrator ---
+    # --- Orchestrator (only active sources: PNCP + Transparencia) ---
     sources = [
         _pncp_source,
-        ComprasGovSource(),
         TransparenciaSource(),
-        QueridoDiarioSource(),
-        TCERJSource(),
     ]
     _orchestrator = MultiSourceOrchestrator(sources=sources)
+
+    # --- Durable Task Runner (TD-H02) ---
+    _task_runner = DurableTaskRunner(redis=_redis)
 
     logger.info("All dependencies initialized")
 
@@ -123,3 +122,8 @@ def get_redis():
 def get_redis_cache():
     """Dependency: get the Redis cache (may be None)."""
     return _redis_cache
+
+
+def get_task_runner():
+    """Dependency: get the durable task runner."""
+    return _task_runner

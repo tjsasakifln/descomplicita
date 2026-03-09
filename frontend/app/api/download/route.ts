@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
-const API_KEY = process.env.BACKEND_API_KEY || "";
+import { getBackendHeaders } from "../../lib/backendAuth";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -14,11 +12,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+  const headers = await getBackendHeaders();
+
   // Proxy the download request to the backend streaming endpoint
   let response: Response;
   try {
-    response = await fetch(`${BACKEND_URL}/buscar/${id}/download`, {
-      headers: API_KEY ? { "X-API-Key": API_KEY } : {},
+    response = await fetch(`${backendUrl}/buscar/${id}/download`, {
+      headers,
     });
   } catch (error) {
     console.error(`Download proxy error for ${id}:`, error);

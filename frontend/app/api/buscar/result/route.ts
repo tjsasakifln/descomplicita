@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendHeaders } from "../../../lib/backendAuth";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
-const API_KEY = process.env.BACKEND_API_KEY || "";
 
 export async function GET(request: NextRequest) {
   const job_id = request.nextUrl.searchParams.get("job_id");
@@ -13,10 +13,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const headers = await getBackendHeaders();
+
   let response: Response;
   try {
     response = await fetch(`${BACKEND_URL}/buscar/${job_id}/result`, {
-      headers: API_KEY ? { "X-API-Key": API_KEY } : {},
+      headers,
     });
   } catch (error) {
     const message = `Backend indisponível em ${BACKEND_URL}: ${error instanceof Error ? error.message : "conexão recusada"}`;

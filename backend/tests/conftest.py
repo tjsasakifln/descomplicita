@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, Mock
 
 from job_store import JobStore
+from task_queue import DurableTaskRunner
 from sources.orchestrator import OrchestratorResult, SourceStats
 from sources.base import NormalizedRecord
 
@@ -13,10 +14,18 @@ from sources.base import NormalizedRecord
 # Module-level job store for tests (replaces the DI-provided one)
 _test_job_store = JobStore()
 
+# Module-level task runner for tests (no Redis)
+_test_task_runner = DurableTaskRunner(redis=None)
+
 
 def get_test_job_store():
     """Return the test job store instance."""
     return _test_job_store
+
+
+def get_test_task_runner():
+    """Return the test task runner instance."""
+    return _test_task_runner
 
 
 @pytest.fixture(autouse=True)
@@ -33,18 +42,20 @@ def _reset_rate_limiter():
 
 @pytest.fixture(autouse=True)
 def _disable_auth_for_tests(monkeypatch):
-    """Ensure API_KEY is not set during tests (auth bypassed)."""
+    """Ensure API_KEY and JWT_SECRET are not set during tests (auth bypassed)."""
     monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.delenv("JWT_SECRET", raising=False)
 
 
 @pytest.fixture(autouse=True)
 def _override_dependencies():
     """Override DI dependencies for testing (no Redis, in-memory stores)."""
     from main import app
-    from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_redis, get_redis_cache
+    from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_redis, get_redis_cache, get_task_runner
 
-    # Use test job store
+    # Use test job store and task runner
     app.dependency_overrides[get_job_store] = get_test_job_store
+    app.dependency_overrides[get_task_runner] = get_test_task_runner
     app.dependency_overrides[get_redis] = lambda: None
     app.dependency_overrides[get_redis_cache] = lambda: None
 
@@ -57,8 +68,10 @@ def _override_dependencies():
 def _reset_job_store():
     """Clear the test job store before and after every test."""
     _test_job_store._jobs.clear()
+    _test_job_store._excel.clear()
     yield
     _test_job_store._jobs.clear()
+    _test_job_store._excel.clear()
 
 
 @pytest.fixture()
@@ -66,12 +79,10 @@ def run_sync(monkeypatch):
     """
     Make background search jobs execute synchronously inside the TestClient.
 
-    Patches run_search_job to avoid thread pool deadlocks with Starlette's
-    TestClient, and patches asyncio.create_task to run the background
-    coroutine inline.
+    Patches the DurableTaskRunner.enqueue to run the coroutine inline
+    instead of using asyncio.create_task.
 
-    Updated for the new 4-param signature:
-        run_search_job(job_id, request, job_store, orchestrator)
+    Updated for the task_runner architecture (TD-H02).
     """
     import main as main_module
 
@@ -97,16 +108,12 @@ def run_sync(monkeypatch):
 
     monkeypatch.setattr("main.run_search_job", _inline_run_search_job)
 
-    original_create_task = asyncio.create_task
+    # Patch task_runner.enqueue to execute inline
+    async def _inline_enqueue(job_id, params, coro_factory):
+        coro = coro_factory()
+        await coro
 
-    def _inline_create_task(coro, *args, **kwargs):
-        coro_name = getattr(coro, "__qualname__", "") or getattr(coro, "__name__", "")
-        if "run_search_job" in coro_name or "_inline" in coro_name:
-            loop = asyncio.get_running_loop()
-            return loop.create_task(coro)
-        return original_create_task(coro, *args, **kwargs)
-
-    monkeypatch.setattr("main.asyncio.create_task", _inline_create_task)
+    _test_task_runner.enqueue = _inline_enqueue
 
 
 def make_mock_orchestrator(raw_records=None, error=None):
