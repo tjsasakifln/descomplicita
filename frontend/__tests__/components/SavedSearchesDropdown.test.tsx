@@ -140,7 +140,7 @@ describe('SavedSearchesDropdown', () => {
       expect(mockDeleteSearch).toHaveBeenCalledWith('search-1');
     });
 
-    it('should auto-reset delete confirmation after 3 seconds', async () => {
+    it('should NOT auto-dismiss delete confirmation (WCAG 2.2.1)', async () => {
       render(<SavedSearchesDropdown {...defaultProps} />);
 
       fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
@@ -149,15 +149,83 @@ describe('SavedSearchesDropdown', () => {
       fireEvent.click(deleteButtons[0]);
       expect(screen.getByRole('button', { name: /Confirmar exclusão/i })).toBeInTheDocument();
 
-      // Advance time by 3 seconds
+      // Advance time well beyond the old 3-second timeout
       act(() => {
-        jest.advanceTimersByTime(3100);
+        jest.advanceTimersByTime(10000);
       });
 
-      // Should reset back to normal state
+      // Confirmation should still be visible — no auto-dismiss
+      expect(screen.getByRole('button', { name: /Confirmar exclusão/i })).toBeInTheDocument();
+    });
+
+    it('should show a cancel button alongside the confirm button', () => {
+      render(<SavedSearchesDropdown {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+
+      const deleteButtons = screen.getAllByRole('button', { name: /Excluir busca/i });
+      fireEvent.click(deleteButtons[0]);
+
+      // Cancel button must be present
+      expect(screen.getByRole('button', { name: /Cancelar exclusão/i })).toBeInTheDocument();
+    });
+
+    it('should dismiss confirmation when cancel button is clicked', () => {
+      render(<SavedSearchesDropdown {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+
+      const deleteButtons = screen.getAllByRole('button', { name: /Excluir busca/i });
+      fireEvent.click(deleteButtons[0]);
+      expect(screen.getByRole('button', { name: /Confirmar exclusão/i })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /Cancelar exclusão/i }));
+
+      expect(screen.queryByRole('button', { name: /Confirmar exclusão/i })).not.toBeInTheDocument();
+      expect(mockDeleteSearch).not.toHaveBeenCalled();
+    });
+
+    it('should reset delete confirmation when dropdown closes via Escape', async () => {
+      render(<SavedSearchesDropdown {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+
+      const deleteButtons = screen.getAllByRole('button', { name: /Excluir busca/i });
+      fireEvent.click(deleteButtons[0]);
+      expect(screen.getByRole('button', { name: /Confirmar exclusão/i })).toBeInTheDocument();
+
+      // Close dropdown via Escape
+      fireEvent.keyDown(document, { key: 'Escape' });
+
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: /Confirmar exclusão/i })).not.toBeInTheDocument();
+        expect(screen.queryByText('Uniformes Sul')).not.toBeInTheDocument();
       });
+
+      // Reopen and verify confirmation is gone
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+      expect(screen.queryByRole('button', { name: /Confirmar exclusão/i })).not.toBeInTheDocument();
+    });
+
+    it('should reset delete confirmation when dropdown closes via backdrop click', async () => {
+      render(<SavedSearchesDropdown {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+
+      const deleteButtons = screen.getAllByRole('button', { name: /Excluir busca/i });
+      fireEvent.click(deleteButtons[0]);
+      expect(screen.getByRole('button', { name: /Confirmar exclusão/i })).toBeInTheDocument();
+
+      // Click the backdrop (fixed overlay behind the dropdown)
+      const backdrop = document.querySelector('[aria-hidden="true"]') as HTMLElement;
+      fireEvent.click(backdrop);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Uniformes Sul')).not.toBeInTheDocument();
+      });
+
+      // Reopen and verify confirmation is gone
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+      expect(screen.queryByRole('button', { name: /Confirmar exclusão/i })).not.toBeInTheDocument();
     });
   });
 
@@ -198,21 +266,40 @@ describe('SavedSearchesDropdown', () => {
       expect(mockClearAll).toHaveBeenCalledTimes(1);
     });
 
-    it('should auto-cancel clear confirmation after 3 seconds', async () => {
+    it('should NOT auto-dismiss clear confirmation (WCAG 2.2.1)', async () => {
       render(<SavedSearchesDropdown {...defaultProps} />);
 
       fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
       fireEvent.click(screen.getByText('Limpar todas'));
       expect(screen.getByText('Confirmar exclusão?')).toBeInTheDocument();
 
+      // Advance time well beyond the old 3-second timeout
       act(() => {
-        jest.advanceTimersByTime(3100);
+        jest.advanceTimersByTime(10000);
       });
 
+      // Confirmation should still be visible — no auto-dismiss
+      expect(screen.getByText('Confirmar exclusão?')).toBeInTheDocument();
+    });
+
+    it('should reset clear confirmation when dropdown closes via Escape', async () => {
+      render(<SavedSearchesDropdown {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+      fireEvent.click(screen.getByText('Limpar todas'));
+      expect(screen.getByText('Confirmar exclusão?')).toBeInTheDocument();
+
+      // Close dropdown via Escape
+      fireEvent.keyDown(document, { key: 'Escape' });
+
       await waitFor(() => {
-        expect(screen.getByText('Limpar todas')).toBeInTheDocument();
-        expect(screen.queryByText('Confirmar exclusão?')).not.toBeInTheDocument();
+        expect(screen.queryByText('Uniformes Sul')).not.toBeInTheDocument();
       });
+
+      // Reopen and verify clear confirmation is gone
+      fireEvent.click(screen.getByRole('button', { name: /Buscas salvas/i }));
+      expect(screen.queryByText('Confirmar exclusão?')).not.toBeInTheDocument();
+      expect(screen.getByText('Limpar todas')).toBeInTheDocument();
     });
   });
 

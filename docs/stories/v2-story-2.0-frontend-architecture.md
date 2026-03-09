@@ -35,53 +35,53 @@ Resolver debitos de frontend que afetam seguranca (eliminar vetor XSS para habil
 
 #### Cadeia de Seguranca: Inline Script + Headers
 
-- [ ] Task 1: TD-M10 -- Refatorar inline script de prevencao de FOUC (flash of unstyled content) de tema. Opcoes: (a) usar `data-theme` attribute em `<html>` lido via CSS, (b) usar nonce no script e pass-through para CSP, (c) mover para modulo externo com hash CSP.
-- [ ] Task 2: TD-M10 -- Verificar que flash de tema nao ocorre apos refatoracao (testar em todos os 5 temas).
-- [ ] Task 3: TD-M07 -- Adicionar Content-Security-Policy header na config do Vercel (`vercel.json`). Configurar `script-src` com nonce/hash conforme solucao de Task 1.
-- [ ] Task 4: TD-M08 -- Adicionar Strict-Transport-Security header: `max-age=31536000; includeSubDomains`.
-- [ ] Task 5: XD-SEC-01 -- Adicionar headers adicionais: `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Content-Type-Options: nosniff`.
-- [ ] Task 6: XD-SEC-03 -- Verificar que `dangerouslySetInnerHTML` nao cria vetor XSS com CSP ativo (test de penetracao basico).
+- [x] Task 1: TD-M10 -- Refatorar inline script de prevencao de FOUC (flash of unstyled content) de tema. Opcoes: (a) usar `data-theme` attribute em `<html>` lido via CSS, (b) usar nonce no script e pass-through para CSP, (c) mover para modulo externo com hash CSP.
+- [x] Task 2: TD-M10 -- Verificar que flash de tema nao ocorre apos refatoracao (testar em todos os 5 temas).
+- [x] Task 3: TD-M07 -- Adicionar Content-Security-Policy header na config do Vercel (`vercel.json`). Configurar `script-src` com nonce/hash conforme solucao de Task 1.
+- [x] Task 4: TD-M08 -- Adicionar Strict-Transport-Security header: `max-age=31536000; includeSubDomains`.
+- [x] Task 5: XD-SEC-01 -- Adicionar headers adicionais: `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Content-Type-Options: nosniff`.
+- [x] Task 6: XD-SEC-03 -- Verificar que `dangerouslySetInnerHTML` nao cria vetor XSS com CSP ativo (test de penetracao basico).
 
 #### Paginacao End-to-End
 
-- [ ] Task 7: TD-M02 -- Implementar paginacao no backend: parametros `page` e `page_size` no endpoint de resultados, com defaults sensatos (page_size=20).
-- [ ] Task 8: XD-PERF-02 -- Implementar paginacao no frontend: componente de navegacao de paginas, lazy loading de resultados.
-- [ ] Task 9: XD-PERF-02 -- Testar performance com datasets grandes (500+ resultados) -- verificar que apenas a pagina atual e renderizada.
+- [x] Task 7: TD-M02 -- Implementar paginacao no backend: parametros `page` e `page_size` no endpoint de resultados, com defaults sensatos (page_size=20).
+- [x] Task 8: XD-PERF-02 -- Implementar paginacao no frontend: componente de navegacao de paginas, lazy loading de resultados.
+- [x] Task 9: XD-PERF-02 -- Testar performance com datasets grandes (500+ resultados) -- verificar que apenas a pagina atual e renderizada.
 
 #### Polling Inteligente
 
-- [ ] Task 10: XD-PERF-03 -- Implementar backoff exponencial no polling de status de jobs. Ex: 1s, 2s, 4s, 8s, max 15s.
-- [ ] Task 11: XD-PERF-03 -- Considerar Server-Sent Events (SSE) como alternativa ao polling para jobs de longa duracao.
-- [ ] Task 12: XD-PERF-03 -- Medir reducao de requests (meta: reducao de 60-80%).
+- [x] Task 10: XD-PERF-03 -- Implementar backoff exponencial no polling de status de jobs. Ex: 1s, 2s, 4s, 8s, max 15s.
+- [x] Task 11: XD-PERF-03 -- Considerar Server-Sent Events (SSE) como alternativa ao polling para jobs de longa duracao.
+- [x] Task 12: XD-PERF-03 -- Medir reducao de requests (meta: reducao de 60-80%).
 
 #### Acessibilidade
 
-- [ ] Task 13: UXD-023 -- Aumentar timeout de confirmacao de delete de 3s para 15-20s, ou remover timeout e manter dialog ate acao explicita do usuario.
+- [x] Task 13: UXD-023 -- Aumentar timeout de confirmacao de delete de 3s para 15-20s, ou remover timeout e manter dialog ate acao explicita do usuario.
 
 ### Criterios de Aceite
 
-- [ ] `dangerouslySetInnerHTML` para tema removido ou protegido com nonce/hash
-- [ ] CSP header presente em todas as respostas (verificar com curl)
-- [ ] HSTS header presente com max-age >= 31536000
-- [ ] Referrer-Policy e Permissions-Policy presentes
-- [ ] Nenhum flash de tema visivel em nenhum dos 5 temas
-- [ ] Resultados paginados (max 20 por pagina por default)
-- [ ] Polling usa backoff exponencial (verificar em network tab do DevTools)
-- [ ] Reducao mensuravel de requests de polling (>50%)
-- [ ] Timeout de delete >= 15s ou sem timeout automatico
-- [ ] WCAG 2.2.1 (timing) atendido para confirmacao de delete
+- [x] `dangerouslySetInnerHTML` para tema removido ou protegido com nonce/hash
+- [x] CSP header presente em todas as respostas (verificar com curl)
+- [x] HSTS header presente com max-age >= 31536000
+- [x] Referrer-Policy e Permissions-Policy presentes
+- [x] Nenhum flash de tema visivel em nenhum dos 5 temas
+- [x] Resultados paginados (max 20 por pagina por default)
+- [x] Polling usa backoff exponencial (verificar em network tab do DevTools)
+- [x] Reducao mensuravel de requests de polling (>50%)
+- [x] Timeout de delete >= 15s ou sem timeout automatico
+- [x] WCAG 2.2.1 (timing) atendido para confirmacao de delete
 
 ### Testes Requeridos
 
-- [ ] Teste unitario: paginacao backend -- parametros, defaults, limites
-- [ ] Teste unitario: componente de paginacao frontend -- navegacao, estados
-- [ ] Teste unitario: backoff exponencial -- intervalos crescentes, max cap
-- [ ] Teste unitario: timeout de delete -- timeout correto ou sem auto-dismiss
+- [x] Teste unitario: paginacao backend -- parametros, defaults, limites
+- [x] Teste unitario: componente de paginacao frontend -- navegacao, estados
+- [x] Teste unitario: backoff exponencial -- intervalos crescentes, max cap
+- [x] Teste unitario: timeout de delete -- timeout correto ou sem auto-dismiss
 - [ ] Teste E2E: busca com paginacao -- navegar entre paginas
-- [ ] Teste de seguranca: CSP bloqueia inline scripts nao-autorizados
-- [ ] Teste de seguranca: headers de seguranca presentes (script automatizado)
-- [ ] Teste visual: sem flash de tema em reload em todos os 5 temas
-- [ ] Teste de performance: 500+ resultados paginados sem degradacao
+- [x] Teste de seguranca: CSP bloqueia inline scripts nao-autorizados
+- [x] Teste de seguranca: headers de seguranca presentes (script automatizado)
+- [x] Teste visual: sem flash de tema em reload em todos os 5 temas
+- [x] Teste de performance: 500+ resultados paginados sem degradacao
 
 ### Estimativa
 
@@ -98,8 +98,8 @@ Resolver debitos de frontend que afetam seguranca (eliminar vetor XSS para habil
 
 ### Definition of Done
 
-- [ ] Codigo implementado
-- [ ] Testes passando
+- [x] Codigo implementado
+- [x] Testes passando
 - [ ] Review aprovado
 - [ ] Deploy em staging
 - [ ] QA aprovado

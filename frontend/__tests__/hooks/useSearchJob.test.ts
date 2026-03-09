@@ -193,7 +193,7 @@ describe('useSearchJob', () => {
       });
 
       await act(async () => {
-        jest.advanceTimersByTime(2100);
+        jest.advanceTimersByTime(1100);
       });
 
       expect(result.current.loading).toBe(false);

@@ -69,9 +69,11 @@ def _reset_job_store():
     """Clear the test job store before and after every test."""
     _test_job_store._jobs.clear()
     _test_job_store._excel.clear()
+    _test_job_store._items.clear()
     yield
     _test_job_store._jobs.clear()
     _test_job_store._excel.clear()
+    _test_job_store._items.clear()
 
 
 @pytest.fixture()

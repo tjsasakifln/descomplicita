@@ -532,6 +532,9 @@ async def run_search_job(
             ),
         )
 
+        # Store filtered items for paginated retrieval (TD-M02)
+        await job_store.store_items(job_id, licitacoes_filtradas)
+
         logger.info(
             "[job=%s] Filtering complete: %s/%s bids passed",
             job_id, len(licitacoes_filtradas), len(licitacoes_raw),
@@ -774,6 +777,41 @@ async def job_result(
             content={"job_id": job_id, "status": job.status},
             status_code=202,
         )
+
+
+@app.get("/buscar/{job_id}/items")
+@limiter.limit("30/minute")
+async def job_items(
+    job_id: str,
+    request: Request,
+    page: int = 1,
+    page_size: int = 20,
+    job_store=Depends(get_job_store),
+):
+    """Return paginated items from a completed search job (TD-M02)."""
+    if page < 1:
+        raise HTTPException(status_code=400, detail="page must be >= 1")
+    if page_size < 1 or page_size > 100:
+        raise HTTPException(
+            status_code=400, detail="page_size must be between 1 and 100"
+        )
+
+    job = await job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "completed":
+        raise HTTPException(status_code=409, detail="Job not yet completed")
+
+    items, total = await job_store.get_items_page(job_id, page, page_size)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total_items": total,
+        "total_pages": total_pages,
+    }
 
 
 @app.get("/buscar/{job_id}/download")

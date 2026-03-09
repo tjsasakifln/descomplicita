@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Fahkwang, DM_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AnalyticsProvider } from "./components/AnalyticsProvider";
@@ -37,30 +38,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning className={`${dmSans.variable} ${fahkwang.variable} ${dmMono.variable}`}>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                const theme = localStorage.getItem('descomplicita-theme');
-                if (!theme) return;
-                if (theme === 'dark' || theme === 'dim') {
-                  document.documentElement.classList.add('dark');
-                }
-                if (theme === 'paperwhite') {
-                  document.documentElement.style.setProperty('--canvas', '#F5F0E8');
-                } else if (theme === 'sepia') {
-                  document.documentElement.style.setProperty('--canvas', '#EDE0CC');
-                } else if (theme === 'dim') {
-                  document.documentElement.style.setProperty('--canvas', '#2A2A2E');
-                  document.documentElement.style.setProperty('--ink', '#e0e0e0');
-                } else if (theme === 'dark') {
-                  document.documentElement.style.setProperty('--canvas', '#121212');
-                  document.documentElement.style.setProperty('--ink', '#e0e0e0');
-                }
-              } catch(e) {}
-            `,
-          }}
-        />
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body>
         <a

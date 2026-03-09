@@ -37,6 +37,10 @@ const EmptyState = dynamic(
   () => import("./components/EmptyState").then(mod => ({ default: mod.EmptyState })),
 );
 
+const ItemsList = dynamic(
+  () => import("./components/ItemsList").then(mod => ({ default: mod.ItemsList })),
+);
+
 export default function HomePage() {
   const { trackEvent } = useAnalytics();
   const { saveNewSearch, isMaxCapacity } = useSavedSearches();
@@ -165,6 +169,7 @@ export default function HomePage() {
         {hasResults && (
           <div className="mt-6 sm:mt-8 space-y-4 sm:space-y-6 animate-fade-in-up">
             <SearchSummary result={job.result!} />
+            <ItemsList jobId={job.result!.download_id} totalFiltered={job.result!.total_filtrado} />
             <SearchActions result={job.result!} rawCount={job.rawCount} sectorName={form.sectorName}
               downloadLoading={job.downloadLoading} downloadError={job.downloadError}
               isMaxCapacity={isMaxCapacity} onDownload={handleDownload} onSaveSearch={save.handleSaveSearch} />

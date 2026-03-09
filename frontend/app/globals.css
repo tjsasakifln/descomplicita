@@ -54,6 +54,17 @@
   --ring: #116dff;
 }
 
+/* Theme FOUC prevention via data-theme attribute (TD-M10) */
+html[data-theme="dark"],
+html[data-theme="dim"] {
+  color-scheme: dark;
+}
+
+html[data-theme="paperwhite"] { --canvas: #F5F0E8; }
+html[data-theme="sepia"] { --canvas: #EDE0CC; }
+html[data-theme="dim"] { --canvas: #2A2A2E; --ink: #e0e0e0; }
+html[data-theme="dark"] { --canvas: #121212; --ink: #e0e0e0; }
+
 /* Dark mode overrides */
 .dark {
   --canvas: #121212;

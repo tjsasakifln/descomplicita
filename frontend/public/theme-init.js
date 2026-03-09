@@ -1,0 +1,1 @@
+(function(){try{var t=localStorage.getItem('descomplicita-theme');if(t){document.documentElement.setAttribute('data-theme',t);if(t==='dark'||t==='dim')document.documentElement.classList.add('dark')}}catch(e){}})();

@@ -53,9 +53,10 @@ export function useSearchJob(
   const [itemsFiltered, setItemsFiltered] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jobIdRef = useRef<string | null>(null);
   const searchStartTimeRef = useRef<number>(0);
+  const pollCountRef = useRef<number>(0);
   const originalTitleRef = useRef<string>("");
 
   useEffect(() => {
@@ -64,13 +65,13 @@ export function useSearchJob(
 
   useEffect(() => {
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (pollingRef.current) clearTimeout(pollingRef.current);
     };
   }, []);
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
-      clearInterval(pollingRef.current);
+      clearTimeout(pollingRef.current);
       pollingRef.current = null;
     }
     jobIdRef.current = null;
@@ -132,12 +133,31 @@ export function useSearchJob(
     return data as BuscaResult;
   }, []);
 
+  /**
+   * Exponential backoff polling strategy:
+   * - Initial interval: 1000ms (1s)
+   * - Growth factor: 1.5x each poll
+   * - Maximum interval: 15000ms (15s)
+   * - Pattern: 1s, 1.5s, 2.25s, 3.375s, 5.06s, 7.59s, 11.39s, 15s, 15s...
+   * - Timeout: 10 minutes
+   *
+   * This reduces total poll requests by ~60-80% compared to a fixed 2s interval.
+   *
+   * Future optimization: Replace polling with Server-Sent Events (SSE) for
+   * real-time push-based progress updates from the backend. SSE would eliminate
+   * polling entirely and provide instant status updates.
+   */
   const startPolling = useCallback((jobId: string) => {
-    const POLL_INTERVAL = 2000;
+    const INITIAL_INTERVAL = 1000;
+    const MAX_INTERVAL = 15000;
+    const BACKOFF_FACTOR = 1.5;
     const POLL_TIMEOUT = 10 * 60 * 1000;
     const deadline = Date.now() + POLL_TIMEOUT;
 
-    pollingRef.current = setInterval(async () => {
+    let currentInterval = INITIAL_INTERVAL;
+    pollCountRef.current = 0;
+
+    const poll = async () => {
       if (Date.now() > deadline) {
         stopPolling();
         setError("A consulta excedeu o tempo limite. Tente com menos estados ou um periodo menor.");
@@ -146,9 +166,16 @@ export function useSearchJob(
         return;
       }
 
+      pollCountRef.current++;
+
       try {
         const statusRes = await fetch(`/api/buscar/status?job_id=${jobId}`);
-        if (!statusRes.ok) return;
+        if (!statusRes.ok) {
+          // Schedule next poll even on error
+          currentInterval = Math.min(currentInterval * BACKOFF_FACTOR, MAX_INTERVAL);
+          pollingRef.current = setTimeout(poll, currentInterval);
+          return;
+        }
 
         const statusData = await statusRes.json();
         const progress = statusData.progress || {};
@@ -184,6 +211,7 @@ export function useSearchJob(
                   : "0%",
                 valor_total: resultData.resumo?.valor_total || 0,
                 has_summary: !!resultData.resumo?.resumo_executivo,
+                poll_count: pollCountRef.current,
               });
             }
           } catch (e) {
@@ -192,16 +220,28 @@ export function useSearchJob(
             trackEvent("search_failed", {
               error_message: errorMessage,
               time_elapsed_ms: Date.now() - searchStartTimeRef.current,
+              poll_count: pollCountRef.current,
             });
           }
 
           setLoading(false);
           resetProgressState();
+          return;
         }
+
+        // Schedule next poll with backoff
+        currentInterval = Math.min(currentInterval * BACKOFF_FACTOR, MAX_INTERVAL);
+        pollingRef.current = setTimeout(poll, currentInterval);
+
       } catch {
-        // Network error — silently retry next interval
+        // Network error — retry with backoff
+        currentInterval = Math.min(currentInterval * BACKOFF_FACTOR, MAX_INTERVAL);
+        pollingRef.current = setTimeout(poll, currentInterval);
       }
-    }, POLL_INTERVAL);
+    };
+
+    // Start first poll
+    pollingRef.current = setTimeout(poll, currentInterval);
   }, [stopPolling, resetProgressState, fetchResult, trackEvent, notifyCompletion, requestNotificationPermission]);
 
   const buscar = useCallback(async (params: SearchSubmitParams) => {

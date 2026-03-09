@@ -39,6 +39,8 @@ export function SavedSearchesDropdown({
 
   const closeDropdown = useCallback(() => {
     setIsOpen(false);
+    setDeleteConfirmId(null);
+    setClearConfirm(false);
     triggerRef.current?.focus();
   }, []);
 
@@ -87,10 +89,8 @@ export function SavedSearchesDropdown({
         });
       }
     } else {
-      // First click - show confirmation
+      // First click - show confirmation; stays until user confirms, cancels, or closes dropdown
       setDeleteConfirmId(id);
-      // Auto-cancel after 3 seconds
-      setTimeout(() => setDeleteConfirmId(null), 3000);
     }
   };
 
@@ -160,7 +160,7 @@ export function SavedSearchesDropdown({
           {/* Backdrop */}
           <div
             className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
+            onClick={closeDropdown}
             aria-hidden="true"
           />
 
@@ -195,8 +195,8 @@ export function SavedSearchesDropdown({
                           setClearConfirm(false);
                           setIsOpen(false);
                         } else {
+                          // Show confirmation; stays until user confirms, cancels, or closes dropdown
                           setClearConfirm(true);
-                          setTimeout(() => setClearConfirm(false), 3000);
                         }
                       }}
                       className={`text-xs transition-colors ${
@@ -246,23 +246,35 @@ export function SavedSearchesDropdown({
                           </div>
                         </button>
 
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => handleDeleteSearch(search.id, search.name)}
-                          className={`flex-shrink-0 p-1.5 rounded transition-colors ${
-                            deleteConfirmId === search.id
-                              ? 'bg-error text-white'
-                              : 'text-ink-muted hover:text-error hover:bg-error-subtle'
-                          }`}
-                          type="button"
-                          aria-label={deleteConfirmId === search.id ? 'Confirmar exclusão' : 'Excluir busca'}
-                          title={deleteConfirmId === search.id ? 'Clique novamente para confirmar' : 'Excluir'}
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                        {/* Delete Button / Confirm + Cancel */}
+                        <div className="flex-shrink-0 flex items-center gap-1">
+                          {deleteConfirmId === search.id && (
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="text-xs text-ink-muted hover:text-ink px-1.5 py-1 rounded transition-colors"
+                              type="button"
+                              aria-label="Cancelar exclusão"
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteSearch(search.id, search.name)}
+                            className={`p-1.5 rounded transition-colors ${
+                              deleteConfirmId === search.id
+                                ? 'bg-error text-white'
+                                : 'text-ink-muted hover:text-error hover:bg-error-subtle'
+                            }`}
+                            type="button"
+                            aria-label={deleteConfirmId === search.id ? 'Confirmar exclusão' : 'Excluir busca'}
+                            title={deleteConfirmId === search.id ? 'Clique novamente para confirmar' : 'Excluir'}
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

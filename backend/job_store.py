@@ -42,6 +42,7 @@ class JobStore:
         self.ttl = ttl
         self._jobs: Dict[str, SearchJob] = {}
         self._excel: Dict[str, bytes] = {}
+        self._items: Dict[str, list] = {}
         self._lock = asyncio.Lock()
 
     async def create(self, job_id: str) -> SearchJob:
@@ -163,3 +164,23 @@ class JobStore:
         """Retrieve stored Excel bytes for a job."""
         async with self._lock:
             return self._excel.get(job_id)
+
+    # ------------------------------------------------------------------
+    # Paginated items storage (TD-M02)
+    # ------------------------------------------------------------------
+
+    async def store_items(self, job_id: str, items: list) -> None:
+        """Store filtered items for paginated retrieval."""
+        async with self._lock:
+            self._items[job_id] = items
+
+    async def get_items_page(
+        self, job_id: str, page: int = 1, page_size: int = 20
+    ) -> tuple:
+        """Return a page of items and total count."""
+        async with self._lock:
+            items = self._items.get(job_id, [])
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return items[start:end], total

@@ -46,6 +46,7 @@ function applyTheme(themeId: ThemeId) {
   const config = THEMES.find(t => t.id === themeId) || THEMES[0];
   const root = document.documentElement;
 
+  root.setAttribute("data-theme", themeId);
   root.style.setProperty("--canvas", config.canvas);
   root.style.setProperty("--ink", config.ink);
 

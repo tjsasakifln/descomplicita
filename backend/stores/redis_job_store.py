@@ -184,3 +184,50 @@ class RedisJobStore(JobStore):
         except Exception as e:
             logger.warning("Failed to retrieve Excel for job %s: %s", job_id, e)
             return None
+
+    # ------------------------------------------------------------------
+    # Paginated items storage (TD-M02)
+    # ------------------------------------------------------------------
+
+    def _items_key(self, job_id: str) -> str:
+        return f"job:{job_id}:items"
+
+    async def store_items(self, job_id: str, items: list) -> None:
+        """Store filtered items for paginated retrieval in Redis."""
+        # Also store in-memory for the current process
+        await super().store_items(job_id, items)
+        try:
+            await self._redis.setex(
+                self._items_key(job_id),
+                self._redis_ttl,
+                json.dumps(items),
+            )
+            logger.debug("Items stored for job %s (%d items)", job_id, len(items))
+        except Exception as e:
+            logger.warning("Failed to store items for job %s: %s", job_id, e)
+
+    async def get_items_page(
+        self, job_id: str, page: int = 1, page_size: int = 20
+    ) -> tuple:
+        """Return a page of items and total count.
+
+        Tries in-memory first, falls back to Redis.
+        """
+        # Try in-memory first
+        items_page, total = await super().get_items_page(job_id, page, page_size)
+        if total > 0:
+            return items_page, total
+
+        # Fallback to Redis
+        try:
+            raw = await self._redis.get(self._items_key(job_id))
+            if not raw:
+                return [], 0
+            items = json.loads(raw)
+            total = len(items)
+            start = (page - 1) * page_size
+            end = start + page_size
+            return items[start:end], total
+        except Exception as e:
+            logger.warning("Failed to retrieve items for job %s: %s", job_id, e)
+            return [], 0
