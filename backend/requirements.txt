@@ -2,7 +2,7 @@
 # Core dependencies - PINNED for Railway compatibility
 # =============================================================================
 fastapi==0.135.1
-uvicorn==0.34.3
+uvicorn==0.41.0
 pydantic==2.12.5
 pydantic-settings==2.13.1
 starlette==0.52.1
