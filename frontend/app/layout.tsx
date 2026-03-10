@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AnalyticsProvider } from "./components/AnalyticsProvider";
 import { NetworkIndicator } from "./components/NetworkIndicator";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -50,12 +51,14 @@ export default function RootLayout({
         >
           Pular para o conteúdo principal
         </a>
-        <AnalyticsProvider>
-          <ThemeProvider>
-            <NetworkIndicator />
-            {children}
-          </ThemeProvider>
-        </AnalyticsProvider>
+        <AuthProvider>
+          <AnalyticsProvider>
+            <ThemeProvider>
+              <NetworkIndicator />
+              {children}
+            </ThemeProvider>
+          </AnalyticsProvider>
+        </AuthProvider>
       </body>
     </html>
   );

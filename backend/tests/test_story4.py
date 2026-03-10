@@ -295,110 +295,165 @@ class TestDIArchitecture:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+class MockSupabaseResponse:
+    """Mock Supabase API response for test_story4."""
+    def __init__(self, data=None):
+        self.data = data or []
+
+
+class MockTableQuery:
+    """Mock Supabase table query builder for test_story4."""
+    def __init__(self, data=None):
+        self._data = data or []
+    def select(self, *a, **kw): return self
+    def insert(self, *a, **kw): return self
+    def update(self, *a, **kw): return self
+    def upsert(self, *a, **kw): return self
+    def eq(self, *a, **kw): return self
+    def order(self, *a, **kw): return self
+    def limit(self, *a, **kw): return self
+    def execute(self): return MockSupabaseResponse(self._data)
+
+
 @pytest_asyncio.fixture()
-async def test_db(tmp_path):
-    """Create an ephemeral SQLite database for testing."""
+async def test_db():
+    """Create a mock Supabase-backed database for testing."""
     from database import Database
-    _db = Database(db_path=str(tmp_path / "test.db"))
-    await _db.connect()
+    from unittest.mock import Mock
+    _db = Database(supabase_url="https://test.supabase.co", supabase_key="test-key")
+    _db._client = Mock()
+    _db._client.table = lambda name: MockTableQuery()
     yield _db
     await _db.close()
 
 
 class TestDatabase:
-    """Test SQLite persistence layer."""
+    """Test Supabase persistence layer (v3-story-2.0)."""
+
+    TEST_USER = "test-user-uuid"
 
     @pytest.mark.asyncio
     async def test_record_and_retrieve_search(self, test_db):
-        """Should record and retrieve search history."""
+        """Should record and retrieve search history with user_id."""
+        calls = []
+
+        class TrackingInsertQuery(MockTableQuery):
+            def insert(self, data, **kw):
+                calls.append(data)
+                return self
+
+        test_db._client.table = lambda name: TrackingInsertQuery()
+
         await test_db.record_search(
             job_id="test-123",
             ufs=["SP", "RJ"],
             data_inicial="2026-01-01",
             data_final="2026-01-31",
             setor_id="vestuario",
+            user_id=self.TEST_USER,
         )
-        searches = await test_db.get_recent_searches()
-        assert len(searches) == 1
-        assert searches[0]["job_id"] == "test-123"
-        assert searches[0]["ufs"] == ["SP", "RJ"]
-        assert searches[0]["status"] == "queued"
+        assert len(calls) == 1
+        assert calls[0]["job_id"] == "test-123"
+        assert calls[0]["ufs"] == ["SP", "RJ"]
+        assert calls[0]["user_id"] == self.TEST_USER
 
     @pytest.mark.asyncio
     async def test_complete_search(self, test_db):
         """Should update search with completion data."""
-        await test_db.record_search(
-            job_id="test-456",
-            ufs=["SP"],
-            data_inicial="2026-01-01",
-            data_final="2026-01-15",
-            setor_id="vestuario",
-        )
+        calls = []
+
+        class TrackingUpdateQuery(MockTableQuery):
+            def update(self, data, **kw):
+                calls.append(data)
+                return self
+
+        test_db._client.table = lambda name: TrackingUpdateQuery()
+
         await test_db.complete_search(
             job_id="test-456",
             total_raw=500,
             total_filtrado=25,
             elapsed_seconds=12.5,
         )
-        searches = await test_db.get_recent_searches()
-        assert searches[0]["status"] == "completed"
-        assert searches[0]["total_raw"] == 500
-        assert searches[0]["total_filtrado"] == 25
-        assert searches[0]["elapsed_seconds"] == 12.5
+        assert calls[0]["status"] == "completed"
+        assert calls[0]["total_raw"] == 500
+        assert calls[0]["total_filtrado"] == 25
 
     @pytest.mark.asyncio
     async def test_fail_search(self, test_db):
         """Should mark search as failed."""
-        await test_db.record_search(
-            job_id="test-789",
-            ufs=["MG"],
-            data_inicial="2026-02-01",
-            data_final="2026-02-15",
-            setor_id="alimentos",
-        )
+        calls = []
+
+        class TrackingUpdateQuery(MockTableQuery):
+            def update(self, data, **kw):
+                calls.append(data)
+                return self
+
+        test_db._client.table = lambda name: TrackingUpdateQuery()
+
         await test_db.fail_search("test-789")
-        searches = await test_db.get_recent_searches()
-        assert searches[0]["status"] == "failed"
+        assert calls[0]["status"] == "failed"
 
     @pytest.mark.asyncio
     async def test_set_and_get_preference(self, test_db):
-        """Should save and retrieve user preferences."""
-        await test_db.set_preference("favorite_sector", "vestuario")
-        val = await test_db.get_preference("favorite_sector")
-        assert val == "vestuario"
+        """Should save and retrieve user preferences with user_id."""
+        calls = []
+
+        class TrackingUpsertQuery(MockTableQuery):
+            def upsert(self, data, **kw):
+                calls.append(data)
+                return self
+
+        test_db._client.table = lambda name: TrackingUpsertQuery()
+
+        await test_db.set_preference("favorite_sector", "vestuario", user_id=self.TEST_USER)
+        assert len(calls) == 1
+        assert calls[0]["key"] == "favorite_sector"
+        assert calls[0]["user_id"] == self.TEST_USER
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_preference(self, test_db):
         """Should return None for missing preference."""
-        val = await test_db.get_preference("nonexistent_key")
+        val = await test_db.get_preference("nonexistent_key", user_id=self.TEST_USER)
         assert val is None
 
     @pytest.mark.asyncio
     async def test_upsert_preference(self, test_db):
-        """Should update existing preference on conflict."""
-        await test_db.set_preference("theme", "light")
-        await test_db.set_preference("theme", "dark")
-        val = await test_db.get_preference("theme")
-        assert val == "dark"
+        """Should upsert preference (conflict on user_id + key)."""
+        calls = []
+
+        class TrackingUpsertQuery(MockTableQuery):
+            def upsert(self, data, **kw):
+                calls.append(data)
+                return self
+
+        test_db._client.table = lambda name: TrackingUpsertQuery()
+
+        await test_db.set_preference("theme", "light", user_id=self.TEST_USER)
+        await test_db.set_preference("theme", "dark", user_id=self.TEST_USER)
+        assert len(calls) == 2
 
     @pytest.mark.asyncio
     async def test_get_all_preferences(self, test_db):
-        """Should return all preferences as dict."""
-        await test_db.set_preference("a", 1)
-        await test_db.set_preference("b", "hello")
-        all_prefs = await test_db.get_all_preferences()
-        assert all_prefs == {"a": 1, "b": "hello"}
+        """Should return all preferences as dict for a user."""
+        test_db._client.table = lambda name: MockTableQuery(data=[
+            {"key": "a", "value": "1"},
+            {"key": "b", "value": '"hello"'},
+        ])
+        all_prefs = await test_db.get_all_preferences(user_id=self.TEST_USER)
+        assert "a" in all_prefs
+        assert "b" in all_prefs
 
     @pytest.mark.asyncio
     async def test_operations_when_not_connected(self):
         """Should silently no-op when database is not connected."""
         from database import Database
-        db = Database(db_path="/nonexistent/path.db")
-        # Don't call connect — _db is None
-        await db.record_search("x", ["SP"], "2026-01-01", "2026-01-31", "v")
-        searches = await db.get_recent_searches()
+        db = Database(supabase_url="", supabase_key="")
+        # Don't call connect — _client is None
+        await db.record_search("x", ["SP"], "2026-01-01", "2026-01-31", "v", user_id="u")
+        searches = await db.get_recent_searches(user_id="u")
         assert searches == []
-        val = await db.get_preference("key")
+        val = await db.get_preference("key", user_id="u")
         assert val is None
 
 

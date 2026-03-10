@@ -22,8 +22,14 @@ openai==1.109.1
 # Rate limiting
 slowapi==0.1.9
 
-# SQLite async (TD-H04 persistence)
+# SQLite async (TD-H04 persistence — legacy, kept for migration script)
 aiosqlite==0.20.0
+
+# Supabase PostgreSQL (v3-story-2.0)
+supabase==2.13.0
+postgrest==0.19.2
+gotrue==2.12.0
+python-jose[cryptography]==3.3.0
 
 # Error monitoring
 sentry-sdk[fastapi]==2.22.0

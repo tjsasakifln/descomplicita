@@ -1,85 +1,99 @@
-"""Minimal persistence layer using SQLite (TD-H04).
+"""Persistence layer using Supabase PostgreSQL (v3-story-2.0).
 
-Provides lightweight persistence for:
-- Search history (who searched what, when)
-- User preferences (saved searches, favorite sectors)
+Replaces the SQLite ephemeral storage (TD-H04) with Supabase for:
+- Search history (per-user, with RLS)
+- User preferences (per-user key-value store)
 
 Design decisions:
-- SQLite chosen for zero-cost POC (no external service needed)
-- aiosqlite for async compatibility with FastAPI
-- File-based storage at DATA_DIR/descomplicita.db
-- Compatible with Railway/Vercel (ephemeral storage is acceptable for POC)
-- Future migration path: Supabase PostgreSQL for production persistence
+- supabase-py client with service role key for backend operations
+- user_id required on all mutations (multi-tenant isolation DB-001)
+- RLS policies enforce isolation at DB level as defense-in-depth
+- Graceful fallback: if Supabase unavailable, operations return empty/None
+- SQLite compatibility maintained in method signatures for smooth migration
 """
 
-import asyncio
 import json
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-import aiosqlite
-
 logger = logging.getLogger(__name__)
 
-# Database file location (configurable via env)
-DATA_DIR = os.getenv("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.getenv("DATABASE_URL", os.path.join(DATA_DIR, "descomplicita.db"))
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS search_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id TEXT NOT NULL UNIQUE,
-    ufs TEXT NOT NULL,
-    data_inicial TEXT NOT NULL,
-    data_final TEXT NOT NULL,
-    setor_id TEXT NOT NULL,
-    termos_busca TEXT,
-    total_raw INTEGER DEFAULT 0,
-    total_filtrado INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'queued',
-    created_at TEXT NOT NULL,
-    completed_at TEXT,
-    elapsed_seconds REAL
-);
-
-CREATE TABLE IF NOT EXISTS user_preferences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    key TEXT NOT NULL UNIQUE,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_search_history_created
-    ON search_history(created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_search_history_setor
-    ON search_history(setor_id);
-"""
+# Supabase configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 
 class Database:
-    """Async SQLite database for search history and preferences."""
+    """Supabase PostgreSQL database for search history and preferences."""
 
-    def __init__(self, db_path: str = DB_PATH) -> None:
-        self.db_path = db_path
-        self._db: Optional[aiosqlite.Connection] = None
+    def __init__(
+        self,
+        supabase_url: str = SUPABASE_URL,
+        supabase_key: str = SUPABASE_SERVICE_ROLE_KEY,
+    ) -> None:
+        self.supabase_url = supabase_url
+        self.supabase_key = supabase_key
+        self._client = None
 
     async def connect(self) -> None:
-        """Open database connection and create schema."""
-        self._db = await aiosqlite.connect(self.db_path)
-        self._db.row_factory = aiosqlite.Row
-        await self._db.executescript(_SCHEMA_SQL)
-        await self._db.commit()
-        logger.info("Database connected: %s", self.db_path)
+        """Initialize Supabase client."""
+        if not self.supabase_url or not self.supabase_key:
+            logger.warning(
+                "Supabase not configured (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing). "
+                "Database persistence disabled."
+            )
+            return
+
+        try:
+            from supabase import create_client
+
+            self._client = create_client(self.supabase_url, self.supabase_key)
+            # Verify connectivity with a simple query
+            self._client.table("users").select("id").limit(1).execute()
+            logger.info("Supabase connected: %s", self.supabase_url)
+        except Exception as e:
+            logger.warning("Supabase connection failed (%s), persistence disabled", e)
+            self._client = None
 
     async def close(self) -> None:
-        """Close database connection."""
-        if self._db:
-            await self._db.close()
-            self._db = None
-            logger.info("Database connection closed")
+        """Close Supabase client (no-op, HTTP client is stateless)."""
+        self._client = None
+        logger.info("Supabase client released")
+
+    @property
+    def is_connected(self) -> bool:
+        """Check if database client is available."""
+        return self._client is not None
+
+    # --- User Management ---
+
+    async def get_or_create_user(self, user_id: str, email: str = "") -> Optional[dict]:
+        """Get existing user or create a new profile entry.
+
+        The auto-trigger on auth.users handles creation on signup,
+        but this is a fallback for edge cases.
+        """
+        if not self._client:
+            return None
+        try:
+            result = self._client.table("users").select("*").eq("id", user_id).execute()
+            if result.data:
+                return result.data[0]
+
+            # Create user profile if not exists (fallback)
+            if email:
+                result = self._client.table("users").insert({
+                    "id": user_id,
+                    "email": email,
+                    "display_name": email.split("@")[0],
+                }).execute()
+                return result.data[0] if result.data else None
+            return None
+        except Exception as e:
+            logger.warning("Failed to get/create user %s: %s", user_id, e)
+            return None
 
     # --- Search History ---
 
@@ -91,25 +105,27 @@ class Database:
         data_final: str,
         setor_id: str,
         termos_busca: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         """Record a new search job in history."""
-        if not self._db:
+        if not self._client:
             return
-        await self._db.execute(
-            """INSERT OR IGNORE INTO search_history
-               (job_id, ufs, data_inicial, data_final, setor_id, termos_busca, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                job_id,
-                json.dumps(ufs),
-                data_inicial,
-                data_final,
-                setor_id,
-                termos_busca,
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        await self._db.commit()
+        if not user_id:
+            logger.debug("Skipping record_search: no user_id")
+            return
+        try:
+            self._client.table("search_history").insert({
+                "user_id": user_id,
+                "job_id": job_id,
+                "ufs": ufs,
+                "data_inicial": data_inicial,
+                "data_final": data_final,
+                "setor_id": setor_id,
+                "termos_busca": termos_busca,
+                "status": "queued",
+            }).execute()
+        except Exception as e:
+            logger.warning("Failed to record search %s: %s", job_id, e)
 
     async def complete_search(
         self,
@@ -119,98 +135,122 @@ class Database:
         elapsed_seconds: float,
     ) -> None:
         """Update search history with completion data."""
-        if not self._db:
+        if not self._client:
             return
-        await self._db.execute(
-            """UPDATE search_history
-               SET status='completed', total_raw=?, total_filtrado=?,
-                   elapsed_seconds=?, completed_at=?
-               WHERE job_id=?""",
-            (
-                total_raw,
-                total_filtrado,
-                round(elapsed_seconds, 2),
-                datetime.now(timezone.utc).isoformat(),
-                job_id,
-            ),
-        )
-        await self._db.commit()
+        try:
+            self._client.table("search_history").update({
+                "status": "completed",
+                "total_raw": total_raw,
+                "total_filtrado": total_filtrado,
+                "elapsed_seconds": round(elapsed_seconds, 2),
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("job_id", job_id).execute()
+        except Exception as e:
+            logger.warning("Failed to complete search %s: %s", job_id, e)
 
     async def fail_search(self, job_id: str) -> None:
         """Mark a search as failed in history."""
-        if not self._db:
+        if not self._client:
             return
-        await self._db.execute(
-            """UPDATE search_history SET status='failed', completed_at=? WHERE job_id=?""",
-            (datetime.now(timezone.utc).isoformat(), job_id),
-        )
-        await self._db.commit()
+        try:
+            self._client.table("search_history").update({
+                "status": "failed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("job_id", job_id).execute()
+        except Exception as e:
+            logger.warning("Failed to mark search %s as failed: %s", job_id, e)
 
-    async def get_recent_searches(self, limit: int = 20) -> list[dict[str, Any]]:
-        """Get recent search history."""
-        if not self._db:
+    async def get_recent_searches(
+        self,
+        limit: int = 20,
+        user_id: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """Get recent search history for a specific user."""
+        if not self._client:
             return []
-        cursor = await self._db.execute(
-            """SELECT job_id, ufs, data_inicial, data_final, setor_id,
-                      termos_busca, total_raw, total_filtrado, status,
-                      created_at, elapsed_seconds
-               FROM search_history ORDER BY created_at DESC LIMIT ?""",
-            (limit,),
-        )
-        rows = await cursor.fetchall()
-        return [
-            {
-                "job_id": row["job_id"],
-                "ufs": json.loads(row["ufs"]),
-                "data_inicial": row["data_inicial"],
-                "data_final": row["data_final"],
-                "setor_id": row["setor_id"],
-                "termos_busca": row["termos_busca"],
-                "total_raw": row["total_raw"],
-                "total_filtrado": row["total_filtrado"],
-                "status": row["status"],
-                "created_at": row["created_at"],
-                "elapsed_seconds": row["elapsed_seconds"],
-            }
-            for row in rows
-        ]
+        if not user_id:
+            return []
+        try:
+            result = (
+                self._client.table("search_history")
+                .select(
+                    "job_id, ufs, data_inicial, data_final, setor_id, "
+                    "termos_busca, total_raw, total_filtrado, status, "
+                    "created_at, elapsed_seconds"
+                )
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
+        except Exception as e:
+            logger.warning("Failed to get recent searches: %s", e)
+            return []
 
     # --- User Preferences ---
 
-    async def set_preference(self, key: str, value: Any) -> None:
+    async def set_preference(
+        self,
+        key: str,
+        value: Any,
+        user_id: Optional[str] = None,
+    ) -> None:
         """Set a user preference (upsert)."""
-        if not self._db:
+        if not self._client or not user_id:
             return
-        await self._db.execute(
-            """INSERT INTO user_preferences (key, value, updated_at)
-               VALUES (?, ?, ?)
-               ON CONFLICT(key) DO UPDATE SET value=?, updated_at=?""",
-            (
-                key,
-                json.dumps(value),
-                datetime.now(timezone.utc).isoformat(),
-                json.dumps(value),
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        await self._db.commit()
+        try:
+            self._client.table("user_preferences").upsert({
+                "user_id": user_id,
+                "key": key,
+                "value": json.dumps(value) if not isinstance(value, (dict, list)) else value,
+            }, on_conflict="user_id,key").execute()
+        except Exception as e:
+            logger.warning("Failed to set preference %s: %s", key, e)
 
-    async def get_preference(self, key: str) -> Optional[Any]:
+    async def get_preference(
+        self,
+        key: str,
+        user_id: Optional[str] = None,
+    ) -> Optional[Any]:
         """Get a user preference by key."""
-        if not self._db:
+        if not self._client or not user_id:
             return None
-        cursor = await self._db.execute(
-            "SELECT value FROM user_preferences WHERE key=?", (key,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return json.loads(row["value"])
-        return None
+        try:
+            result = (
+                self._client.table("user_preferences")
+                .select("value")
+                .eq("user_id", user_id)
+                .eq("key", key)
+                .execute()
+            )
+            if result.data:
+                val = result.data[0]["value"]
+                return json.loads(val) if isinstance(val, str) else val
+            return None
+        except Exception as e:
+            logger.warning("Failed to get preference %s: %s", key, e)
+            return None
 
-    async def get_all_preferences(self) -> dict[str, Any]:
+    async def get_all_preferences(
+        self,
+        user_id: Optional[str] = None,
+    ) -> dict[str, Any]:
         """Get all user preferences as a dict."""
-        if not self._db:
+        if not self._client or not user_id:
             return {}
-        cursor = await self._db.execute("SELECT key, value FROM user_preferences")
-        rows = await cursor.fetchall()
-        return {row["key"]: json.loads(row["value"]) for row in rows}
+        try:
+            result = (
+                self._client.table("user_preferences")
+                .select("key, value")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            prefs = {}
+            for row in result.data or []:
+                val = row["value"]
+                prefs[row["key"]] = json.loads(val) if isinstance(val, str) else val
+            return prefs
+        except Exception as e:
+            logger.warning("Failed to get all preferences: %s", e)
+            return {}

@@ -1,9 +1,11 @@
-"""FastAPI dependency injection providers (TD-013 / TD-M05).
+"""FastAPI dependency injection providers (TD-013 / TD-M05 / v3-story-2.0).
 
 Refactored from module-level globals to a centralized AppState class.
 All state is encapsulated; dependency functions access it through
 get_app_state() which is overridable via FastAPI's dependency_overrides
 for clean test injection.
+
+v3-story-2.0: Database now uses Supabase PostgreSQL instead of SQLite.
 """
 
 import asyncio
@@ -91,7 +93,7 @@ class AppState:
         # --- Durable Task Runner (TD-H02) ---
         self.task_runner = DurableTaskRunner(redis=self.redis)
 
-        # --- Database (TD-H04) ---
+        # --- Database (v3-story-2.0: Supabase PostgreSQL) ---
         try:
             self.database = Database()
             await self.database.connect()

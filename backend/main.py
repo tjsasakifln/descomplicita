@@ -1,8 +1,13 @@
 """
-Descomplicita POC - Backend API
+Descomplicita Backend API (v3-story-2.0: Supabase Migration)
 
 FastAPI application for searching and analyzing uniform procurement bids
 from Brazil's PNCP (Portal Nacional de Contratações Públicas).
+
+v3-story-2.0 changes:
+- Supabase Auth integration (signup, login, token refresh)
+- user_id attached to all search operations (DB-001 multi-tenant isolation)
+- Legacy auth (custom JWT, API key) still supported during transition
 """
 
 import asyncio
@@ -17,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import Optional
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +32,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from auth.jwt import JWTError, generate_token, validate_token
+from auth.supabase_auth import SupabaseAuthError
 from config import setup_logging, MAX_DATE_RANGE_DAYS, MAX_DOWNLOAD_SIZE
 from error_codes import ErrorCode, error_response
 from middleware.auth import APIKeyMiddleware
@@ -247,6 +254,19 @@ def parse_multi_word_terms(raw: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# User identity helper (v3-story-2.0 / DB-001)
+# ---------------------------------------------------------------------------
+
+def get_user_id(request: Request) -> Optional[str]:
+    """Extract user_id from request state (set by auth middleware).
+
+    Returns the Supabase user UUID if authenticated via Supabase Auth,
+    or None for legacy auth methods (custom JWT, API key).
+    """
+    return getattr(request.state, "user_id", None)
+
+
+# ---------------------------------------------------------------------------
 # Public endpoints
 # ---------------------------------------------------------------------------
 
@@ -330,6 +350,173 @@ async def auth_token(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Supabase Auth endpoints (v3-story-2.0 / Task 6)
+# ---------------------------------------------------------------------------
+
+@app.post("/auth/signup")
+async def auth_signup(request: Request, database=Depends(get_database)):
+    """Register a new user via Supabase Auth."""
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+
+    if not supabase_url or not supabase_key:
+        raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
+
+    body = await request.json()
+    email = body.get("email", "")
+    password = body.get("password", "")
+    display_name = body.get("display_name", "")
+
+    if not email or not password:
+        raise error_response(
+            ErrorCode.VALIDATION_ERROR, status_code=400,
+            message="Email and password are required",
+        )
+
+    try:
+        from supabase import create_client
+        client = create_client(supabase_url, supabase_key)
+        result = client.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {
+                "data": {"display_name": display_name or email.split("@")[0]},
+            },
+        })
+
+        if result.user:
+            return {
+                "user": {
+                    "id": str(result.user.id),
+                    "email": result.user.email,
+                },
+                "session": {
+                    "access_token": result.session.access_token if result.session else None,
+                    "refresh_token": result.session.refresh_token if result.session else None,
+                    "expires_in": result.session.expires_in if result.session else None,
+                } if result.session else None,
+                "message": "Signup successful" + (
+                    ". Check your email for confirmation." if not result.session else ""
+                ),
+            }
+        else:
+            raise error_response(
+                ErrorCode.AUTH_INVALID_KEY, status_code=400,
+                message="Signup failed",
+            )
+    except error_response.__class__:
+        raise
+    except Exception as e:
+        logger.warning("Signup failed: %s", e)
+        raise error_response(
+            ErrorCode.INTERNAL_ERROR, status_code=500,
+            message=f"Signup failed: {e}",
+        )
+
+
+@app.post("/auth/login")
+async def auth_login(request: Request):
+    """Authenticate user via Supabase Auth (email/password)."""
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+
+    if not supabase_url or not supabase_key:
+        raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
+
+    body = await request.json()
+    email = body.get("email", "")
+    password = body.get("password", "")
+
+    if not email or not password:
+        raise error_response(
+            ErrorCode.VALIDATION_ERROR, status_code=400,
+            message="Email and password are required",
+        )
+
+    try:
+        from supabase import create_client
+        client = create_client(supabase_url, supabase_key)
+        result = client.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+
+        if result.session:
+            return {
+                "user": {
+                    "id": str(result.user.id),
+                    "email": result.user.email,
+                },
+                "session": {
+                    "access_token": result.session.access_token,
+                    "refresh_token": result.session.refresh_token,
+                    "expires_in": result.session.expires_in,
+                    "token_type": "bearer",
+                },
+            }
+        else:
+            raise error_response(
+                ErrorCode.AUTH_INVALID_KEY, status_code=401,
+                message="Invalid credentials",
+            )
+    except error_response.__class__:
+        raise
+    except Exception as e:
+        logger.warning("Login failed: %s", e)
+        raise error_response(
+            ErrorCode.AUTH_INVALID_KEY, status_code=401,
+            message="Invalid credentials",
+        )
+
+
+@app.post("/auth/refresh")
+async def auth_refresh(request: Request):
+    """Refresh an expired Supabase Auth session."""
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+
+    if not supabase_url or not supabase_key:
+        raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
+
+    body = await request.json()
+    refresh_token = body.get("refresh_token", "")
+
+    if not refresh_token:
+        raise error_response(
+            ErrorCode.VALIDATION_ERROR, status_code=400,
+            message="refresh_token is required",
+        )
+
+    try:
+        from supabase import create_client
+        client = create_client(supabase_url, supabase_key)
+        result = client.auth.refresh_session(refresh_token)
+
+        if result.session:
+            return {
+                "session": {
+                    "access_token": result.session.access_token,
+                    "refresh_token": result.session.refresh_token,
+                    "expires_in": result.session.expires_in,
+                    "token_type": "bearer",
+                },
+            }
+        else:
+            raise error_response(
+                ErrorCode.AUTH_INVALID_KEY, status_code=401,
+                message="Invalid refresh token",
+            )
+    except error_response.__class__:
+        raise
+    except Exception as e:
+        logger.warning("Token refresh failed: %s", e)
+        raise error_response(
+            ErrorCode.AUTH_INVALID_KEY, status_code=401,
+            message="Invalid refresh token",
+        )
+
+
+# ---------------------------------------------------------------------------
 # Debug endpoints
 # ---------------------------------------------------------------------------
 
@@ -410,7 +597,10 @@ async def buscar_licitacoes(
     job_id = str(uuid.uuid4())
     await job_store.create(job_id)
 
-    # TD-H04: Record search in persistent history
+    # v3-story-2.0: Extract user_id for multi-tenant isolation (DB-001)
+    user_id = get_user_id(request)
+
+    # TD-H04: Record search in persistent history (now with user_id)
     if database:
         await database.record_search(
             job_id=job_id,
@@ -419,6 +609,7 @@ async def buscar_licitacoes(
             data_final=body.data_final,
             setor_id=body.setor_id,
             termos_busca=body.termos_busca,
+            user_id=user_id,
         )
 
     # Enqueue via durable task runner (TD-H02) instead of asyncio.create_task
@@ -915,13 +1106,15 @@ async def job_download(
 
 @app.get("/search-history")
 async def search_history(
+    request: Request,
     limit: int = 20,
     database=Depends(get_database),
 ):
-    """Return recent search history from persistent database."""
+    """Return recent search history from persistent database (per-user)."""
     if not database:
         return {"searches": [], "message": "Database not configured"}
-    searches = await database.get_recent_searches(limit=min(limit, 100))
+    user_id = get_user_id(request)
+    searches = await database.get_recent_searches(limit=min(limit, 100), user_id=user_id)
     return {"searches": searches}
 
 
@@ -942,6 +1135,9 @@ v1_router.add_api_route("/buscar/{job_id}/download", job_download, methods=["GET
 v1_router.add_api_route("/setores", listar_setores, methods=["GET"])
 v1_router.add_api_route("/health", health, methods=["GET"])
 v1_router.add_api_route("/auth/token", auth_token, methods=["POST"])
+v1_router.add_api_route("/auth/signup", auth_signup, methods=["POST"])
+v1_router.add_api_route("/auth/login", auth_login, methods=["POST"])
+v1_router.add_api_route("/auth/refresh", auth_refresh, methods=["POST"])
 v1_router.add_api_route("/search-history", search_history, methods=["GET"])
 
 app.include_router(v1_router)
