@@ -21,10 +21,15 @@ from auth.supabase_auth import SupabaseAuthError, validate_supabase_token
 
 logger = logging.getLogger(__name__)
 
-# Paths that bypass authentication
+# Paths that bypass authentication entirely (no request.state setup)
 PUBLIC_PATHS = {
     "/health", "/docs", "/redoc", "/openapi.json",
     "/auth/token", "/auth/signup", "/auth/login", "/auth/refresh",
+}
+
+# Paths that allow anonymous access (auth is optional, user_id=None if unauthenticated)
+OPTIONAL_AUTH_PATHS = {
+    "/buscar", "/setores", "/search-history", "/exportar",
 }
 
 
@@ -113,7 +118,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                     content={"detail": "Invalid API key."},
                 )
 
-        # No valid auth provided
+        # No valid auth provided — allow anonymous for optional-auth paths
+        if clean_path in OPTIONAL_AUTH_PATHS:
+            request.state.user_id = None
+            request.state.user_sub = "anonymous"
+            request.state.auth_method = "none"
+            return await call_next(request)
+
         return JSONResponse(
             status_code=401,
             content={
