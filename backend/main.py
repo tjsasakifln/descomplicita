@@ -439,7 +439,13 @@ async def buscar_licitacoes(
         extra={"job_id": job_id, "ufs": body.ufs},
     )
 
-    return JobCreatedResponse(job_id=job_id, status="queued")
+    # Calculate expected duration for frontend timeout alignment
+    expected_seconds = 300 + max(0, len(body.ufs) - 5) * 15
+
+    return JSONResponse(
+        content={"job_id": job_id, "status": "queued"},
+        headers={"X-Expected-Duration": str(expected_seconds)},
+    )
 
 
 async def run_search_job(

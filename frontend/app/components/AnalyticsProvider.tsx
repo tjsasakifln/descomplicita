@@ -56,7 +56,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
             timestamp: new Date().toISOString(),
           });
         } catch {
-          // Silently fail
+          // Analytics must never break the app
+          void 0;
         }
       }
     };

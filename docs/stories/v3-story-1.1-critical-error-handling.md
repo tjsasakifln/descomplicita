@@ -21,23 +21,23 @@ Eliminar silent failures criticos no frontend: error swallowing na paginacao, ra
 
 ## Tasks
 
-- [ ] Task 1: FE-005 -- Substituir `catch {}` vazio em ItemsList.tsx por error state com mensagem e retry button inline
-- [ ] Task 2: FE-005 -- Adicionar error boundary para erros de rede vs erros de parsing, com mensagens diferenciadas
-- [ ] Task 3: FE-019 -- Implementar AbortController em fetchPage para cancelar requests anteriores ao navegar rapidamente entre paginas
-- [ ] Task 4: Timeout alignment -- Backend: enviar header `X-Expected-Duration` na resposta de /api/buscar
-- [ ] Task 5: Timeout alignment -- Frontend: useSearchJob.ts calcular POLL_TIMEOUT dinamicamente baseado em UFs selecionadas (formula: 300 + max(0, ufs-5)*15 + 60 segundos de margem)
-- [ ] Task 6: SYS-010 -- Adicionar timeout de 30s nas chamadas OpenAI (summary generation) com fallback graceful
-- [ ] Task 7: Adicionar lint rule (eslint no-empty no-catch) para prevenir reintroducao de catch {} vazios
+- [x] Task 1: FE-005 -- Substituir `catch {}` vazio em ItemsList.tsx por error state com mensagem e retry button inline
+- [x] Task 2: FE-005 -- Adicionar error boundary para erros de rede vs erros de parsing, com mensagens diferenciadas
+- [x] Task 3: FE-019 -- Implementar AbortController em fetchPage para cancelar requests anteriores ao navegar rapidamente entre paginas
+- [x] Task 4: Timeout alignment -- Backend: enviar header `X-Expected-Duration` na resposta de /api/buscar
+- [x] Task 5: Timeout alignment -- Frontend: useSearchJob.ts calcular POLL_TIMEOUT dinamicamente baseado em UFs selecionadas (formula: 300 + max(0, ufs-5)*15 + 60 segundos de margem)
+- [x] Task 6: SYS-010 -- Adicionar timeout de 30s nas chamadas OpenAI (summary generation) com fallback graceful
+- [x] Task 7: Adicionar lint rule (eslint no-empty no-catch) para prevenir reintroducao de catch {} vazios
 
 ## Criterios de Aceite
 
-- [ ] ItemsList exibe mensagem de erro clara quando fetch falha, com botao "Tentar novamente"
-- [ ] Erro de paginacao diferencia timeout de rede vs erro de servidor
-- [ ] Navegacao rapida entre paginas nao exibe dados stale (AbortController cancela requests anteriores)
-- [ ] Frontend timeout >= backend timeout para TODAS as combinacoes validas de UFs (1-27) e dias (1-90)
-- [ ] Chamadas OpenAI tem timeout de 30s; se expirar, summary mostra fallback sem travar a busca
-- [ ] Zero `catch {}` vazios restantes no frontend (validado por lint)
-- [ ] Testes de timeout verificam formula para cenarios: 1 UF, 5 UFs, 10 UFs, 27 UFs
+- [x] ItemsList exibe mensagem de erro clara quando fetch falha, com botao "Tentar novamente"
+- [x] Erro de paginacao diferencia timeout de rede vs erro de servidor
+- [x] Navegacao rapida entre paginas nao exibe dados stale (AbortController cancela requests anteriores)
+- [x] Frontend timeout >= backend timeout para TODAS as combinacoes validas de UFs (1-27) e dias (1-90)
+- [x] Chamadas OpenAI tem timeout de 30s; se expirar, summary mostra fallback sem travar a busca
+- [x] Zero `catch {}` vazios restantes no frontend (validado por lint)
+- [x] Testes de timeout verificam formula para cenarios: 1 UF, 5 UFs, 10 UFs, 27 UFs
 
 ## Testes Requeridos
 
@@ -62,8 +62,8 @@ Eliminar silent failures criticos no frontend: error swallowing na paginacao, ra
 
 ## Definition of Done
 
-- [ ] Code implemented and reviewed
-- [ ] Tests written and passing (CP1, CP2, CP3, UX1, UX2, UX6)
-- [ ] No regressions in existing 404+ tests
-- [ ] Lint rule ativa para catch vazios
-- [ ] Acceptance criteria verified
+- [x] Code implemented and reviewed
+- [x] Tests written and passing (CP1, CP2, CP3, UX1, UX2, UX6, RT5)
+- [x] No regressions in existing 455+ tests (39 suites, 0 failures)
+- [x] Lint rule ativa para catch vazios (eslint.config.mjs + no-empty rule)
+- [x] Acceptance criteria verified

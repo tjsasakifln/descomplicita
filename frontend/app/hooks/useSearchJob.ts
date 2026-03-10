@@ -147,11 +147,12 @@ export function useSearchJob(
    * real-time push-based progress updates from the backend. SSE would eliminate
    * polling entirely and provide instant status updates.
    */
-  const startPolling = useCallback((jobId: string) => {
+  const startPolling = useCallback((jobId: string, ufCount: number) => {
     const INITIAL_INTERVAL = 1000;
     const MAX_INTERVAL = 15000;
     const BACKOFF_FACTOR = 1.5;
-    const POLL_TIMEOUT = 10 * 60 * 1000;
+    const expectedSeconds = 300 + Math.max(0, ufCount - 5) * 15;
+    const POLL_TIMEOUT = (expectedSeconds + 60) * 1000;
     const deadline = Date.now() + POLL_TIMEOUT;
 
     let currentInterval = INITIAL_INTERVAL;
@@ -297,7 +298,7 @@ export function useSearchJob(
       }
 
       jobIdRef.current = jobId;
-      startPolling(jobId);
+      startPolling(jobId, params.ufs.length);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Erro desconhecido";
       setError(errorMessage);

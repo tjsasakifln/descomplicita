@@ -28,7 +28,7 @@ from typing import Any
 import json
 import os
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APITimeoutError
 
 from schemas import ResumoLicitacoes
 from excel import parse_datetime
@@ -94,8 +94,8 @@ async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uni
             }
         )
 
-    # Initialize async OpenAI client (TD-H03)
-    client = AsyncOpenAI(api_key=api_key)
+    # Initialize async OpenAI client (TD-H03) with 30s timeout (SYS-010)
+    client = AsyncOpenAI(api_key=api_key, timeout=30.0)
 
     # System prompt with expert persona and rules
     system_prompt = f"""Você é um analista de licitações especializado em {sector_name}.
@@ -124,16 +124,20 @@ Data atual: {datetime.now().strftime("%d/%m/%Y")}
     max_tokens = int(os.getenv("LLM_MAX_TOKENS", "500"))
 
     # Call OpenAI API with structured output (async)
-    response = await client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format=ResumoLicitacoes,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    try:
+        response = await client.beta.chat.completions.parse(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format=ResumoLicitacoes,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    except APITimeoutError:
+        # Timeout after 30s — use fallback without blocking the search (SYS-010)
+        return gerar_resumo_fallback(licitacoes, sector_name=sector_name)
 
     # Extract parsed response
     resumo = response.choices[0].message.parsed

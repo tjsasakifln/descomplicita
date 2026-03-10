@@ -83,7 +83,8 @@ describe("ItemsList", () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        "/api/buscar/items?job_id=my-job-id&page=1&page_size=20"
+        "/api/buscar/items?job_id=my-job-id&page=1&page_size=20",
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
     });
   });
@@ -139,7 +140,7 @@ describe("ItemsList", () => {
   });
 
   it("handles fetch error gracefully", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+    mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
     render(<ItemsList jobId="job-err" totalFiltered={5} />);
 
@@ -147,6 +148,12 @@ describe("ItemsList", () => {
     expect(
       screen.getByText("Licitacoes Encontradas")
     ).toBeInTheDocument();
+
+    // Should show error message with retry
+    await waitFor(() => {
+      expect(screen.getByText(/Erro de conexão/)).toBeInTheDocument();
+      expect(screen.getByText("Tentar novamente")).toBeInTheDocument();
+    });
   });
 
   it("shows fallback text for items without objeto", async () => {

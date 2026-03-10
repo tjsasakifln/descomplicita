@@ -9,7 +9,8 @@ function loadMixpanel(): Promise<void> {
   mixpanelLoading = import('mixpanel-browser').then(mod => {
     mixpanelInstance = mod.default || mod;
   }).catch(() => {
-    // Silently fail — analytics should never break the app
+    // Analytics import failure must never break the app
+    void 0;
   });
   return mixpanelLoading;
 }
@@ -25,7 +26,8 @@ export const useAnalytics = () => {
           environment: process.env.NODE_ENV || 'development',
         });
       } catch {
-        // Silently fail
+        // Analytics must never break the app
+        void 0;
       }
     });
   };
@@ -39,7 +41,8 @@ export const useAnalytics = () => {
           mixpanelInstance?.people.set(properties);
         }
       } catch {
-        // Silently fail
+        // Analytics must never break the app
+        void 0;
       }
     });
   };
