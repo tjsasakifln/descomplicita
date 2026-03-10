@@ -1,10 +1,11 @@
 # Relatorio de Debito Tecnico
 
-**Projeto:** Descomplicita POC v0.2
+**Projeto:** Descomplicita
 **Data:** 2026-03-09
-**Versao:** 2.0 (atualizacao do assessment de Janeiro 2026)
-**Preparado por:** @analyst (Ada), Business Analyst
-**Fonte:** Assessment tecnico FINAL validado por @architect (Atlas), @ux-design-expert (Vera), @qa (Quinn)
+**Versao:** 1.0
+**Preparado por:** @analyst (Athena) -- Business Analyst
+**Baseado em:** Technical Debt Assessment FINAL v1.0 (validado por @architect Atlas, @data-engineer Delphi, @ux-design-expert Pixel, @qa Quartz)
+**Commit de referencia:** 5e56b38d
 
 ---
 
@@ -12,29 +13,125 @@
 
 ### Situacao Atual
 
-O Descomplicita e uma plataforma de busca e analise de licitacoes publicas de uniformes no Portal Nacional de Contratacoes Publicas (PNCP). O produto funciona e entrega valor: usuarios pesquisam licitacoes por estado, setor e palavras-chave, visualizam resultados com resumos gerados por inteligencia artificial e exportam dados para Excel. A plataforma opera com 5 temas visuais, cobertura de 27 estados e duas fontes de dados ativas (PNCP e BEC-SP).
+O Descomplicita e uma plataforma SaaS de busca de licitacoes publicas brasileiras que permite empresas encontrarem oportunidades de fornecimento ao governo via o Portal Nacional de Compras Publicas (PNCP). A plataforma possui uma base tecnica madura -- 404 testes automatizados, 5 temas visuais, excelente acessibilidade (ARIA, axe-core), e uma experiencia de loading state acima da media do mercado com grid visual por estado, carrossel de curiosidades e barra de progresso com ETA. A qualidade da fundacao e real e demonstra competencia tecnica significativa.
 
-Uma auditoria tecnica completa, conduzida por tres especialistas independentes (arquitetura, UX e qualidade), identificou **55 debitos tecnicos** que representam riscos concretos ao negocio. Os mais graves dizem respeito a seguranca: a plataforma opera com uma unica chave de API compartilhada por todos os usuarios, sem identificacao individual, sem trilha de auditoria e sem limite de uso por pessoa. Se a chave nao estiver configurada, o sistema fica totalmente exposto na internet. Alem disso, o sistema armazena dados temporarios apenas em memoria, perdendo tudo a cada atualizacao ou reinicializacao.
+Entretanto, uma auditoria completa conduzida por quatro especialistas independentes identificou **60 debitos tecnicos** que afetam diretamente as tres funcionalidades que definem a proposta de valor do produto: **qualidade de busca** (resultados relevantes vs. irrelevantes), **buscas de grande volume** (27 estados, 30+ dias), e **experiencia do usuario** (retencao e conversao). O banco de dados atual perde todos os dados a cada deploy, tornando impossivel qualquer modelo de assinatura. A implementacao de seguranca possui vulnerabilidades que impedem a ida para producao. E o motor de busca -- razao de existencia do produto -- apresenta taxa de falsos positivos entre 20-40% para buscas personalizadas e descarta silenciosamente ate 95,6% dos resultados disponiveis em estados de alto volume como Sao Paulo.
 
-A boa noticia: comparado ao assessment anterior (versao 1.0, marco 2026), o cenario melhorou significativamente. O numero total de debitos caiu de 57 para 55, a severidade de varios itens foi reavaliada com mais precisao, e o esforco estimado diminuiu de 206-388 horas para 155-232 horas -- uma reducao de 25-40%. O plano de resolucao e viavel: 4 sprints em 5-6 semanas eliminam os riscos criticos e posicionam o produto para crescimento sustentavel.
+A descoberta mais importante da auditoria e tambem a mais promissora: o parametro `palavraChave` da API do PNCP nunca foi utilizado pelo sistema. Se funcionar, o volume de dados processados cai entre 10 e 20 vezes, eliminando ou reduzindo drasticamente varios dos problemas mais caros do inventario. Testar este parametro leva 2 horas e custa R$ 300. E potencialmente a acao de maior retorno sobre investimento de todo o projeto.
 
 ### Numeros Chave
 
 | Metrica | Valor |
 |---------|-------|
-| Total de Debitos | 55 |
-| Debitos Criticos (acao imediata) | 3 |
-| Debitos de Alta Prioridade | 10 |
-| Debitos de Media Prioridade | 25 |
-| Debitos de Baixa Prioridade | 17 |
-| Esforco Total Estimado | 155 - 232 horas |
-| Custo Estimado (minimo) | R$ 23.250 |
-| Custo Estimado (maximo) | R$ 34.800 |
-| Timeline de Execucao | 5-6 semanas (4 sprints) |
+| Total de debitos identificados | **60** (24 Sistema + 16 Banco de Dados + 20 Frontend) |
+| Debitos criticos (bloqueiam producao) | **4** |
+| Debitos de alta prioridade (degradam valor) | **12** |
+| Debitos de media prioridade | **24** |
+| Debitos de baixa prioridade | **20** |
+| Horas totais estimadas | **~255 horas** |
+| Horas para criticos + altos | **~100 horas** |
+| Custo total (R$150/h) | **R$ 38.250** |
+| Custo criticos + altos | **R$ 15.000** |
+| Custo Sprints 1-3 (resolucao planejada) | **R$ 20.550** |
+| Timeline de execucao | **3 sprints em 6-8 semanas** |
 
 ### Recomendacao
 
-Recomendamos aprovar o plano de resolucao em 4 sprints, priorizando os Quick Wins (Sprint 1, R$ 1.200) que podem ser executados em 1-2 dias, seguidos imediatamente pelo Sprint 2 de correcoes criticas (R$ 6.600 - R$ 10.350). O lancamento publico ou qualquer acao de marketing **nao deve ocorrer** antes da conclusao do Sprint 2, que endereca as vulnerabilidades de seguranca e os bloqueadores funcionais. O investimento total de R$ 23.250 - R$ 34.800 evita riscos estimados em R$ 150.000 - R$ 450.000, representando um ROI de 5:1 a 13:1.
+Recomendamos a aprovacao imediata do orcamento para os **Sprints 1 e 2** (R$ 15.150, 6 semanas), que resolvem todos os 16 itens criticos e altos, habilitam persistencia de dados via Supabase PostgreSQL, e melhoram significativamente a qualidade de busca e a experiencia de grande volume. A execucao deve comecar pelo teste do parametro `palavraChave` (2 horas, R$ 300), cujo resultado pode alterar todas as prioridades subsequentes. Adiar esta resolucao custa entre R$ 100.000 e R$ 350.000 ao longo de 12 meses em receita perdida, riscos de seguranca e perda competitiva -- 5 a 17 vezes o investimento necessario para resolver.
+
+---
+
+## Impacto nas Funcionalidades Core
+
+Estes tres pilares sao a razao pela qual o usuario paga pelo produto. Os debitos identificados afetam exatamente o que o Descomplicita promete entregar.
+
+### Qualidade de Busca
+
+A proposta de valor central do Descomplicita e simples: ajudar empresas a encontrar licitacoes relevantes. Quando a busca retorna resultados errados ou esconde oportunidades reais, o produto falha na sua missao fundamental.
+
+**Resultados irrelevantes (falsos positivos) -- 20-40% para buscas personalizadas:**
+
+O sistema utiliza conjuntos de palavras-chave com niveis de confianca (termos inequivocos, termos fortes e termos ambiguos) e listas de exclusao por setor para filtrar resultados. O mecanismo e sofisticado e funciona bem para buscas pre-configuradas. Entretanto, quando o usuario digita termos personalizados, **o sistema desativa completamente os filtros de exclusao por setor**. Isso significa que uma busca por "confeccao" retorna "confeccao de placas de sinalizacao" misturada com resultados de vestuario.
+
+Alem disso, o calculo de relevancia para termos ambiguos possui uma falha conceitual: quando um resultado contem tres termos fracos (ex: "bota + meia + avental"), o sistema calcula a relevancia com base apenas no melhor termo individual (0.3 de 1.0), em vez de somar os tres. O resultado e sistematicamente rejeitado (0.3 < limiar de 0.6), mesmo sendo claramente relevante.
+
+**Para o usuario, isto significa:** a cada 10 resultados de uma busca personalizada, 2 a 4 sao irrelevantes. O usuario perde tempo avaliando licitacoes que nao interessam. A confianca no produto erode gradualmente. E licitacoes genuinamente relevantes que combinam termos ambiguos nunca aparecem.
+
+**Resultados relevantes perdidos (falsos negativos) -- ate 95,6% em estados de alto volume:**
+
+Tres fatores causam perda silenciosa de oportunidades:
+
+1. **Truncamento de volume:** O sistema busca no maximo 500 licitacoes por combinacao de estado e modalidade. Para Sao Paulo com Pregao Eletronico, existem ate 11.400 resultados -- o sistema descarta 95,6% sem que o usuario saiba. Oportunidades de negocio sao silenciosamente perdidas.
+
+2. **Ausencia de reconhecimento gramatical:** O sistema nao reconhece variantes de palavras. "Uniformizado" nao aparece quando se busca "uniforme". "Confeccionado" nao aparece para "confeccao". Toda uma classe de licitacoes relevantes e invisivel.
+
+3. **Parametro `palavraChave` nao utilizado:** Toda a filtragem e feita localmente apos buscar todos os resultados da API. Se o parametro `palavraChave` da API PNCP for utilizado, o volume de dados cai 10-20x, eliminando o problema de truncamento e reduzindo drasticamente o tempo de processamento.
+
+**Acentuacao (ponto positivo confirmado):**
+
+A busca trata acentos corretamente em todas as camadas -- "licitacao" e "licitacao" (com cedilha e til) retornam resultados identicos. A normalizacao Unicode cobre todas as diacriticas do portugues brasileiro. Nao ha falhas. A unica recomendacao e informar o usuario sobre isto com uma dica sutil no campo de busca, reduzindo incerteza especialmente para usuarios com teclados internacionais.
+
+**Impacto direto no negocio:**
+- Usuarios perdem confianca ao ver resultados irrelevantes misturados com oportunidades reais
+- Oportunidades de negocio sao perdidas silenciosamente por truncamento -- o usuario nem sabe que existiam
+- Competidores com busca mais precisa capturam clientes insatisfeitos
+- Para um SaaS de busca, a qualidade dos resultados e literalmente o que o cliente paga para ter
+
+### Buscas de Grande Volume
+
+Usuarios que buscam em **27 estados** com janela de **30+ dias** sao provavelmente os mais engajados e potencialmente os clientes premium ou enterprise. Representam maior receita por usuario e maior lifetime value. Sao exatamente estes usuarios que enfrentam os piores problemas.
+
+**O resultado que o usuario nunca ve (race condition de timeout):**
+
+Quando um usuario busca em 27 estados, o backend precisa de ate 10 minutos e 30 segundos para processar. Mas o frontend desiste aos 10 minutos exatos. Existe uma janela de 30 segundos onde o backend completa com sucesso, armazena os resultados no cache, mas o usuario ja viu a mensagem "A consulta excedeu o tempo limite" e saiu. Minutos de processamento desperdicados. Resultados prontos que ninguem vera.
+
+**O servidor que pode cair (pressao de memoria):**
+
+Uma unica busca de 27 estados por 90 dias consome ate **460MB de memoria**. O servidor tem 512MB. Os dados sao armazenados duplamente -- uma copia em Python e outra no cache Redis. Para 85.000 itens, sao ~120MB desnecessarios na copia Python. Duas buscas grandes simultaneas (920MB) derrubam o sistema para todos os usuarios.
+
+**A barra de progresso que mente (ETA impreciso):**
+
+As estimativas de tempo sao fixas: "faltam ~15 segundos" independente do volume. Para 85.000 itens, a filtragem leva 30-60 segundos, nao 15. A barra de progresso trava em 60% durante o processamento. O usuario conclui que o sistema travou e abandona a busca, ou aciona suporte.
+
+**O aviso que nao existe (sem advertencia proativa):**
+
+O usuario seleciona 27 estados + 90 dias e clica em buscar. Nenhum banner, nenhuma estimativa de tempo, nenhuma sugestao de reduzir o escopo. Nenhuma indicacao de que a busca sera demorada ou que pode exceder limites do sistema. O usuario descobre os problemas da pior forma possivel: esperando.
+
+**Impacto direto no negocio:**
+- Usuarios premium (3-5x receita media) tem a pior experiencia da plataforma
+- Abandono de buscas longas gera percepcao de produto instavel
+- Risco de indisponibilidade por OOM afeta todos os usuarios, nao apenas quem fez a busca grande
+- Custo de infraestrutura elevado sem necessidade -- se `palavraChave` funcionar, o volume cai drasticamente
+
+### Experiencia do Usuario
+
+Alem dos problemas de busca e grande volume, a experiencia geral apresenta falhas que afetam diretamente retencao e conversao.
+
+**Erro silencioso na listagem de resultados (CRITICO):**
+
+Quando a paginacao de resultados falha -- seja por timeout, erro de memoria ou falha de rede -- o sistema engole o erro silenciosamente. Sem mensagem. Sem botao de retry. Sem logging. O usuario ve "Carregando..." para sempre e conclui que o produto nao funciona. Este e o tipo de experiencia que causa abandono imediato e permanente. E especificamente para buscas de grande volume, onde paginacao e essencial, o impacto e inaceitavel.
+
+**Impossivel avaliar rapidamente a relevancia dos resultados:**
+
+Os termos de busca nao sao destacados nos resultados. O campo "objeto" exibe texto puro, sem nenhuma indicacao visual de por que aquela licitacao foi retornada. Em uma lista com centenas de resultados, o usuario precisa ler cada descricao inteira para avaliar relevancia. Isto multiplica por 3 a 5 vezes o tempo de avaliacao e dificulta a identificacao de falsos positivos -- o usuario nao consegue distinguir rapidamente um resultado bom de um ruim.
+
+**Termos compostos nao funcionam pela interface:**
+
+O usuario quer buscar "camisa polo" (duas palavras, um conceito). Ao digitar no campo de busca, o espaco cria dois tokens separados: "camisa" e "polo". O backend ja suporta termos compostos via aspas, mas a interface nao oferece nenhuma forma de usar esta funcionalidade. O campo de busca nao menciona aspas, virgulas, ou qualquer mecanismo de agrupamento. Resultado: buscas imprecisas para necessidades especificas.
+
+**Contraste abaixo do padrao de acessibilidade:**
+
+Valores monetarios e datas -- exatamente as informacoes mais importantes para o usuario B2B -- usam uma cor com contraste de 4.1:1, abaixo do minimo de 4.5:1 exigido pelo padrao WCAG AA. Usuarios com baixa visao ou em ambientes com muita luz tem dificuldade para ler dados financeiros.
+
+**Buscas salvas existem apenas no navegador:**
+
+Todas as buscas salvas residem no localStorage do navegador. Trocar de dispositivo, limpar dados ou usar outro navegador significa perder todas as configuracoes. Nao ha sincronizacao. Para um usuario que acessa de multiplos dispositivos (escritorio e celular), a funcionalidade e fragil.
+
+**Impacto direto no negocio:**
+- Erro silencioso de paginacao causa abandono imediato e gera percepcao de produto quebrado
+- Falta de highlight aumenta custo cognitivo por resultado, reduzindo produtividade do usuario
+- Problemas de acessibilidade podem ter implicacoes legais (Lei Brasileira de Inclusao 13.146/2015)
+- Perda de buscas salvas frustra usuarios recorrentes e reduz stickiness do produto
 
 ---
 
@@ -42,243 +139,189 @@ Recomendamos aprovar o plano de resolucao em 4 sprints, priorizando os Quick Win
 
 ### Custo de RESOLVER
 
-| Categoria | Horas (min) | Horas (max) | Custo Min (R$150/h) | Custo Max (R$150/h) |
-|-----------|-------------|-------------|----------------------|----------------------|
-| Sistema (Backend) | 78 | 124 | R$ 11.700 | R$ 18.600 |
-| Frontend/UX | 43 | 58 | R$ 6.450 | R$ 8.700 |
-| Cross-cutting | 34 | 50 | R$ 5.100 | R$ 7.500 |
-| **TOTAL** | **155** | **232** | **R$ 23.250** | **R$ 34.800** |
+| Categoria | Itens | Horas Estimadas | Custo (R$150/h) |
+|-----------|-------|-----------------|-----------------|
+| Sistema (infraestrutura, seguranca, arquitetura) | 24 | ~109h | R$ 16.350 |
+| Banco de Dados e Busca (persistencia, qualidade) | 16 | ~49h | R$ 7.350 |
+| Frontend/UX (interface, experiencia) | 20 | ~33h | R$ 4.950 |
+| Investigacoes e validacao (spikes, golden test suite) | -- | ~14h | R$ 2.100 |
+| Reserva para contingencias (~15%) | -- | ~38h | R$ 5.700 |
+| **TOTAL** | **60** | **~255h (+38h reserva)** | **R$ 43.950** |
+
+**Nota:** O custo sem reserva de contingencia e R$ 38.250. A reserva cobre riscos de descobertas adicionais durante a migracao Supabase e complexidades nao previstas. O investimento planejado para os 3 sprints prioritarios (excluindo backlog) e R$ 20.550.
 
 ### Custo de NAO RESOLVER (Risco Acumulado)
 
-| Risco | Probabilidade | Impacto | Custo Potencial |
-|-------|---------------|---------|-----------------|
-| **Abuso da API sem autenticacao:** qualquer pessoa na internet pode consumir todos os recursos do sistema, derrubar o servico ou fazer requisicoes ilimitadas ao PNCP | Alta (70%) | Indisponibilidade total + bloqueio pelo PNCP | R$ 30.000 - R$ 100.000 |
-| **Perda de dados em cada deploy:** buscas em andamento, cache de resultados e arquivos sao armazenados apenas em memoria e perdidos a cada atualizacao | Alta (80%) | Usuarios perdem trabalho, experiencia degradada | R$ 20.000 - R$ 60.000 |
-| **Falhas de download para arquivos grandes:** limite de 10 segundos no Vercel combinado com bufferizacao tripla em memoria pode impedir exportacoes Excel | Media (50%) | Funcionalidade core quebrada | R$ 15.000 - R$ 40.000 |
-| **Penalidade por inacessibilidade (LBI 13.146/2015):** ferramenta voltada ao setor publico sem conformidade WCAG AA em contraste de cores e campos de formulario | Baixa (15%) | Multa administrativa + processo civil | R$ 20.000 - R$ 100.000 |
-| **Busca com funcionalidade quebrada:** usuarios nao conseguem pesquisar termos como "camisa polo" (espaco cria tokens separados em vez de manter a expressao) | Alta (90%) | Resultados incorretos, abandono do produto | R$ 25.000 - R$ 75.000 |
-| **Esgotamento do sistema sob carga:** chamadas de IA sem timeout + threads compartilhadas podem travar o sistema inteiro quando multiplos usuarios buscam simultaneamente | Media (40%) | Sistema para de responder | R$ 15.000 - R$ 50.000 |
-| **Incapacidade de escalar:** arquitetura in-memory limita a uma unica instancia do servidor | Alta (80%) | Teto de crescimento, perda de oportunidade | R$ 30.000 - R$ 80.000 |
+| Risco | Probabilidade | Impacto | Custo Potencial (12 meses) |
+|-------|---------------|---------|----------------------------|
+| **Perda de dados a cada deploy** -- banco efemero impede modelo de assinatura | Certa (100%) | Critico | Impossibilita receita recorrente. Todo o modelo SaaS e inviavel. |
+| **Brecha de seguranca** -- JWT sem padrao, timing attack, sem rotacao de chaves | Alta (70%) | Critico | R$ 50.000 - R$ 200.000 (resposta a incidente, dano reputacional, potencial multa LGPD) |
+| **Churn por busca de baixa qualidade** -- 20-40% de falsos positivos em buscas customizadas | Alta (60%) | Alto | 15-30% da base perdida em 6 meses. Para 100 usuarios a R$200/mes: R$ 36.000 - R$ 72.000/ano |
+| **Perda de usuarios premium** -- experiencia de grande volume degradada | Alta (60%) | Alto | Usuarios enterprise representam 3-5x receita media. R$ 10.000 - R$ 30.000/ano |
+| **Queda do servidor** -- OOM em busca grande (460MB de 512MB disponiveis) | Media (40%) | Alto | Indisponibilidade total. R$ 5.000 - R$ 15.000 por incidente |
+| **Perda competitiva** -- concorrente com busca superior captura mercado | Media (40%) | Alto | Perda gradual de market share. Custo de reconquista: 5-7x custo de retencao |
+| **Resultados relevantes perdidos** -- 95,6% truncados em SP sem que usuario saiba | Alta (80%) | Alto | Oportunidades de negocio invisiveis. Impacto no valor percebido do produto |
 
-**Custo potencial ponderado de nao agir: R$ 95.000 - R$ 305.000**
-
-**Cenario pessimista (multiplos riscos simultaneos): R$ 150.000 - R$ 450.000**
+**Resumo:** O custo de nao resolver e estimado em **R$ 100.000 - R$ 350.000** ao longo de 12 meses. O investimento para resolver os 3 sprints prioritarios (R$ 20.550) representa **6-17%** do custo de inacao. O ratio custo/beneficio e de **1:5 a 1:17**.
 
 ---
 
 ## Impacto no Negocio
 
-### Seguranca
-
-O sistema opera com protecao minima. As vulnerabilidades mais relevantes para o negocio:
-
-- **Sem identificacao de usuarios** -- todos compartilham a mesma chave de acesso. Nao e possivel saber quem faz o que, nem responsabilizar usos indevidos. Se a chave nao estiver configurada, qualquer pessoa na internet acessa tudo.
-- **Headers de seguranca ausentes** -- protecoes padrao da web (CSP, HSTS) nao estao implementadas, deixando o sistema mais vulneravel a ataques comuns como injecao de scripts maliciosos.
-- **Configuracao de CORS permissiva** -- aceita qualquer tipo de requisicao de qualquer origem, embora as origens permitidas estejam corretamente restritas.
-- **Risco de compliance com LGPD** -- sem trilha de auditoria e sem avaliacao de informacoes pessoais em logs, ha risco de nao conformidade com a lei de protecao de dados.
-
 ### Performance
 
-Os problemas de performance impactam diretamente a experiencia do usuario e a viabilidade de crescimento:
+| Problema | Situacao Atual | Apos Resolucao |
+|----------|---------------|----------------|
+| Paginacao de resultados grandes | ~5 segundos (carrega todos os itens na memoria) | < 200ms (leitura direta do cache via Redis LIST) |
+| Memoria do servidor por busca grande | ~460MB (limite do servidor: 512MB) | < 300MB (eliminando duplicacao Python/Redis) |
+| Tempo de busca em 27 UFs | 4-7 minutos (resultado pode ser perdido por timeout) | Mesmo tempo, mas com timeout alinhado e aviso previo |
+| Volume de dados processados | 100% dos resultados da API (filtro apenas local) | 5-10% (se `palavraChave` funcionar -- reducao de 10-20x) |
+| Chamadas de IA | Sem limite de tempo (pode travar indefinidamente) | Timeout configurado, sem risco de travamento |
 
-- **Arquivos Excel duplicados em memoria** -- o mesmo arquivo e armazenado 3 vezes simultaneamente (no processamento, no cache Redis e na resposta ao usuario), triplicando o consumo de memoria.
-- **Sem paginacao** -- todos os resultados de uma busca sao retornados de uma vez. Com muitas licitacoes, o tempo de resposta aumenta e o consumo de memoria cresce.
-- **Limite de 10 segundos no servidor** -- a plataforma de hospedagem (Vercel) impoe um limite de 10 segundos por requisicao. Downloads de arquivos grandes podem falhar.
-- **Requisicoes desnecessarias** -- o sistema faz entre 60 e 300 requisicoes extras por busca para verificar o progresso, sem otimizacao. Isso gera carga desnecessaria no servidor.
+### Seguranca
+
+| Problema | Risco para o Negocio | Resolucao Planejada |
+|----------|---------------------|---------------------|
+| JWT implementado manualmente, sem padrao | Tokens podem ser forjados; sem rotacao de chaves | Adotar biblioteca PyJWT com rotacao, audience e issuer |
+| Comparacao de chave vulneravel a timing attack (2 pontos no codigo) | Atacante pode descobrir a chave API caractere por caractere | Usar comparacao de tempo constante (hmac.compare_digest) |
+| Headers de seguranca ausentes (CSP, HSTS) | Vulneravel a ataques XSS, clickjacking, downgrade HTTPS | Adicionar headers padrao da industria |
+| Bypass de autenticacao quando variaveis nao configuradas | Sistema totalmente exposto se credenciais esquecidas | Bloquear startup sem credenciais |
 
 ### Experiencia do Usuario
 
-Problemas que afetam diretamente a adocao e retencao de usuarios:
-
-- **Busca por termos compostos nao funciona** -- pesquisar "camisa polo" cria dois filtros separados ("camisa" e "polo") em vez de buscar a expressao completa. Este e um bloqueador funcional critico para o caso de uso principal do produto.
-- **Licitacoes vencidas nos resultados** -- o filtro de prazo esta desabilitado, mostrando licitacoes que ja encerraram o periodo de propostas. Usuarios perdem tempo analisando oportunidades que nao existem mais.
-- **Problemas de contraste visual** -- alguns temas visuais (Sepia, Paperwhite) nao atendem ao padrao minimo de legibilidade, dificultando a leitura para usuarios com baixa visao ou em ambientes com muita luz.
-- **Campos obrigatorios nao sinalizados para leitores de tela** -- usuarios com deficiencia visual que usam tecnologias assistivas nao sabem quais campos precisam preencher.
-- **Buscas salvas apenas no navegador** -- se o usuario trocar de dispositivo ou limpar o navegador, perde todas as buscas salvas.
+| Problema | Impacto na Retencao | Prioridade |
+|----------|---------------------|------------|
+| Erro silencioso na paginacao | Abandono imediato -- usuario preso em "Carregando..." sem saida | Critica -- Sprint 1 |
+| Sem destaque de termos nos resultados | Avaliacao de relevancia 3-5x mais lenta | Alta -- Sprint 2 |
+| Sem aviso para buscas de grande volume | Abandono por falta de expectativa de tempo | Alta -- Sprint 2 |
+| Buscas salvas apenas no navegador | Sem continuidade entre dispositivos | Alta -- Sprint 2 |
+| Termos compostos impossiveis pela interface | Busca imprecisa para necessidades especificas | Media -- Sprint 3 |
+| Contraste abaixo de WCAG AA em valores monetarios | Usuarios com baixa visao nao leem dados financeiros | Alta -- Sprint 2 |
 
 ### Manutenibilidade
 
-Problemas que afetam a velocidade de entrega de novas funcionalidades:
-
-- **Velocidade de desenvolvimento atual** -- a base de codigo tem acoplamentos que dificultam mudancas isoladas. Um componente de interface com mais de 450 linhas precisa ser decomposto para permitir evolucao mais rapida.
-- **Risco de regressao** -- sem testes de integracao entre frontend e backend, e sem testes de regressao visual, cada mudanca pode introduzir defeitos nao detectados.
-- **Codigo morto** -- 3 das 5 fontes de dados originais estao desabilitadas mas o codigo permanece na base, aumentando a complexidade de manutencao.
-- **Custo de novas features** -- sem banco de dados, sem versionamento de API e sem testes de contrato, cada funcionalidade nova exige mais cuidado e tempo para implementar com seguranca.
-
----
-
-## Evolucao desde Janeiro 2026
-
-Este relatorio atualiza a versao 1.0 publicada em 07/03/2026, incorporando revisoes de dois especialistas adicionais (UX e QA). Principais mudancas:
-
-### O que melhorou
-
-| Aspecto | Antes (v1.0) | Agora (v2.0) |
-|---------|--------------|--------------|
-| Total de debitos | 57 | 55 (-2) |
-| Debitos criticos | 5 | 3 (-2) |
-| Esforco estimado | 206-388 horas | 155-232 horas (-25 a -40%) |
-| Custo estimado | R$ 30.900 - R$ 58.200 | R$ 23.250 - R$ 34.800 (-25 a -40%) |
-| Timeline | 10 semanas (6 sprints) | 5-6 semanas (4 sprints) |
-| Especialistas envolvidos | 1 (arquiteto) | 3 (arquiteto + UX + QA) |
-
-### O que mudou
-
-- **Severidades recalibradas** -- 9 itens tiveram severidade ajustada com base em risco real, nao teorico. Por exemplo: codigo morto de fontes desabilitadas foi rebaixado de Critico para Alto (o sistema funciona bem com 2 fontes), e problemas de contraste foram promovidos de Medio para Alto (obrigacao legal).
-- **Plano mais compacto** -- o assessment anterior incluia sprints separados para decomposicao de componentes frontend e infraestrutura. A reavaliacao consolidou o trabalho em 4 sprints focados em impacto.
-- **Custos mais precisos** -- faixas de estimativa mais estreitas (155-232h vs 206-388h) gracas a validacao cruzada por 3 especialistas.
-
-### O que e novo
-
-- **3 novos debitos de acessibilidade** identificados pela revisao UX: cores hardcoded que nao respeitam temas, campos sem sinalizacao para leitores de tela, e timeout de confirmacao inacessivel.
-- **Cadeia de falhas em cascata** documentada: chamadas de IA sem timeout podem travar o sistema inteiro quando combinadas com compartilhamento de threads.
-- **Grafo de dependencias** entre debitos, permitindo planejamento mais inteligente da ordem de resolucao.
-
-### O que permanece
-
-- **Autenticacao** continua sendo o debito mais critico (P0), sem resolucao desde a identificacao.
-- **Dados em memoria** continuam sendo perdidos a cada deploy.
-- **Busca por termos compostos** continua quebrada.
+| Problema | Impacto no Time de Desenvolvimento |
+|----------|-------------------------------------|
+| Banco de dados sem sistema de migracao | Cada mudanca de schema e manual e arriscada (CREATE TABLE IF NOT EXISTS) |
+| 115 entradas redundantes nos filtros de busca | Risco de atualizar uma variante e esquecer a outra |
+| Testes de integracao sao placeholder | Regressoes descobertas apenas em producao |
+| Dual-write entre Python e Redis sem invalidacao | Complexidade desnecessaria; bugs de sincronizacao inevitaveis |
 
 ---
 
 ## Timeline Recomendado
 
-### Sprint 1: Quick Wins (1-2 dias)
+### Sprint 1: Quick Wins + Fundacao Critica (2-4 semanas)
 
-Correcoes rapidas que geram resultado imediato e constroem confianca na equipe.
+**Investimento:** ~65 horas | **R$ 9.750**
+**Objetivo:** Eliminar riscos criticos, habilitar persistencia de dados, e realizar a investigacao de maior ROI do projeto.
 
-| Item | Descricao em linguagem de negocio | Horas |
-|------|-----------------------------------|-------|
-| Acentos em badges | Corrigir texto sem acentuacao visivel para usuarios | 0.25h |
-| Formulario com submissao nativa | Melhorar experiencia em dispositivos moveis (botao "Enviar" no teclado) | 2.1h |
-| Campos obrigatorios sinalizados | Usuarios de leitores de tela sabem o que preencher | 0.5h |
-| Prevencao de perda de busca | Aviso antes de sair da pagina durante busca ativa | 0.5h |
-| Limpeza de arquivo de teste vazio | Higiene de codigo (5 minutos) | 0.1h |
-| Versao centralizada | Evitar inconsistencias na identificacao da versao do sistema | 1h |
-| Restricao de headers | Fechar permissividade desnecessaria na API | 1h |
-| Cores corrigidas para temas | Corrigir elementos visuais quebrados nos temas Sepia e Paperwhite | 1.5h |
-| Protecao contra travamento de IA | Adicionar limite de tempo nas chamadas de inteligencia artificial | 2h |
+| Acao | Horas | Por que agora |
+|------|-------|---------------|
+| **Testar parametro `palavraChave` da API PNCP** | 2h | Pode reduzir volume de dados 10-20x. Resultado muda todas as prioridades. **R$ 300 de investimento que pode economizar R$ 5.000 - R$ 10.000.** |
+| Corrigir erro silencioso na listagem (FE-005) | 2h | Usuarios presos em "Carregando..." sem explicacao. Pre-requisito para que problemas de paginacao e memoria se tornem visiveis. |
+| Corrigir vulnerabilidades JWT e timing attack (SYS-003 + DB-005 + DB-014) | 5h | Seguranca basica. Bloqueiam ida para producao. Correcoes rapidas e independentes. |
+| Migrar banco de dados para Supabase PostgreSQL (SYS-001 + DB-001 + DB-002 + DB-003) | 24-32h | Resolve 7 problemas de uma vez: persistencia, isolamento multi-usuario, sistema de migracoes, backups automaticos, e 3 itens menores. |
+| Alinhar timeout frontend com backend | 3h | Elimina janela de 30 segundos onde resultados sao processados mas usuario ja desistiu. |
+| Projetar modelo de identidade de usuario (SYS-002) | 24h | Base para contas, assinaturas e personalizacao. Desenvolver em paralelo com migracao Supabase. |
 
-- **Custo:** R$ 1.350 (~9 horas)
-- **ROI:** Imediato -- melhoria de qualidade perceptivel + prevencao de travamento do sistema
+**Resultado esperado:** Dados persistem entre deploys. Usuarios identificados individualmente. Seguranca basica garantida. Erros de paginacao visiveis. Parametro `palavraChave` avaliado.
 
-### Sprint 2: Correcoes Criticas (1 semana)
+### Sprint 2: Qualidade de Busca e UX Critica (2-3 semanas)
 
-Itens que bloqueiam o lancamento publico e a evolucao do produto.
+**Investimento:** ~36 horas | **R$ 5.400**
+**Objetivo:** Melhorar significativamente a qualidade dos resultados e a experiencia de grandes volumes.
 
-| Item | Descricao em linguagem de negocio | Horas |
-|------|-----------------------------------|-------|
-| Autenticacao de usuarios | Cada usuario tera acesso individual, com rastreabilidade e limites de uso | 8-16h |
-| Busca por termos compostos | Usuarios poderao pesquisar "camisa polo" como uma expressao unica | 3h |
-| Otimizacao de memoria e downloads | Eliminar triplicacao de dados em memoria e resolver falhas de download | 8-16h |
-| Sistema de filas duravel | Buscas em andamento sobrevivem a atualizacoes do sistema | 12-20h |
-| Remocao de codigo morto | Limpar 3 fontes de dados desabilitadas, reduzindo complexidade | 8-16h |
-| Auditoria de contraste visual | Garantir legibilidade em todos os 5 temas (obrigacao legal) | 4h |
+| Acao | Horas | Por que agora |
+|------|-------|---------------|
+| Paginacao eficiente via Redis LIST (DB-009) | 6h | Reduz consumo de memoria de ~100MB para kilobytes por pagina. |
+| Reativar filtros de exclusao para buscas customizadas | 3h | Reduz resultados irrelevantes em 20-40% para termos personalizados. |
+| Aviso proativo para buscas de grande volume (FE-016) | 3h | Banner inline quando usuario seleciona >10 estados ou >30 dias. |
+| Destacar termos de busca nos resultados (FE-015) | 5h | Usuario avalia relevancia 3-5x mais rapido. Requer 1h backend + 4h frontend. |
+| Corrigir contraste e cores de temas (FE-001 + FE-007) | 2h | Acessibilidade WCAG AA para valores monetarios e datas. |
+| Hardening de seguranca -- CORS, CSP, HSTS, auth bypass (SYS-004 + SYS-005 + SYS-007) | 7h | Protecao contra ataques web comuns. |
+| Timeout em chamadas de IA (SYS-010) | 2h | Previne travamento do sistema aguardando resposta da OpenAI. |
+| Buscas salvas no servidor (SYS-006) | 8h | Sincronizacao entre dispositivos. Depende da migracao Supabase do Sprint 1. |
 
-- **Custo:** R$ 6.450 - R$ 11.250 (~43-75 horas)
-- **ROI:** Seguranca + estabilidade -- habilita lancamento publico
+**Resultado esperado:** Busca mais precisa (20-40% menos falsos positivos). Usuarios de grande volume informados antes de buscar. Interface mais acessivel. Buscas salvas persistentes e sincronizadas.
 
-### Sprint 3: Fundacao Tecnica (1-2 semanas)
+### Sprint 3: Otimizacao e Refinamento (2-3 semanas)
 
-Fortalecimento da base tecnica para suportar crescimento.
+**Investimento:** ~36 horas | **R$ 5.400**
+**Objetivo:** Eliminar classe inteira de falsos negativos, reduzir consumo de memoria, e polir a experiencia.
 
-| Item | Descricao em linguagem de negocio | Horas |
-|------|-----------------------------------|-------|
-| Modernizacao de chamadas de IA | Sistema nao trava mais quando multiplos usuarios buscam ao mesmo tempo | 4-8h |
-| Downloads sem limite de tempo | Arquivos grandes nao falham por timeout do servidor | 4-8h |
-| Paginacao de resultados | Resultados carregam mais rapido, consumindo menos dados | 8-16h |
-| Headers de seguranca | Protecoes padrao da web implementadas (CSP, HSTS) | 4-8h |
-| Timeout acessivel | Usuarios com deficiencia tem tempo suficiente para confirmar acoes | 1h |
-| Reducao de requisicoes | Sistema inteligente que reduz carga no servidor em 80% | 2-4h |
-| Teste automatico pos-atualizacao | Sistema verifica automaticamente se esta funcionando apos cada deploy | 2-4h |
-| Filtro de prazo | Usuarios veem apenas licitacoes com prazo aberto | 4-8h |
+| Acao | Horas | Por que agora |
+|------|-------|---------------|
+| Implementar reconhecimento de variantes gramaticais -- stemming PT-BR (RSLP/NLTK) | 10h | "Uniformizado" passa a encontrar "uniforme". Novas oportunidades antes invisiveis. |
+| Eliminar duplicacao de dados na memoria (DB-015) | 3h | Reduz ~120MB de consumo desnecessario por busca grande. |
+| Protecao contra dados desatualizados na paginacao (FE-019) | 2h | Navegacao rapida nao exibe dados de outra pagina. |
+| Mensagem de timeout com orientacao especifica (FE-017) | 2h | Em vez de erro generico, sugere reduzir numero de estados ou periodo. |
+| Reducao de gravacoes redundantes no cache (DB-006) | 4h | Cada atualizacao de progresso regravava todo o dataset. |
+| Limpeza de filtros redundantes de acentuacao | 2h | Remove 115 entradas duplicadas desnecessarias (com e sem acento do mesmo termo). |
+| Melhoria no calculo de relevancia para termos ambiguos | 2h | Combinacao de 3+ termos fracos ("bota + meia + avental") passa a pontuar corretamente. |
+| Componente padrao de botao (FE-006) | 3h | Previne inconsistencia visual entre telas. |
+| Suporte a termos compostos na interface (FE-020) | 3h | Permitir "camisa polo" como termo unico de busca. |
+| Quick wins de qualidade -- spinner, link /termos, teste SourceBadges (FE-004 + FE-008 + FE-011) | 5h | Polimento geral e cobertura de testes. |
 
-- **Custo:** R$ 4.350 - R$ 8.550 (~29-57 horas)
-- **ROI:** Performance + velocidade de desenvolvimento
+**Resultado esperado:** Busca encontra mais resultados relevantes (stemming). Sistema mais estavel e eficiente (menos memoria). Interface mais consistente e precisa.
 
-### Sprint 4: Polimento e Evolucao (1-2 semanas)
+### Backlog (Prioridade P4/P5)
 
-Itens que habilitam a proxima fase de crescimento do produto.
+| Grupo | Descricao | Horas | Notas |
+|-------|-----------|-------|-------|
+| Limpeza de codigo | Versao hardcoded, MD5, fontes deprecadas, aliases Jest | 7h | Higiene tecnica |
+| Infraestrutura | Limites Vercel, refactoring JobStore, retry BFF | 16h | Escalabilidade |
+| Modernizacao | React 18 para 19, health check, regex engine | 18h | Longo prazo |
+| Funcionalidades | Filtro deadline, OpenAPI, testes integracao, Docker, Mixpanel, logging | 29h | Evolucao |
+| Banco de dados | Preferencias usuario, health check DB, cleanup, degradation | 6h | Completude |
+| Dados e cache | Backup, transactions, cache keys | 4,5h | Defesa em profundidade |
+| Frontend menor | Cor SourceBadges, UUID, dynamic fallback, teste RegionSelector | 3,5h | Quick wins |
+| Frontend polimento | Tema Dim, SavedSearches null, page.tsx monolitico, heading acento | 6,75h | Refinamento |
+| Longo prazo | Pipeline de ingestao batch PNCP (pre-computed data) | 40h | Elimina buscas on-demand. Requer Supabase. |
 
-| Item | Descricao em linguagem de negocio | Horas |
-|------|-----------------------------------|-------|
-| Banco de dados | Habilita historico de buscas, preferencias e funcionalidades que exigem persistencia | 8-16h |
-| Versionamento de API | Atualizacoes no backend nao quebram a interface do usuario | 4-8h |
-| Testes de contrato | Backend e frontend validados automaticamente um contra o outro | 4-8h |
-| Componentes de interface acessiveis | Menus e dialogos funcionam corretamente com leitores de tela | 3h |
-| Alinhamento visual de temas | Eliminacao de flash visual ao trocar de tema | 3h |
-| Indicador de conexao | Usuarios sabem quando estao sem internet (em vez de erros genericos) | 4h |
-| Simplificacao de componente grande | Componente de 450+ linhas dividido em partes menores e testaveis | 6h |
-| Testes de integracao | Frontend e backend testados juntos automaticamente no CI | 4-8h |
-
-- **Custo:** R$ 5.400 - R$ 8.400 (~36-56 horas)
-- **ROI:** Experiencia do usuario + velocidade de entrega de novas funcionalidades
+**Subtotal Backlog: ~131h | R$ 19.650** -- a ser priorizado conforme necessidade do negocio apos Sprints 1-3.
 
 ---
 
 ## ROI da Resolucao
 
-| Dimensao | Investimento | Retorno Esperado |
-|----------|--------------|------------------|
-| Financeiro | R$ 23.250 - R$ 34.800 | R$ 95.000 - R$ 305.000 em riscos evitados |
-| Tempo | 155 - 232 horas | Reducao de 40-60% no tempo para novas funcionalidades |
-| Prazo | 5-6 semanas | Produto seguro, estavel e pronto para escalar |
-| Seguranca | R$ 7.800 - R$ 12.600 (Sprints 1+2) | Protecao contra indisponibilidade, abuso e bloqueio pelo PNCP |
-| Performance | R$ 4.350 - R$ 8.550 (Sprint 3) | Downloads confiaveis, busca rapida, servidor estavel |
-| Escalabilidade | R$ 5.400 - R$ 8.400 (Sprint 4) | Banco de dados + API versionada = fundacao para crescer |
+| | Investimento | Retorno Esperado |
+|--|-------------|------------------|
+| **Spike palavraChave** | R$ 300 (2h) | Se funcionar: reducao de 10-20x no volume processado. **R$ 300 que podem economizar R$ 5.000 - R$ 10.000 em trabalho futuro e eliminar problemas de truncamento, memoria e timeout.** |
+| **Sprint 1** | R$ 9.750 (65h) | Persistencia de dados habilitada. Sem persistencia, nao ha modelo de assinatura viavel. **Habilita toda a receita futura do SaaS.** |
+| **Sprint 2** | R$ 5.400 (36h) | Reducao de 20-40% em falsos positivos. Retencao estimada de 15-25% mais usuarios. Para 100 usuarios a R$200/mes: **R$ 3.600 - R$ 6.000/mes em receita protegida.** |
+| **Sprint 3** | R$ 5.400 (36h) | 10% mais resultados relevantes (stemming). Menos memoria consumida. **Diferenciacao competitiva em qualidade de busca.** |
+| **Total Sprints 1-3** | **R$ 20.550** | **Plataforma pronta para producao, modelo SaaS viavel, qualidade de busca competitiva** |
 
-### Calculo de ROI
-
-**Cenario conservador:**
-
-- Investimento: R$ 23.250
-- Riscos evitados (ponderados por probabilidade): R$ 95.000
-- **ROI: 4:1** -- cada R$ 1 investido evita R$ 4 em perdas potenciais
-
-**Cenario moderado:**
-
-- Investimento: R$ 29.000 (ponto medio)
-- Riscos evitados: R$ 200.000
-- **ROI: 7:1** -- cada R$ 1 investido evita R$ 7 em perdas potenciais
-
-**Cenario pessimista (multiplos riscos simultaneos):**
-
-- Investimento: R$ 34.800
-- Perdas potenciais evitadas: R$ 450.000
-- **ROI: 13:1**
-
-### Beneficios Nao Quantificaveis
-
-- Conformidade com a Lei Brasileira de Inclusao (Lei 13.146/2015)
-- Conformidade com LGPD (protecao de dados)
-- Confianca do mercado em ferramenta que interage com governo
-- Capacidade de atrair investimento com base tecnica solida
-- Base de codigo limpa atrai e retem desenvolvedores talentosos
+| Comparacao | Valor |
+|------------|-------|
+| Investimento planejado (Sprints 1-3) | R$ 20.550 |
+| Custo estimado de nao resolver (12 meses) | R$ 100.000 - R$ 350.000 |
+| **Ratio custo/beneficio** | **1:5 a 1:17** |
+| Payback estimado | 3-4 meses de operacao com 50+ assinantes |
 
 ---
 
 ## Proximos Passos
 
-1. [ ] Aprovar orcamento de R$ 23.250 - R$ 34.800 para o plano completo (4 sprints, 5-6 semanas)
-2. [ ] Iniciar Sprint 1 (Quick Wins) imediatamente -- R$ 1.350, retorno em 1-2 dias
-3. [ ] Alocar desenvolvedor backend para Sprint 2 (autenticacao + filas)
-4. [ ] Alocar desenvolvedor frontend para Sprint 2 (busca + acessibilidade)
-5. [ ] Suspender divulgacao publica ate conclusao do Sprint 2
-6. [ ] Medir cobertura de testes do backend (`pytest --cov`) -- acao pendente pre-execucao
-7. [ ] Definir provedor Redis e infraestrutura para Sprint 3
-8. [ ] Review semanal de progresso a cada sprint
+1. [ ] **Aprovar orcamento** -- Sprints 1 e 2 (R$ 15.150) como prioridade imediata
+2. [ ] **Executar spike `palavraChave`** -- 2 horas, resultado define prioridades de todos os sprints
+3. [ ] **Definir sprint backlog** -- com base no resultado do spike, confirmar ou ajustar prioridades
+4. [ ] **Alocar time** -- 1-2 desenvolvedores para Sprint 1 (2-4 semanas)
+5. [ ] **Iniciar Sprint 1** -- comecar por FE-005 (erro silencioso) e seguranca JWT em paralelo com planejamento Supabase
+6. [ ] **Revisao pos-Sprint 1** -- avaliar resultados, confirmar Sprint 2
+7. [ ] **Aprovar Sprint 3** (R$ 5.400) -- apos resultados dos Sprints 1 e 2
+8. [ ] **Avaliar backlog** -- priorizar os R$ 19.650 restantes conforme necessidade do negocio
 
 ### Decisoes Necessarias
 
 | Decisao | Responsavel | Prazo |
 |---------|-------------|-------|
-| Aprovar orcamento do plano completo | Diretor de Produto | Imediato |
-| Modelo de autenticacao (JWT stateless vs outro) | CTO + Produto | Antes do Sprint 2 |
-| Provedor de infraestrutura Redis | CTO / DevOps | Antes do Sprint 3 |
-| Banco de dados para persistencia (Sprint 4) | CTO / DevOps | Semana 4 |
-| Politica de rotacao de secrets e credenciais | DevOps + Seguranca | Sprint 2 |
+| Aprovar orcamento Sprints 1-2 | Diretor de Produto / CEO | Imediato |
+| Resultado do spike `palavraChave` | Time de Desenvolvimento | Semana 1 |
+| Modelo de identidade (design SYS-002) | CTO + Produto | Semana 1-2 |
+| Credenciais e projeto Supabase | CTO / DevOps | Antes do Sprint 1 (migracao) |
+| Aprovar Sprint 3 | Diretor de Produto | Semana 5-6 |
 
 ---
 
@@ -288,38 +331,37 @@ Itens que habilitam a proxima fase de crescimento do produto.
 
 | Documento | Localizacao |
 |-----------|-------------|
-| Assessment Tecnico Completo (55 debitos detalhados) | [technical-debt-assessment.md](../prd/technical-debt-assessment.md) |
-| Arquitetura do Sistema | [system-architecture.md](../architecture/system-architecture.md) |
-| Especificacao Frontend | [frontend-spec.md](../frontend/frontend-spec.md) |
-| Review QA | [qa-review.md](../reviews/qa-review.md) |
-| Review UX Specialist | [ux-specialist-review.md](../reviews/ux-specialist-review.md) |
+| Assessment Tecnico Completo (60 debitos detalhados) | [`docs/prd/technical-debt-assessment.md`](../prd/technical-debt-assessment.md) |
+| Inventario com severidade, horas e prioridade | Incluido no assessment (secao "Inventario Completo") |
+| Matriz de dependencias entre itens | Incluido no assessment (secao "Dependencias entre Items") |
+| Criterios de sucesso com metricas quantitativas | Incluido no assessment (secao "Criterios de Sucesso") |
+| Fluxo de dependencias visual | Incluido no assessment (secao "Plano de Resolucao") |
 
 ### Glossario para Stakeholders
 
 | Termo | Significado |
 |-------|-------------|
-| PNCP | Portal Nacional de Contratacoes Publicas -- fonte dos dados de licitacoes |
+| PNCP | Portal Nacional de Contratacoes Publicas -- fonte oficial dos dados de licitacoes |
+| Supabase | Plataforma de banco de dados PostgreSQL na nuvem, com backups automaticos |
+| Falso positivo (FP) | Resultado de busca que aparece mas nao e relevante para o usuario |
+| Falso negativo (FN) | Resultado relevante que deveria aparecer mas nao aparece |
+| Stemming | Tecnica que reconhece variantes gramaticais ("uniforme" encontra "uniformizado") |
 | WCAG AA | Padrao internacional de acessibilidade digital (nivel intermediario) |
-| LBI | Lei Brasileira de Inclusao (Lei 13.146/2015) -- exige acessibilidade digital |
-| LGPD | Lei Geral de Protecao de Dados -- regulamenta tratamento de dados pessoais |
+| SaaS | Software as a Service -- modelo de negocio por assinatura |
 | Sprint | Ciclo de trabalho com duracao e entregas definidas |
 | Debito tecnico | Decisoes de implementacao que funcionam hoje mas criam riscos ou custos futuros |
-| JWT | Token de autenticacao que identifica usuarios sem precisar de banco de dados |
-| Redis | Banco de dados em memoria usado para cache e filas de processamento |
-| CSP / HSTS | Protecoes padrao da web que previnem ataques comuns |
-| ROI | Retorno sobre investimento -- quanto cada real investido gera em valor ou economia |
+| OOM | Out of Memory -- quando o servidor fica sem memoria e para de funcionar |
 
 ### Metodologia
 
 - **Taxa base:** R$ 150/hora (desenvolvedor mid-senior)
-- **Faixas de estimativa:** Horas minimas e maximas por item, validadas por 3 especialistas (arquiteto, UX, QA)
-- **Riscos financeiros:** Estimados com base em benchmarks de mercado para empresas SaaS B2G (Business-to-Government)
+- **Estimativas:** Horas por item, validadas por 4 especialistas (arquiteto, engenheiro de dados, especialista UX, QA)
+- **Riscos financeiros:** Estimados com base em benchmarks de mercado para SaaS B2G (Business-to-Government)
 - **ROI:** Calculado como (riscos evitados ponderados por probabilidade) / (investimento em resolucao)
-- **Evolucao:** Comparacao direta com assessment v1.0 (07/03/2026)
+- **Commit de referencia:** Todos os detalhes tecnicos verificados contra o codigo-fonte no commit 5e56b38d
 
 ---
 
-*Relatorio preparado em 2026-03-09*
-*Baseado no Assessment Tecnico FINAL v2.0 (Brownfield Discovery Fases 1, 3, 4, 6, 7)*
-*Validado por: @architect (Atlas), @ux-design-expert (Vera), @qa (Quinn)*
-*Para duvidas, contate @analyst (Ada)*
+*Relatorio preparado em 2026-03-09 por @analyst (Athena)*
+*Baseado no Technical Debt Assessment FINAL v1.0*
+*Validado por: @architect (Atlas), @data-engineer (Delphi), @ux-design-expert (Pixel), @qa (Quartz)*

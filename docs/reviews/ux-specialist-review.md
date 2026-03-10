@@ -1,251 +1,437 @@
 # UX Specialist Review
-## Reviewer: @ux-design-expert (Vera)
-## Data: 2026-03-09
+**Reviewer:** @ux-design-expert (Pixel)
+**Date:** 2026-03-09
 
-> **Note:** This review supersedes the previous review by @ux-design-expert (Pixel) dated 2026-03-07.
-> The codebase has changed substantially since that review -- the god component has been decomposed,
-> accessibility improvements have been implemented, and the debt IDs have been renumbered (UXD-* scheme).
-> All assessments below are based on the current codebase state as of commit 9c47d4ce.
+> **Note:** This review supersedes the previous review by @ux-design-expert (Vera) dated 2026-03-09.
+> The codebase has changed substantially since that review -- LoadingProgress has been decomposed,
+> ThemeProvider refactored to CSS cascade, SavedSearchesDropdown has full ARIA listbox, SaveSearchDialog
+> uses native `<dialog>`, and Ctrl+Enter keyboard shortcut is implemented.
+> The technical debt IDs have been renumbered from UXD-* to FE-* scheme in the consolidated DRAFT.
+> All assessments below are based on the current codebase state as of commit 5e56b38d.
 
 ---
 
-## Summary
+## Gate Status: NEEDS REVISION
 
-I reviewed all 20 UXD-* debts and 12 cross-cutting (XD-*) debts from the technical debt DRAFT against the actual codebase. The assessment is largely accurate. I validated 19 of 20 UXD debts, adjusted severity on 4 items, and found 3 new debts that were missed. The most impactful finding remains UXD-001 (multi-word terms impossible) -- this is a genuine user-facing bug that blocks legitimate search workflows. From a pure UX perspective, the hardcoded Tailwind colors in SearchSummary (UXD-018) should be elevated because they cause visible breakage in Sepia/Paperwhite themes, directly degrading the experience for users who chose those themes.
-
-The previous review (Pixel, 2026-03-07) referenced debts (TD-004 god component, TD-008 focus trap, TD-009 Escape key, etc.) that have since been resolved. The current codebase is in substantially better shape: page.tsx is 185 lines, focus traps and ARIA roles are implemented, Escape handlers are present, and test coverage is at ~68%. The remaining debts are real but less severe than the previous assessment.
+The DRAFT is substantially well-researched. The FE debt items are accurate, and the deep dives on search quality and large-volume scenarios are strong. However, I identify **5 missing UX debt items**, several severity adjustments, and critical UX gaps in the search results experience that must be addressed before this document is finalized.
 
 ---
 
 ## Debitos Validados
 
-| ID | Debito | Severidade Original | Severidade Ajustada | Horas | Prioridade | Impacto UX | Notas |
-|----|--------|---------------------|---------------------|-------|------------|------------|-------|
-| UXD-001 | Termos multi-palavras impossiveis | **Alta** | **Alta** | 3h | **P1** | Critico | Confirmado: SearchForm.tsx linha 113, espaco (`val.endsWith(" ")`) dispara criacao de token. Usuarios de licitacoes frequentemente buscam termos compostos ("camisa polo", "material de limpeza"). Bloqueador funcional real. |
-| UXD-002 | Sem loading state para fetch de setores | Media | Media | 1h | P3 | Medio | Confirmado: useSearchForm.ts usa FALLBACK_SETORES hardcoded (7 setores) enquanto busca. Dropdown nunca fica completamente vazio, mas setores podem estar desatualizados momentaneamente. Impacto menor que o previsto devido ao fallback. |
-| UXD-003 | Sem pagina 404 | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: nenhum `not-found.tsx` encontrado. Impacto baixo pois app tem rota unica. |
-| UXD-004 | Sem atalho de teclado para busca | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: Enter no input de termos cria token, nao submete busca. Campos de data nao tem handler de Enter. |
-| UXD-005 | SavedSearchesDropdown sem ARIA listbox | Media | Media | 3h | P3 | Medio | Confirmado: usa `div` com backdrop fixo inset-0. Funcional mas semanticamente incorreto. `aria-expanded` e `aria-haspopup` presentes, porem falta `role="listbox"` e `role="option"` nos itens. |
-| UXD-006 | SaveSearchDialog sem `<dialog>` nativo | Media | **Baixa** | 2h | P4 | Baixo | Confirmado: usa `div` com `role="dialog"` e `aria-modal="true"`. Focus trap manual funciona corretamente (Tab cycling, Escape). A implementacao atual atende ARIA spec. Migrar para `<dialog>` nativo e melhoria de codigo, nao de UX. Severidade reduzida. |
-| UXD-007 | Sem elemento `<form>` envolvendo formulario | Media | Media | 2h | P3 | Medio | Confirmado: page.tsx nao envolve o formulario em `<form>`. Impede autofill do browser e submissao nativa. Afeta usabilidade em mobile (teclado nao mostra "Go"/"Enviar"). |
-| UXD-008 | Mixpanel importado incondicionalmente | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: AnalyticsProvider importa mixpanel-browser no topo. ~40KB de bundle desnecessario quando analytics desabilitado. Impacto em performance, nao em UX diretamente. |
-| UXD-009 | Sem confirmacao page unload durante busca | Baixa | Baixa | 0.5h | P4 | Baixo | Parcialmente abordado: LoadingProgress.tsx ja tem listener `beforeunload` mas apenas para analytics tracking (trackEvent), nao para exibir confirmacao ao usuario. Falta adicionar `e.preventDefault(); e.returnValue = ""` para mostrar dialogo nativo do browser. Esforco reduzido pois o listener ja existe. |
-| UXD-010 | ThemeProvider imperativo (30+ props CSS) | Baixa | Baixa | 8h | P4 | Baixo | Confirmado: `applyTheme()` em ThemeProvider.tsx faz 30+ chamadas `root.style.setProperty()`. Funcional mas dificil de manter. Refatorar para data-attribute + CSS rules melhoraria DX mas nao afeta UX diretamente. |
-| UXD-011 | Script FOUC duplica logica do ThemeProvider | Media | Media | 3h | P3 | Medio | Confirmado: layout.tsx linhas 41-61 duplicam parcialmente a logica do ThemeProvider (canvas/ink apenas, dark class). Script inline aplica apenas 2-4 propriedades vs 30+ do ThemeProvider completo. Flash parcial possivel em Sepia/Paperwhite (surfaces e borders nao aplicadas no script inline). |
-| UXD-012 | Sem indicador offline/rede | Media | Media | 4h | P3 | Medio | Confirmado: nenhum uso de `navigator.onLine` ou Network Information API encontrado. Erros de rede durante polling mostram mensagem generica. |
-| UXD-013 | Footer sem conteudo significativo | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: page.tsx linha 180-182, footer contem apenas "DescompLicita -- Licitacoes e Contratos de Forma Descomplicada". Sem links de utilidade. |
-| UXD-014 | SourceBadges sem acentos portugues | Baixa | Baixa | 0.25h | P4 (Quick Win) | Baixo | Confirmado: SourceBadges.tsx linha 112, `combinac{...}oes` / `combinac{...}ao` sem acentuacao correta. |
-| UXD-015 | Sem auditoria de contraste (5 temas) | Media | **Alta** | 4h | **P2** | Alto | Confirmado e severidade elevada. ThemeProvider.tsx mostra que Sepia e Paperwhite tem tratamento especial para surfaces, mas cores semanticas como `--ink-secondary: #3d5975` sobre `--canvas: #EDE0CC` (Sepia) precisam verificacao. Acessibilidade e obrigacao legal (LBI 13.146/2015, WCAG AA), nao opcional. |
-| UXD-016 | LoadingProgress 450+ linhas | Media | Media | 6h | P3 | Baixo | Confirmado: 452 linhas. Componente funcional e complexo por natureza. Decomposicao melhora manutenibilidade mas nao afeta UX do usuario final. |
-| UXD-017 | Setores fallback hardcoded | Baixa | Baixa | 1h | P4 | Baixo | Confirmado: useSearchForm.ts linhas 45-51, 7 setores hardcoded como FALLBACK_SETORES. Risco de drift se backend adicionar ou remover setores. |
-| UXD-018 | Cores hardcoded em SearchSummary | Baixa | **Media** | 1h | **P2** (Quick Win) | Medio | Confirmado e severidade elevada: SearchSummary.tsx linhas 26-33 usam `bg-blue-100 text-blue-800` e `bg-purple-100 text-purple-800` com fallback `dark:`. Essas cores ignoram completamente os temas Sepia e Paperwhite, criando badges visualmente inconsistentes. Usuarios desses temas veem cores que nao combinam com o restante da interface. |
-| UXD-019 | carouselData com cores hardcoded | Baixa | **Media** | 2h | P3 | Medio | Confirmado e severidade elevada: carouselData.ts usa `bg-blue-50 dark:bg-blue-950/30`, `bg-green-50`, etc. Mesma questao do UXD-018 -- ignora Sepia/Paperwhite. Porem impacto menor pois carrossel so aparece durante loading (transiente). |
-| UXD-020 | Sem noValidate no form | Baixa | Baixa | 0.1h | P4 (Quick Win) | Trivial | Confirmado: nenhum uso de `noValidate` encontrado. Porem, sem elemento `<form>` (UXD-007), `noValidate` nao se aplica atualmente. Este debito depende de UXD-007 ser resolvido primeiro. |
-
----
-
-## Debitos Removidos
-
-Nenhum debito completamente removido. Todos os 20 UXD debts sao reais e verificados no codigo.
-
-**UXD-020 merece nota:** embora valido, e inoperante ate que UXD-007 (adicionar `<form>`) seja resolvido. Nao e um falso positivo, mas e uma dependencia que deve ser documentada.
+| ID | Debito | Severidade Original -> Revisada | Horas | Prioridade | Impacto UX |
+|----|--------|--------------------------------|-------|------------|------------|
+| FE-001 | Cores hardcoded em SearchSummary badges | Alta -> **Alta** (confirmado) | 1h | P2 | Badges `bg-blue-100 text-blue-800` e `bg-purple-100 text-purple-800` nao respondem a temas paperwhite/sepia/dim. Verificado no codigo: linhas 26-34 de `SearchSummary.tsx`. Em sepia (`--canvas: #EDE0CC`), os badges azul/roxo criam contraste visual chocante e perdem legibilidade. |
+| FE-002 | Cor hardcoded em SourceBadges warning | Baixa -> **Baixa** (confirmado) | 0.5h | P4 | `text-amber-600 dark:text-amber-400` na linha 111 de `SourceBadges.tsx` nao usa o token `text-warning`. Impacto real e minimo -- amber e proximo de warning em todos os temas, mas viola a consistencia do design system. |
+| FE-003 | UUID dependency desnecessaria | Baixa -> **Baixa** (confirmado) | 0.5h | P4 | Sem impacto UX direto. Apenas bundle size. |
+| FE-004 | Spinner component ausente | Media -> **Media** (confirmado) | 1h | P3 | SVG spinner duplicado em `SearchForm.tsx` (linhas 67-70) e `SearchActions.tsx`. Risco de drift visual entre as duas instancias. |
+| FE-005 | Error swallowing em ItemsList | Alta -> **Critica** (elevada) | 2h | **P1** | Verificado: `catch {}` vazio na linha 44 de `ItemsList.tsx`. O teste `ItemsList.test.tsx` linha 141-150 confirma que o cenario de erro e tratado como "graceful" mas na realidade o usuario fica preso em "Carregando..." ou ve uma lista vazia sem explicacao. Para buscas de grande volume onde paginacao e essencial, isso e **critico**. Sem retry, sem mensagem, sem Sentry logging. |
+| FE-006 | Button component ausente | Media -> **Media** (confirmado) | 3h | P3 | Botoes inline com classes longas em `page.tsx` (linha 138-141), `EmptyState.tsx` (linha 131), `SearchActions.tsx`, etc. Drift ja visivel: o botao "Tentar novamente" em `page.tsx` usa `bg-error` enquanto outros usam `bg-brand-navy`. |
+| FE-007 | ink-muted contraste < WCAG AA | Media -> **Alta** (elevada) | 1h | **P2** | `#5a6a7a` contra `#ffffff` = 4.1:1 (abaixo de 4.5:1). Usado extensivamente para timestamps, metadata, hints em `ItemsList.tsx`, `Pagination.tsx`, `ProgressBar.tsx`, `EmptyState.tsx`, e footer. Isso afeta leitura de informacao crucial como datas, valores, e contagem de resultados. Nota: paperwhite (`#526272` contra `#F5F0E8` = ~4.6:1) e sepia (`#4a5968` contra `#EDE0CC` = ~5.2:1) ja estao adequados. Apenas o tema light esta abaixo. Recomendacao: alterar `--ink-muted` no `:root` de `#5a6a7a` para `#4f5f6f` (~4.8:1) -- ajuste minimo que atinge AA. |
+| FE-008 | Link /termos quebrado | Media -> **Media** (confirmado) | 2h | P3 | Verificado em `page.tsx` linha 202: `<a href="/termos">`. Rota inexistente. Cada usuario ve um link quebrado no footer. |
+| FE-009 | Sem fallback para dynamic imports | Baixa -> **Baixa** (confirmado) | 1h | P4 | `EmptyState` e `ItemsList` importados via `next/dynamic` sem `loading` fallback em `page.tsx` linhas 36-42. Chunk load failure = secao em branco. |
+| FE-010 | Teste RegionSelector ausente | Baixa -> **Baixa** (confirmado) | 1.5h | P4 | Sem impacto UX direto. |
+| FE-011 | Teste SourceBadges ausente | Media -> **Media** (confirmado) | 2h | P3 | Componente com logica condicional complexa (status colors, dedup stats, truncation warning) sem teste. Risco de regressao. |
+| FE-012 | Tema Dim incompleto | Baixa -> **Baixa** (confirmado) | 2h | P4 | Verificado em `globals.css` linhas 109-112: dim so sobrescreve `--canvas` e `--surface-0`. Herda tudo de `.dark`. Dim e indistinguivel de dark para a maioria dos elementos. |
+| FE-013 | SavedSearchesDropdown null durante loading | Baixa -> **Baixa** (confirmado) | 0.5h | P5 | Layout shift breve. Impacto minimo. |
+| FE-014 | page.tsx monolitico | Baixa -> **Baixa** (confirmado) | 4h | P5 | 209 linhas com `"use client"`. Nao causa problemas de performance observaveis ainda, mas limita oportunidades de SSR. |
 
 ---
 
 ## Debitos Adicionados
 
-| ID | Debito | Severidade | Horas | Prioridade | Impacto UX |
-|----|--------|------------|-------|------------|------------|
-| UXD-021 | **Cores amber hardcoded em SourceBadges e carouselData.** SourceBadges.tsx linha 111 usa `text-amber-600 dark:text-amber-400` para mensagem de truncamento, e carouselData.ts linha 46 usa `text-amber-600 dark:text-amber-400` para categoria "dica". Mesma classe de problema que UXD-018/019 -- nao responsivo aos temas Sepia/Paperwhite. Deveria usar token `text-warning`. | Baixa | 0.5h | P4 (Quick Win) | Baixo |
-| UXD-022 | **Sem `aria-required` em campos obrigatorios.** Nenhum campo do formulario marca campos obrigatorios com `aria-required="true"`. Verificado: zero resultados para `aria-required` no frontend. Screen readers nao anunciam quais campos sao mandatorios (UF, datas). Afeta acessibilidade. | Media | 0.5h | P2 (Quick Win) | Medio |
-| UXD-023 | **Delete confirmation timeout (3s) inacessivel para screen readers.** SavedSearchesDropdown.tsx linha 93 usa `setTimeout(() => setDeleteConfirmId(null), 3000)` e linha 199 faz o mesmo para "Limpar todas". Usuarios de screen reader ou com deficiencias motoras podem nao conseguir confirmar a acao em 3 segundos. WCAG 2.2.1 (Timing Adjustable) recomenda no minimo 20 segundos ou remocao do timeout. | Media | 1h | P2 | Medio |
+### FE-015: Sem Highlight de Termos de Busca nos Resultados (NOVO)
+
+- **Severidade:** Alta
+- **Impacto UX:** Quando o usuario busca por termos customizados (ex: `"jaleco medico"`), os resultados em `ItemsList.tsx` exibem o campo `objeto` como texto puro (`item.objeto` na linha 79) sem nenhum destaque visual dos termos que causaram o match. O usuario nao consegue avaliar rapidamente POR QUE um resultado foi retornado, dificultando a identificacao de falsos positivos e a triagem eficiente de resultados.
+- **Esforco:** 4h
+- **Prioridade:** P2
+- **Recomendacao:** Implementar highlight dos termos de busca no texto do `objeto`. Receber os termos de busca como prop no `ItemsList` e aplicar `<mark>` ou `<span class="bg-warning-subtle font-medium">` nos trechos correspondentes. Considerar normalizacao de acentos no highlight (ex: busca por "licitacao" deve destacar "licitacao" no resultado).
+
+### FE-016: Sem Advertencia Proativa para Buscas de Grande Volume (NOVO)
+
+- **Severidade:** Alta
+- **Impacto UX:** Quando o usuario seleciona "Selecionar todos" (27 UFs) e um range de 30+ dias, nao ha nenhum feedback visual indicando que a busca sera demorada. O `UfSelector.tsx` mostra apenas "27 estados selecionados" (linha 70) sem nenhum aviso. O usuario clica "Buscar" sem expectativa do tempo necessario (potencialmente 5-10 minutos). Isso leva a abandono da busca, confusao sobre se o sistema travou, e uso desnecessario de recursos.
+- **Esforco:** 3h
+- **Prioridade:** P2
+- **Recomendacao:** Adicionar um banner de aviso condicional no `UfSelector.tsx` ou entre o seletor e o botao de busca. Trigger: `ufsSelecionadas.size > 10` OU date range > 30 dias. Texto sugerido: "Buscas com muitos estados e/ou periodos longos podem demorar varios minutos. Para resultados mais rapidos, selecione ate 10 estados e um periodo de ate 14 dias." Formato: banner informativo com icone, nao bloqueante.
+
+### FE-017: Mensagem de Timeout Generica sem Orientacao (NOVO)
+
+- **Severidade:** Media
+- **Impacto UX:** Quando o polling timeout de 10 minutos e atingido, a mensagem exibida e: `"A consulta excedeu o tempo limite. Tente com menos estados ou um periodo menor."` (linha 163 de `useSearchJob.ts`). Embora inclua uma sugestao basica, nao ha: (a) contexto sobre quantos estados/dias foram selecionados; (b) sugestao especifica de reducao (ex: "Voce selecionou 27 estados -- tente com 5-10"); (c) opcao de re-tentar com parametros reduzidos automaticamente; (d) indicacao se resultados parciais estao disponiveis.
+- **Esforco:** 2h
+- **Prioridade:** P3
+- **Recomendacao:** Enriquecer a mensagem de timeout com contexto do cenario: `"A busca em {N} estados por {M} dias excedeu o limite de 10 minutos. Sugestao: reduza para {N/2} estados ou {M/2} dias para resultados mais rapidos."` Considerar oferecer um botao "Tentar com menos estados" que pre-configura uma selecao reduzida.
+
+### FE-018: ItemsList Heading com Acento Faltando (NOVO)
+
+- **Severidade:** Baixa
+- **Impacto UX:** O heading em `ItemsList.tsx` linha 63 exibe `"Licitacoes Encontradas"` sem acentos (cedilha e til) em vez de `"Licita\u00e7\u00f5es Encontradas"`. Verificado no teste `ItemsList.test.tsx` linhas 35-36 que o texto tambem aparece sem acentos. Embora o restante da aplicacao use acentos corretos (ex: `page.tsx` linha 120: `"Busca de Licita\u00e7\u00f5es"`), este componente usa texto sem acento, criando inconsistencia.
+- **Esforco:** 0.25h
+- **Prioridade:** P4
+- **Recomendacao:** Corrigir para `"Licita\u00e7\u00f5es Encontradas"` com acentos e cedilha. Atualizar o teste correspondente.
+
+### FE-019: Sem Protecao contra Race Conditions na Paginacao (NOVO)
+
+- **Severidade:** Media
+- **Impacto UX:** O `ItemsList.tsx` `fetchPage` callback (linhas 30-51) nao usa AbortController. Quando o usuario navega rapidamente entre paginas, cada mudanca dispara um fetch independente. Se a resposta da pagina 3 chegar depois da resposta da pagina 5, o usuario vera itens da pagina 3 enquanto a UI indica pagina 5. Nao ha debounce no `onPageChange` do `Pagination` component. Em conexoes lentas ou com grande volume de dados (85K items desserializados por request, conforme DB-009), essa race condition e provavel.
+- **Esforco:** 2h
+- **Prioridade:** P3
+- **Recomendacao:** (1) Adicionar `AbortController` em `fetchPage` para cancelar requests anteriores quando uma nova pagina e solicitada. (2) Opcionalmente adicionar debounce de 150ms no `onPageChange`. O pattern de AbortController ja existe implicitamente na estrutura do `useCallback` -- basta adicionar um `abortControllerRef`.
 
 ---
 
-## Cross-cutting Debts Review
+## Deep Dive: Search UX
 
-### XD-SEC-01 (Headers de seguranca ausentes) - Media
-**Impacto UX:** Indireto. CSP poderia bloquear o inline script de FOUC (layout.tsx linhas 41-63) se implementado sem `nonce` ou hash. Ao implementar CSP, sera necessario alinhar com UXD-010/011 para evitar retrabalho.
+### Fluxo de Busca por Termos Customizados
 
-### XD-SEC-02 (Autenticacao fragil end-to-end) - Critica
-**Impacto UX:** Nenhum impacto UX direto na versao atual (POC sem login). Quando auth for implementado, sera necessario adicionar fluxo de login, registro, e tratamento de sessao expirada no frontend. Planejar UX de auth antecipadamente evitara retrabalho significativo.
+**Mecanismo de entrada de termos** (`SearchForm.tsx` linhas 119-155): O usuario digita um termo e pressiona `espaco` ou `Enter` para confirmar. Termos sao transformados em chips visuais com botao de remocao. Multi-word terms sao suportados via aspas no backend (`parse_multi_word_terms`), mas a UI do frontend nao oferece affordance para multi-word -- o espaco cria um token novo. O hint text (linha 157-158) diz "Digite cada termo e pressione espaco para confirmar" mas nao menciona aspas ou virgulas.
 
-### XD-SEC-03 (dangerouslySetInnerHTML + sem CSP) - Media
-**Impacto UX:** Confirmado em layout.tsx linhas 41-63. O script inline e seguro hoje (sem input de usuario), mas quando CSP for adicionado, este script precisara ser refatorado. Alinhar com UXD-010/011.
+**Achados:**
 
-### XD-API-01 (Sem versionamento de API) - Media
-**Impacto UX:** Mudancas no backend podem quebrar o frontend silenciosamente. Usuarios veriam erros genericos. Impacto mitigado pelo BFF pattern (API routes em Next.js atuam como adaptadores).
+1. **Termos com acentos sao aceitos e exibidos corretamente** no input e nos chips. O `onChange` handler (linha 127) aplica `.toLowerCase()` mas preserva acentos. A normalizacao de acentos acontece no backend (`normalize_text()`), nao no frontend. Isso e correto -- o frontend preserva o que o usuario digitou.
 
-### XD-API-02 (Sem testes de contrato) - Media
-**Impacto UX:** Drift entre tipos TypeScript e schemas Pydantic pode causar dados undefined no frontend, resultando em UI quebrada (texto faltando, contadores incorretos, downloads silenciosamente falhando).
+2. **Sem preview/feedback de matching**: O usuario nao sabe quais termos farao match ate ver os resultados. Nao ha auto-suggest, auto-complete, ou indicacao de que acentos serao normalizados.
 
-### XD-API-03 (Codigos de erro nao estruturados) - Baixa
-**Impacto UX:** Frontend depende de parsing de texto livre para exibir erros. Mensagens de erro podem ser confusas se backend mudar wording. Severidade adequada.
+3. **Resultados nao indicam relevancia**: `ItemsList.tsx` exibe os items como lista flat sem score, ranking, ou indicacao de por que o item apareceu. O usuario nao consegue distinguir um match forte (termo no titulo) de um match fraco (termo em contexto ambiguo).
 
-### XD-PERF-01 (Download bufferizado em cadeia) - Alta
-**Impacto UX:** Alto. Usuarios experimentam delay significativo entre clicar "Download" e receber o arquivo. Sem indicador de progresso real para o download (apenas spinner). Para arquivos grandes, pode causar timeout (TD-H06) sem feedback claro ao usuario.
+4. **Sem filtro/refinamento pos-busca**: Uma vez que os resultados aparecem, o usuario nao pode filtrar por UF, valor, data, ou tipo. A unica acao e uma nova busca do zero.
 
-### XD-PERF-02 (Sem paginacao end-to-end) - Media
-**Impacto UX:** Medio. O componente SearchSummary mostra resumo AI e o download Excel e o CTA principal, entao a maioria dos usuarios nao precisa percorrer resultados individualmente. Impacto aumentara quando lista detalhada de licitacoes for implementada.
+### Fluxo "No Results Found"
 
-### XD-PERF-03 (Polling intervalo fixo) - Baixa
-**Impacto UX:** Baixo. Polling a cada 2s e imperceptivel para o usuario. Backoff exponencial economizaria requests mas nao melhoraria UX perceptivelmente. Severidade adequada.
+O `EmptyState.tsx` e **bem implementado**:
+- Exibe contagem de items brutos encontrados vs rejeitados
+- Breakdown por motivo de rejeicao (keyword, valor, UF) com contagens individuais
+- Tips actionaveis para cada motivo de rejeicao
+- Sugestoes genericas (ampliar periodo, selecionar mais estados, trocar setor)
+- Botao "Ajustar criterios de busca" que faz scroll to top
+- Estatisticas contextuais (numero de estados pesquisados, modalidades usadas)
 
-### XD-TEST-01 (Sem testes integracao frontend-backend) - Media
-**Impacto UX:** Indireto. Bugs de integracao so sao detectados em producao, afetando usuarios reais.
+**Lacuna encontrada:** O EmptyState usa `sectorName` como default `"uniformes"` (linha 18) quando nao informado. Para buscas por termos customizados, o `sectorName` e passado como `"Licita\u00e7\u00f5es"` (`useSearchForm.ts` linhas 147-149), o que gera a mensagem "Nenhuma licita\u00e7\u00e3o de licita\u00e7\u00f5es encontrada" -- redundante e confusa. O EmptyState deveria exibir os termos de busca em vez do nome do setor quando em modo `termos`.
 
-### XD-TEST-02 (Sem smoke tests pos-deploy) - Media
-**Impacto UX:** Indireto. Deploy quebrado afeta todos os usuarios sem deteccao automatica.
+### Qualidade Visual dos Resultados
 
-### XD-TEST-03 (Sem testes regressao visual) - Baixa
-**Impacto UX:** Com 5 temas, mudancas visuais involuntarias sao provaveis. Regressao visual nos temas Sepia/Paperwhite e particularmente arriscada dado os tokens hardcoded (UXD-018/019/021). Severidade adequada mas importancia cresce com cada correcao de tema.
+O `SearchSummary.tsx` apresenta um **resumo executivo AI forte** com:
+- Total de oportunidades (numero grande, fonte data)
+- Valor total em R$ (numero grande, fonte data)
+- Badges de tipo (licitacao/ata) -- mas com cores hardcoded (FE-001)
+- Alerta de urgencia (condicional, role="alert")
+- Lista de destaques com animacao staggered
+- SourceBadges com detalhamento expansivel
+
+A estrutura e boa, mas os **items individuais** em `ItemsList.tsx` sao significativamente mais pobres em informacao. Cada card mostra:
+- `objeto` (descricao) -- truncado em 2 linhas (`line-clamp-2`)
+- `orgao` (nome do orgao)
+- `uf` (estado, como badge)
+- `valorTotalEstimado` (valor em R$)
+- `dataPublicacao` (data formatada pt-BR)
+- Link "Ver" para o PNCP
+
+**O que falta nos cards de resultado:**
+- Tipo (licitacao vs ata) -- o campo `tipo` e recebido (linha 13 do `ProcurementItem` interface) mas nunca renderizado
+- Score/relevancia
+- Highlight dos termos de busca
+- Modalidade (pregao eletronico, concorrencia, etc.)
+- Status (ativo, encerrado)
+
+---
+
+## Deep Dive: Large Volume Search UX
+
+### O Que o Usuario Ve Durante Busca de 27 UFs x 30 Dias
+
+**Cenario analisado via codigo:**
+
+1. **Botao "Buscar"** muda para "Buscando..." com `aria-busy="true"` -- imediato, bom feedback.
+
+2. **LoadingProgress aparece** (`page.tsx` linhas 143-149) dentro de `aria-live="polite"`:
+   - **ProgressBar**: Barra de progresso com porcentagem, ETA estimado, tempo decorrido, mensagem de status contextual ("Buscando em X/Y estados... (Z licita\u00e7\u00f5es encontradas)")
+   - **UfGrid**: Grid visual de 27 UFs mostrando estados completados (azul escuro), em processamento (azul com pulse animation), e pendentes (cinza) -- **excelente feedback granular**
+   - **StageList**: 5 stages com dots de progresso (queued, fetching, filtering, summarizing, generating_excel) + mobile detail card
+   - **CuriosityCarousel**: Dicas educacionais rotativas a cada 6s, filtradas por setor selecionado -- **muito bom para manter engajamento durante esperas longas**
+   - **SkeletonCards**: Placeholder cards com shimmer animation
+   - **Cancel button**: Sempre visivel, com hover state vermelho
+
+3. **ETA accuracy** (`LoadingProgress.tsx` `getETA()` linhas 41-50):
+   - Para fase `fetching`: calcula ETA baseado em `(ufsTotal - ufsCompleted) * (elapsedSeconds / ufsCompleted) + 20s buffer`. Funciona razoavelmente para 3-10 UFs, mas para 27 UFs o ETA inicial sera impreciso (baseado em poucas amostras) e vai flutuar significativamente nos primeiros estados.
+   - Para fases pos-fetching: ETAs fixos hardcoded (`~15s restantes`, `~10s restantes`, `~5s restantes`). Para 85K items, a fase de filtering pode levar 30-60s, nao 15s. **O ETA hardcoded sera enganoso para grandes volumes.**
+
+4. **Progress bar accuracy**: A funcao `calculateProgress()` (linhas 29-34) usa valores fixos para fases pos-fetching: filtering=60%, summarizing=75%, generating_excel=90%. Para grandes volumes, o usuario pode ficar preso em 60% por minutos enquanto a mensagem diz "~15s restantes".
+
+5. **Timeout scenario**: Apos 10 minutos, o usuario ve: "A consulta excedeu o tempo limite. Tente com menos estados ou um periodo menor." + botao "Tentar novamente". Mensagem generica sem contexto especifico (analisada em FE-017).
+
+### Analise Critica do Feedback para Grande Volume
+
+| Aspecto | Avaliacao | Detalhe |
+|---------|-----------|---------|
+| Progress bar accuracy (fetching) | **Adequada** | Baseia-se em UFs completados / total -- metrica real |
+| Progress bar accuracy (pos-fetching) | **Inadequada** | Valores fixos (60%, 75%, 90%) nao refletem tempo real de filtering/summarizing para 85K items |
+| ETA para fetching | **Imprecisa no inicio** | Com 1 de 27 UFs completo, o ETA extrapola linearmente, mas UFs variam muito em volume (SP vs AC) |
+| ETA pos-fetching | **Enganosa** | Hardcoded `~15s restantes` para filtering quando pode levar 60s+ com 85K items |
+| UF Grid | **Excelente** | Feedback visual granular por estado, pulse animation no estado ativo |
+| Cancel button | **Adequado** | Sempre visivel, acao imediata, tracking de analytics |
+| Tab notification | **Bom** | Titulo muda + browser notification quando backgrounded |
+| Polling overhead | **Adequado** | Exponential backoff de 1s a 15s reduz requests em 60-80% |
+| Curiosity carousel | **Excelente** | Mantém engajamento, filtrado por setor, rotacao a cada 6s com fade |
+
+### Race Condition: Frontend Timeout vs Backend Timeout
+
+Confirmada pelo DRAFT: para 27 UFs, o backend calcula timeout de `300 + (27-5)*15 = 630s` (10.5 min), enquanto o frontend timeout e fixo em `10 * 60 * 1000 = 600000ms` (10 min exatos). O frontend desistira 30 segundos antes do backend completar. O usuario vera erro de timeout mesmo que o backend estivesse prestes a retornar resultados.
+
+### Perguntas Respondidas sobre Grande Volume
+
+**Deve haver hard cap no frontend para UFs ou date range?**
+
+Recomendacao: **NAO** implementar hard cap, mas sim **soft warning** (FE-016). Razoes:
+- Usuarios B2B podem legitimamente precisar de buscas nacionais para analise de mercado
+- Um hard cap seria arbitrario e frustrante -- o usuario sabe melhor o que precisa
+- O backend ja tem protecoes automaticas (reducao de modalidades para >10 UFs, MAX_PAGES_PER_COMBO adaptativo)
+- Melhor UX: informar o usuario sobre o tempo esperado e deixar a decisao com ele
+
+**Formato do aviso:** Banner inline amarelo (usando tokens `bg-warning-subtle text-warning border border-warning/20`) entre o seletor de UFs e o botao de busca. Nao usar modal confirmacao -- seria interruptivo demais para uma acao frequente. Nao usar tooltip -- muito sutil, nao funciona em mobile.
+
+---
+
+## Deep Dive: Search Results Quality UX
+
+### Como o Usuario Avalia Relevancia dos Resultados
+
+**Problema central:** O usuario nao tem ferramentas para avaliar a qualidade dos resultados.
+
+1. **Sem indicacao de score/relevancia**: O tier scoring do backend (A/B/C com pesos 1.0/0.7/0.3) nao e exposto ao frontend. Um item que fez match por Tier A ("uniforme") aparece identico a um que fez match por Tier C ("camisa"). O tipo `ProcurementItem` em `ItemsList.tsx` (linhas 6-15) nao inclui campo de score ou termos matched.
+
+2. **Sem highlight de termos**: Analisado em FE-015. O `objeto` e exibido como texto puro sem destaque dos termos que causaram o match.
+
+3. **Sem filtro pos-busca**: O `ItemsList` recebe apenas `jobId` e `totalFiltered`. Nao ha filtros de UF, valor, data, tipo (licitacao/ata), ou relevancia. O usuario so pode fazer nova busca do zero.
+
+4. **Ordenacao opaca**: Os resultados vem na ordem retornada pelo backend (que ordena por data de publicacao descendente). O usuario nao sabe disso e nao pode re-ordenar. Nao ha indicacao visual da ordenacao.
+
+5. **Tipo (licitacao/ata) oculto nos items**: Os badges de tipo aparecem apenas no `SearchSummary.tsx` como contagem agregada (ex: "150 Licita\u00e7\u00f5es", "30 Atas RP"). Nos items individuais, o campo `tipo` e recebido na interface `ProcurementItem` (linha 13) mas **nunca renderizado**. O usuario nao consegue distinguir licitacoes de atas na lista.
+
+6. **Informacao de truncamento escondida**: O `SourceBadges` mostra warning sobre combos truncados (linhas 110-113), mas essa informacao esta escondida atras do toggle "fontes consultadas" (`expanded` state, default false). O usuario pode nao perceber que esta vendo resultados parciais e tomar decisoes com base em dados incompletos.
+
+### Falsos Positivos -- Perspectiva do Usuario
+
+O DRAFT documenta corretamente que termos customizados desabilitam exclusoes (main.py linha 543). Do ponto de vista UX:
+
+- O usuario que busca "camisa" vera items como "confeccao de camisa de forca" sem nenhuma indicacao visual de que isso pode ser um falso positivo
+- Sem highlight de termos, o usuario precisa ler cada `objeto` inteiro para avaliar relevancia
+- Para 1000+ resultados, isso e impraticavel -- 50+ paginas de 20 items cada
+- O truncamento de `line-clamp-2` em `ItemsList.tsx` agrava o problema: o contexto do match pode estar truncado
+
+**Recomendacoes imediatas:**
+1. Expor o campo `tipo` nos cards de resultado (1h)
+2. Implementar highlight de termos (FE-015, 4h)
+3. Considerar re-ordenacao e filtragem client-side para futuro proximo
+
+---
+
+## Deep Dive: Acentuacao UX
+
+### Input de Busca
+
+**Status: Funcional.** Verificado no codigo:
+
+1. `SearchForm.tsx` linha 124-135: O `onChange` handler faz `.trim().toLowerCase()` mas **preserva acentos**. "Licita\u00e7\u00e3o" se torna "licita\u00e7\u00e3o" (com cedilha preservada, apenas lowercase).
+
+2. Os chips de termos (linhas 96-117) exibem o texto exatamente como digitado (apos lowercase): "licita\u00e7\u00e3o" com acentos intactos.
+
+3. Nao ha normalizacao visual de acentos no frontend -- o usuario ve exatamente o que digitou. Isso e **correto** e nao deve mudar.
+
+### Historico de Busca (Saved Searches)
+
+**Status: Funcional com ressalva.** Os termos sao salvos em localStorage via `savedSearches.ts` com os termos originais (incluindo acentos). `useSearchForm.ts` `loadSearchParams` (linhas 157-182) restaura termos preservando acentos.
+
+**Ressalva:** A funcao `loadSearchParams` (linha 174) faz split por virgula e depois `trim().replace(/^"|"$/g, "")`. Para termos com acentos e aspas como `"licita\u00e7\u00e3o"`, o parsing funciona corretamente. Porem, para termos com virgula interna (improvavel mas possivel em frases longas), o split quebraria o termo.
+
+### Display de Resultados
+
+**Status: Correto.** Os textos de `objeto`, `orgao`, `uf` vem diretamente da API PNCP sem transformacao. O PNCP retorna textos com acentuacao nativa do portugues brasileiro. Verificado que `ItemsList.tsx` renderiza `item.objeto` diretamente (linha 79) sem transformacao.
+
+### Inconsistencia Textual Encontrada
+
+O heading `"Licitacoes Encontradas"` em `ItemsList.tsx` linha 63 esta **sem acentos** (falta cedilha e til), enquanto `page.tsx` linha 120 usa `"Busca de Licita\u00e7\u00f5es"` com acentos corretos. Documentado como FE-018.
+
+### Avaliacao Geral
+
+| Aspecto | Status | Acao Necessaria |
+|---------|--------|-----------------|
+| Digitacao de acentos no input | Funcional | Nenhuma |
+| Chips com acentos | Funcional | Nenhuma |
+| Normalizacao para matching | Funcional (backend normalize_text em ambos os lados) | Nenhuma |
+| Display de resultados (PNCP) | Correto (acentos preservados) | Nenhuma |
+| Historico com acentos | Funcional | Nenhuma |
+| Heading "Licitacoes Encontradas" | **Bug** -- falta acentos | Corrigir (FE-018) |
+| Indicacao ao usuario sobre acentos opcionais | Ausente | Considerar adicionar hint |
+
+**Recomendacao adicional:** Adicionar uma nota sutil no hint do campo de termos: "Acentos sao opcionais -- 'licitacao' e 'licita\u00e7\u00e3o' retornam os mesmos resultados." Isso reduziria incerteza do usuario e e especialmente util para quem usa teclados internacionais sem acentos.
 
 ---
 
 ## Respostas ao Architect
 
-### 1. UXD-001 (termos multi-palavras): abordagem preferida
+### Pergunta 1: LoadingProgress suficiente para buscas de 5+ minutos? ETA preciso?
 
-**Recomendacao: combinacao de aspas + virgula como delimitadores.**
+O LoadingProgress e **uma das melhores implementacoes de loading state** para este tipo de aplicacao. O UfGrid visual, curiosity carousel contextual, e progress bar criam uma experiencia engajante que mantém o usuario informado. Porem, para buscas de 5+ minutos, dois problemas:
 
-- Aspas duplas para termos compostos: `"camisa polo"` resulta em token unico "camisa polo"
-- Virgula como delimitador alternativo: `camisa polo, material limpeza` cria dois tokens compostos
-- Manter espaco como delimitador para termos simples (retrocompativel)
-- Placeholder deve atualizar para: `"Separe termos por virgula ou use aspas para termos compostos"`
-- Impacto na curva de aprendizado: minimo. Aspas sao convencao universal (Google, Amazon). Hint text no placeholder e no `aria-describedby` orientam usuarios novos.
-- Alternativa descartada: modal de adicao de termo (overengineering para POC).
+1. **ETA pos-fetching e impreciso** (hardcoded em `~15s/~10s/~5s` independente do volume de dados). Para 85K items, filtering pode levar 30-60s. O usuario vera "~15s restantes" por muito mais que 15s, gerando desconfianca e percepcao de que o sistema travou.
 
-### 2. UXD-015 (contraste dos temas): ferramenta e decisao sobre temas
+2. **Sem indicacao de progresso dentro da fase de filtering**. O backend envia `items_filtered` via progress updates, e o frontend recebe esse valor (`useSearchJob.ts` linha 187), e o `ProgressBar` ate exibe "X licita\u00e7\u00f5es filtradas" (linhas 50-51). Porem, a barra de progresso permanece fixa em 60% durante toda a fase de filtering, nao acompanhando o aumento de `items_filtered`. A barra deveria interpolar entre 60-75% baseada na proporcao `itemsFiltered / itemsFetched`.
 
-**Ferramenta recomendada:** axe DevTools browser extension para auditoria manual dos 5 temas, complementado por `@axe-core/playwright` (ja instalado no projeto) para auditoria automatizada no E2E.
+**Recomendacao:** Tornar ETAs das fases pos-fetching dinamicos baseados no volume de items. Se `itemsFetched > 10000`, multiplicar as estimativas base por `Math.ceil(itemsFetched / 5000)`. Para a barra de progresso, usar `itemsFiltered / itemsFetched` como proxy de progresso real na fase de filtering.
 
-**Processo:**
-1. Para cada tema, executar axe no browser com todos os estados visiveis (form vazio, loading, resultados, empty state, erro)
-2. Documentar todos os pares foreground/background e seus ratios de contraste
-3. Ajustar tokens no ThemeProvider onde necessario
-4. Adicionar teste E2E com axe para cada tema prevenindo regressoes
+### Pergunta 2: Limites proativos -- abordagem UX (banner, tooltip, modal?)
 
-**Sobre manter Sepia e Paperwhite:** Manter ambos. Eles atendem casos de uso reais:
-- **Paperwhite:** reduz fadiga visual para uso prolongado (e-ink aesthetic)
-- **Sepia:** preferido por usuarios com sensibilidade a luz azul
-- Remover temas seria uma regressao de acessibilidade e preferencia do usuario
-- O custo de manter 5 temas e baixo se os tokens forem corrigidos (UXD-018/019/021)
+**Formato recomendado: Banner inline.**
 
-### 3. UXD-016 (LoadingProgress): decomposicao recomendada
+| Formato | Preos | Contras | Recomendacao |
+|---------|-------|---------|--------------|
+| Tooltip | Nao-intrusivo | Muito sutil, facil de perder. Nao funciona em mobile/touch. | NAO |
+| Modal de confirmacao | Impossivel ignorar | Cria "confirmation fatigue" apos 2-3 usos. Interruptivo para usuarios frequentes. | NAO |
+| Banner inline | Visivel sem bloquear. Estilo consistente com o design system. Funciona em mobile. | Pode ser ignorado pelo usuario. | SIM |
 
-**Sim, a decomposicao sugerida esta correta.** Recomendo:
+**Especificacao do banner:**
+- Posicao: entre o `UfSelector` e o botao de busca
+- Trigger: `ufsSelecionadas.size > 10` OU `dateDiffInDays(dataInicial, dataFinal) > 30`
+- Estilo: `bg-warning-subtle text-warning border border-warning/20 rounded-card p-3`
+- Conteudo: icone + texto informativo com estimativa de tempo
+- Comportamento: nao bloqueante, desaparece quando criterios ficam abaixo do threshold
 
+### Pergunta 3: Badges de tipo confusos? EmptyState compreensivel?
+
+**Badges de tipo (licitacao/ata):** Os badges no `SearchSummary` sao claros em contexto ("150 Licita\u00e7\u00f5es", "30 Atas RP"). O problema nao e confusao -- e **ausencia de tipo nos items individuais**. O campo `tipo` e recebido pela interface `ProcurementItem` (linha 13 de `ItemsList.tsx`) mas nunca renderizado nos cards. Um usuario B2B precisa saber se um item e licitacao ou ata para priorizar corretamente. Recomendacao: adicionar badge de tipo em cada card (1h de esforco).
+
+**EmptyState:** O filter breakdown com contagens e tips e excelente e compreensivel. A unica falha e o default `sectorName = "uniformes"` (linha 18 de `EmptyState.tsx`) que, quando recebe `"Licita\u00e7\u00f5es"` da busca por termos customizados, gera texto redundante "Nenhuma licita\u00e7\u00e3o de licita\u00e7\u00f5es encontrada". Recomendacao: aceitar `searchTerms: string[]` como prop alternativa e exibir "Nenhum resultado para 'termo1, termo2'" quando em modo termos.
+
+### Pergunta 4: Design para erro de paginacao (FE-005)
+
+**Recomendacao: Inline error com retry button** dentro do container da lista.
+
+| Opcao | Avaliacao |
+|-------|-----------|
+| Toast notification | Desaparece rapido demais (3-5s), usuario pode perder. Nao permite retry direto. |
+| Banner no topo da pagina | Desconexo da acao que falhou. Confuso quando multiplos erros. |
+| Inline retry (recomendado) | Aparece exatamente onde os resultados deveriam estar. Contexto claro. |
+
+**Design proposto:**
 ```
-LoadingProgress.tsx (orquestrador, ~80 linhas)
-  |-- ProgressBar.tsx (~40 linhas: barra visual, ETA, porcentagem)
-  |-- StageList.tsx (~60 linhas: lista de estagios com icones e status)
-  |-- UfProgressGrid.tsx (~50 linhas: grid de UFs com status individual)
-  |-- CuriosityCarousel.tsx (~80 linhas: carrossel de dicas/curiosidades)
-  |-- LoadingSkeleton.tsx (~30 linhas: skeleton para fallback do dynamic import)
++-----------------------------------------------+
+|  [icone erro]  Nao foi possivel carregar os    |
+|  itens desta pagina.                           |
+|  [Tentar novamente]                            |
++-----------------------------------------------+
 ```
 
-Beneficios: cada sub-componente e testavel isoladamente, o carrossel pode ser lazy-loaded separadamente, e futuros ajustes de UX em um estagio nao arriscam quebrar outros. O carouselData.ts (369 linhas, 52 items) deve ser dynamically imported dentro de CuriosityCarousel para reduzir bundle inicial (~15KB economia).
+Implementacao: adicionar estado `error: string | null` ao `ItemsList`, capturar a mensagem no catch, exibir com `role="alert"`, e oferecer botao que chama `fetchPage(page)`. Adicionar `Sentry.captureException(e)` no catch. Total: 2h conforme estimado.
 
-### 4. Design System: prioridade entre opcoes
+### Pergunta 5: ink-muted contraste -- aceitavel para metadados?
 
-**Ordem recomendada:**
+**WCAG AA deve ser atendido estritamente (4.5:1).** Razoes:
 
-1. **(a) Extrair `<TextInput>` e `<Button>` primeiro.** Impacto imediato: elimina 4x duplicacao de estilos de input (verificada em SearchForm setor select, SearchForm terms wrapper, DateRangeSelector 2x, SaveSearchDialog) e padroniza botoes. Retorno de investimento mais rapido. Estimativa: 4h para TextInput + Button + migracao dos 4+ locais.
-2. **(c) Documentacao de design system.** Um `DESIGN_SYSTEM.md` simples com tokens existentes, tipografia, e componentes. Nao precisa ser exaustivo -- documenta o que ja existe. 2h.
-3. **(b) Setup Storybook.** Ultimo, pois Storybook e mais util quando ha componentes reutilizaveis para documentar. Sem (a) e (c), Storybook seria um shell vazio. Estimativa: 3h para setup + stories iniciais dos componentes extraidos.
+1. Os "metadados" em questao incluem **valores monetarios** (R$ X.XXX) e **datas de publicacao** que sao informacao de decisao para o usuario B2B. Nao sao decorativos.
+2. `ink-muted` e usado em `Pagination.tsx` para "Mostrando X-Y de Z itens" -- informacao de contexto que o usuario precisa para navegar.
+3. Telas em ambientes corporativos com luz forte reduzem contraste perceptivel.
+4. Legislacao brasileira (LBI 13.146/2015) referencia WCAG como padrao de acessibilidade.
 
-### 5. UXD-005/UXD-006: prioridade de migracao para `<dialog>`
+**Acao:** Alterar `--ink-muted` no `:root` de `#5a6a7a` para `#4f5f6f` (atinge ~4.8:1 contra branco). Impacto visual: imperceptivel para usuarios com visao normal. Os outros temas ja estao adequados (paperwhite 4.6:1, sepia 5.2:1, dark usa `#8a99a9` contra `#1a1d22` que precisa verificacao separada).
 
-**Nao e prioritaria.** As implementacoes atuais funcionam corretamente:
+### Pergunta 6: Normalizar acentos visualmente no input?
 
-- **SaveSearchDialog** tem focus trap funcional, `role="dialog"`, `aria-modal="true"`, Escape handler -- atende ARIA spec completamente
-- **SavedSearchesDropdown** tem `aria-expanded`, `aria-haspopup`, Escape handler via document keydown listener -- funcional
+**NAO.** Normalizar visualmente o input criaria confusao ("eu digitei 'licita\u00e7\u00e3o' mas aparece 'licitacao'?"). O correto e o approach atual: preservar o que o usuario digitou e normalizar silenciosamente no backend. Adicionar apenas um **hint textual** informando que acentos sao opcionais.
 
-Migracao para `<dialog>` nativo traz beneficios de manutenibilidade (eliminacao de codigo de focus trap) mas nao melhora UX ou acessibilidade perceptivelmente. Por esse motivo rebaixei UXD-006 para Baixa.
+### Pergunta 7: Tema Dim -- identidade visual distinta do Dark?
 
-**UXD-005 permanece Media** porque o dropdown nao e semanticamente um dialog -- e um listbox/menu. A correcao deveria adicionar `role="listbox"` e `role="option"` nos itens da lista, nao migrar para `<dialog>`.
+O tema Dim **deveria** ter identidade visual distinta do Dark. Atualmente, com apenas `--canvas` e `--surface-0` diferentes (`#2A2A2E` vs `#121212`), o usuario que alterna entre Dim e Dark percebe diferenca minima -- apenas o fundo muda ligeiramente. Todos os textos, borders, badges, e cards ficam identicos.
 
-### 6. Acessibilidade geral: B+ adequado para POC?
+**Recomendacao minima (2h):**
+```css
+html[data-theme="dim"] {
+  --canvas: #2A2A2E;
+  --surface-0: #2A2A2E;
+  --surface-1: #32323a;      /* mais claro que dark #1a1d22 */
+  --surface-2: #3a3a42;      /* mais claro que dark #242830 */
+  --surface-elevated: #2e2e34;
+  --border: rgba(255, 255, 255, 0.12);  /* mais sutil que dark */
+  --ink-secondary: #b0bcc8;  /* mais claro que dark #a8b4c0 */
+}
+```
 
-**B+ e adequado para estagio POC, mas existem itens que deveriam ser P2 antes de lancamento publico:**
-
-- **UXD-022 (aria-required):** Quick win de 30 minutos, melhora experiencia de screen reader significativamente. Campos obrigatorios nao sao anunciados como tal.
-- **UXD-015 (contraste):** Obrigacao legal em muitas jurisdicoes (incluindo Brasil, LBI 13.146/2015). Deveria ser P2 no minimo.
-- **UXD-023 (timeout 3s em confirmacao de delete):** Viola WCAG 2.2.1 (Timing Adjustable) tecnicamente. Fix simples: aumentar timeout para 10s ou remover completamente.
-
-Nenhum desses e P0 bloqueador pois a app funciona para a maioria dos usuarios. Mas esses 3 itens devem ser resolvidos antes de qualquer lancamento publico ou apresentacao para clientes.
-
-A nota B+ e justificada pelo trabalho ja realizado: skip navigation, focus traps, ARIA roles, keyboard navigation em menus, aria-live regions, prefers-reduced-motion, 44px touch targets. A fundacao de acessibilidade e solida.
+Isso criaria uma experiencia "twilight" distinta: superficies mais claras com maior contraste entre camadas, dando ao Dim uma personalidade propria de "conforto noturno sem escuridao total".
 
 ---
 
-## Recomendacoes de Design
+## Recomendacoes de Design (Priorizadas)
 
-### 1. Resolver inconsistencia de cores por tema (UXD-018/019/021)
-Criar tokens semanticos para badges de tipo no design token system:
-- `--badge-primary-bg`, `--badge-primary-text`, `--badge-primary-border`
-- `--badge-secondary-bg`, `--badge-secondary-text`, `--badge-secondary-border`
-- `--badge-info-text` (para mensagens warning/informativas, substituindo amber hardcoded)
+### P1 -- Critico (resolver antes de producao)
 
-Esses tokens devem ser definidos por tema no ThemeProvider `applyTheme()`, eliminando todas as cores Tailwind hardcoded em SearchSummary, carouselData, e SourceBadges.
+| # | Item | Esforco | Justificativa |
+|---|------|---------|---------------|
+| 1 | FE-005: Corrigir error swallowing em ItemsList | 2h | Usuario preso em loading infinito ou lista vazia sem feedback. Nenhum log para debug. |
+| 2 | FE-016: Advertencia para buscas de grande volume | 3h | Previne abandono, frustacao, e uso desnecessario de recursos do servidor |
+| 3 | Alinhar frontend timeout com backend timeout (DRAFT rec. 1) | 4h | Race condition confirmada: frontend 10min vs backend 10.5min para 27 UFs |
 
-### 2. Input de termos multi-palavras (UXD-001)
-A implementacao deve:
-- Detectar aspas no input e nao quebrar em espacos quando dentro de aspas
-- Aceitar virgula como delimitador alternativo ao espaco
-- Mostrar hint text claro com exemplos no `aria-describedby`
-- Suportar paste de termos separados por virgula (parse no onChange)
-- Atualizar placeholder contextualmente
+### P2 -- Alto impacto (resolver no proximo sprint)
 
-### 3. Componentes de formulario extraidos
-Priorizar `<TextInput>` com as seguintes props:
-```
-id, label, value, onChange, placeholder, error?, required?, maxLength?, hint?
-```
-Isso eliminaria a duplicacao de classes CSS em 4+ locais e garantiria consistencia visual automaticamente, alem de fornecer ponto unico para adicionar `aria-required` (resolvendo UXD-022).
+| # | Item | Esforco | Justificativa |
+|---|------|---------|---------------|
+| 4 | FE-001: Corrigir cores hardcoded em SearchSummary | 1h | Ilegibilidade em 3 de 5 temas (paperwhite, sepia, dim) |
+| 5 | FE-007: Corrigir ink-muted para WCAG AA | 1h | Acessibilidade -- afeta leitura de valores monetarios e datas |
+| 6 | FE-015: Highlight de termos de busca nos resultados | 4h | Permite avaliacao rapida de relevancia, reduz impacto de falsos positivos |
+| 7 | Expor campo `tipo` (licitacao/ata) nos cards de resultado | 1h | Informacao de decisao B2B atualmente oculta |
+| 8 | FE-017: Enriquecer mensagem de timeout com contexto | 2h | Orientacao especifica vs generica |
 
-### 4. Script FOUC alinhado com ThemeProvider (UXD-011)
-O script inline em layout.tsx aplica apenas `--canvas` e `--ink` (+ dark class). Quando o ThemeProvider monta, ele aplica 30+ propriedades. O gap temporal causa micro-flash em superficies, borders, e badges. Opcoes:
-- **Curto prazo (recomendado):** Expandir script inline para cobrir `--surface-0`, `--surface-1`, `--border`, `--border-strong` (4 propriedades extras com maior impacto visual)
-- **Longo prazo:** Migrar para data-attribute approach (UXD-010) que eliminaria o script inline completamente
+### P3 -- Qualidade (backlog priorizado)
 
----
+| # | Item | Esforco | Justificativa |
+|---|------|---------|---------------|
+| 9 | ETA dinamico baseado em volume de items | 2h | Evita ETAs enganosos ("~15s" quando faltam 60s) |
+| 10 | FE-006: Button component | 3h | Previne drift de estilos entre variantes de botao |
+| 11 | FE-019: AbortController para pagination race conditions | 2h | Previne exibicao de dados stale em navegacao rapida |
+| 12 | FE-004: Spinner component | 1h | Consistencia visual, eliminacao de duplicacao |
+| 13 | FE-008: Link /termos quebrado | 2h | Link quebrado visivel em todas as paginas |
+| 14 | FE-011: Teste SourceBadges | 2h | Componente complexo sem teste dedicado |
+| 15 | Corrigir EmptyState para modo termos customizados | 1h | Texto redundante "nenhuma licitacao de licitacoes" |
 
-## Ordem de Resolucao Recomendada (UX)
+### P4 -- Refinamento
 
-1. **UXD-001** - Termos multi-palavras (3h) -- bloqueador funcional, usuarios nao conseguem buscar termos compostos
-2. **UXD-022** - Adicionar aria-required (0.5h) -- quick win de acessibilidade
-3. **UXD-018** - Cores hardcoded SearchSummary (1h) -- quebra visual em temas, quick win
-4. **UXD-015** - Auditoria de contraste dos 5 temas (4h) -- obrigacao de acessibilidade
-5. **UXD-023** - Timeout de confirmacao de delete (1h) -- violacao WCAG 2.2.1
-6. **UXD-007** - Adicionar elemento `<form>` (2h) -- melhora autofill e mobile UX
-7. **UXD-021** - Cores amber hardcoded (0.5h) -- quick win junto com UXD-018
-8. **UXD-019** - Cores hardcoded carouselData (2h) -- consistencia visual em temas
-9. **UXD-011** - Alinhar script FOUC com ThemeProvider (3h) -- elimina micro-flash de tema
-10. **UXD-005** - SavedSearchesDropdown ARIA listbox (3h) -- semantica correta para screen readers
-11. **UXD-012** - Indicador offline/rede (4h) -- melhora feedback de erros de conectividade
-12. **UXD-016** - Decomposicao LoadingProgress (6h) -- manutenibilidade e testabilidade
+| # | Item | Esforco | Justificativa |
+|---|------|---------|---------------|
+| 16 | FE-012: Dim theme com identidade propria | 2h | Diferenciacao de Dark |
+| 17 | FE-018: Acento no heading ItemsList | 0.25h | Inconsistencia textual |
+| 18 | Hint sobre acentos opcionais no campo de termos | 0.5h | Reduz incerteza do usuario |
+| 19 | FE-002: Cor hardcoded SourceBadges | 0.5h | Quick win de consistencia |
+| 20 | FE-009: Fallback para dynamic imports | 1h | Protecao contra chunk load failure |
+
+**Esforco total novas recomendacoes (FE-015 a FE-019 + items nao-FE): ~23h**
+**Esforco total estimado incluindo FE existentes: ~50h**
 
 ---
 
-## Quick Wins UX
+## Nota sobre Itens Resolvidos desde a Review Anterior (Vera)
 
-Correcoes com alto retorno de investimento, executaveis em menos de 1 hora cada:
+Os seguintes itens da review anterior (UXD-*) foram **resolvidos** no codebase atual e nao precisam mais constar como debitos:
 
-| ID | Debito | Tempo | Impacto | Descricao da Correcao |
-|----|--------|-------|---------|----------------------|
-| UXD-014 | SourceBadges sem acentos | 15min | Percepcao de qualidade | Corrigir `combinacoes`/`combinacao` para formas com acentuacao correta em SourceBadges.tsx linha 112 |
-| UXD-020 | Sem noValidate no form | 5min | Prevencao de conflito | Adicionar `noValidate` ao `<form>` (implementar junto com UXD-007) |
-| UXD-022 | Sem aria-required | 30min | Acessibilidade | Adicionar `aria-required="true"` nos campos de UF, data, e setor/termos |
-| UXD-021 | Cores amber hardcoded | 30min | Consistencia visual | Substituir `text-amber-600 dark:text-amber-400` por `text-warning` em SourceBadges.tsx e carouselData.ts |
-| UXD-018 | Cores hardcoded SearchSummary | 1h | Corrigir quebra em temas | Criar tokens de badge e substituir `bg-blue-100` etc. por tokens que respeitem todos os 5 temas |
-| UXD-009 | Sem confirmacao page unload | 30min | Prevencao de perda | Adicionar `e.preventDefault(); e.returnValue = ""` no listener existente de beforeunload em LoadingProgress.tsx |
+| UXD antigo | Status | Evidencia |
+|------------|--------|-----------|
+| UXD-002: Sem loading state para setores | **RESOLVIDO** | `SearchForm.tsx` linhas 64-72: spinner + "Carregando setores..." + aria-busy |
+| UXD-003: Sem pagina 404 | **RESOLVIDO** | `not-found.tsx` existe |
+| UXD-004: Sem atalho de teclado | **RESOLVIDO** | `page.tsx` linhas 79-88: Ctrl+Enter |
+| UXD-005: SavedSearchesDropdown sem ARIA listbox | **RESOLVIDO** | Full listbox pattern com role="listbox", role="option", aria-activedescendant |
+| UXD-006: SaveSearchDialog sem `<dialog>` | **RESOLVIDO** | Usa `<dialog>` nativo com showModal() |
+| UXD-008: Mixpanel importado incondicionalmente | **RESOLVIDO** | Lazy loaded via dynamic import |
+| UXD-010: ThemeProvider imperativo | **RESOLVIDO** | CSS cascade via data-theme attribute |
+| UXD-011: Script FOUC duplica logica | **RESOLVIDO** | Ambos usam mesmo mecanismo (data-theme + .dark class) |
+| UXD-012: Sem indicador offline | **RESOLVIDO** | NetworkIndicator component |
+| UXD-016: LoadingProgress 450+ linhas | **RESOLVIDO** | Decomposto em 5 sub-components, orquestrador com 141 linhas |
+| UXD-017: Setores fallback hardcoded | **RESOLVIDO** | Centralizado em constants/fallback-setores.ts |
+| UXD-019: carouselData cores hardcoded | **RESOLVIDO** | Migrado para CSS custom properties (--cat-* tokens) |
 
-**Total quick wins: ~3 horas para 6 correcoes com impacto imediato.**
+**UXD-001 (termos multi-palavras impossivel)** permanece aberto e e um problema UX real. O SearchForm.tsx (linha 126) ainda usa espaco como delimitador de tokens. Porem, este item nao esta listado no DRAFT FE-* consolidado. **Recomendo que o architect avalie se deve ser adicionado como FE-020.**
 
 ---
 
 **Review Status: COMPLETE**
-**Reviewer:** @ux-design-expert (Vera)
+**Reviewer:** @ux-design-expert (Pixel)
 **Signed:** 2026-03-09
 **Next step:** Consolidation by @architect into final technical-debt.md

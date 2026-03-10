@@ -1,335 +1,730 @@
 # Technical Debt Assessment - DRAFT
 
-## Descomplicita POC v0.2
-## Data: 2026-03-09
 ## Para Revisao dos Especialistas
 
-> **Status:** RASCUNHO - Consolidacao das Fases 1 e 3 do Brownfield Discovery.
-> Fase 2 (Database) foi pulada - arquitetura stateless sem banco de dados.
-> Este documento requer validacao dos especialistas antes de ser usado para planejamento.
+**Documento:** DRAFT v2.0
+**Data:** 2026-03-09
+**Autor:** @architect (Atlas)
+**Status:** Consolidado de 3 fases de auditoria -- aguardando revisao
+**Fontes:**
+
+1. `docs/architecture/system-architecture.md` (Phase 1 -- 24 itens SYS-xxx)
+2. `supabase/docs/SCHEMA.md` + `supabase/docs/DB-AUDIT.md` (Phase 2 -- 13 itens DB-xxx)
+3. `docs/frontend/frontend-spec.md` (Phase 3 -- 14 itens FE-xxx)
+4. Analise direta do codigo-fonte (backend/filter.py, backend/sectors.py, backend/main.py, backend/clients/async_pncp_client.py, backend/sources/orchestrator.py)
 
 ---
 
-### 1. Debitos de Sistema
-
-Consolidados de `docs/architecture/system-architecture.md` - Secao 9: Technical Debt Inventory.
-
-#### 1.1 Severidade Critica
-
-| ID | Descricao | Impacto | Esforco |
-|----|-----------|---------|---------|
-| TD-C01 | **Excel bytes armazenados no resultado do job (memoria + Redis).** Jobs completados armazenam bytes Excel brutos tanto no dict Python quanto serializados no Redis como JSON. Um job com 500 licitacoes pode produzir dados multi-MB duplicados entre duas stores. Sem streaming ou armazenamento temporario em arquivo. | Esgotamento de memoria sob carga concorrente, pressao de memoria no Redis | Medio |
-| TD-C02 | **Sem autenticacao de usuario.** Chave API unica compartilhada para todos os clientes. Sem identidade de usuario, sem modelo de autorizacao, sem trilha de auditoria. Se API_KEY nao estiver definida, todos os endpoints ficam totalmente abertos. | Exposicao de seguranca, sem accountability | Alto |
-| TD-C03 | **3 de 5 fontes de dados desabilitadas.** ComprasGov (API deprecada), Querido Diario (retorna HTML), TCE-RJ (404). A arquitetura multi-source esta subutilizada; efetivamente um sistema dual-source. Codigo morto permanece na codebase. | Cobertura de dados reduzida, carga de manutencao por codigo morto | Alto |
-
-#### 1.2 Severidade Alta
-
-| ID | Descricao | Impacto | Esforco |
-|----|-----------|---------|---------|
-| TD-H01 | **In-memory job store como primario.** RedisJobStore estende JobStore in-memory em padrao dual-write. Na reinicializacao do processo, estado in-memory e perdido. Redis serve como fallback para leituras, mas o dual-write adiciona complexidade e potencial inconsistencia. | Perda de dados de jobs em restart durante buscas ativas | Medio |
-| TD-H02 | **asyncio.create_task para jobs em background.** Jobs rodam como tasks asyncio nao rastreadas no mesmo processo. Sem fila de tarefas (Celery, RQ). Em shutdown/deploy, jobs em execucao sao silenciosamente perdidos. Handler SIGTERM existe mas apenas define um evento que nada aguarda. | Perda de jobs em deploy/restart | Alto |
-| TD-H03 | **API OpenAI chamada sincronamente no thread pool.** `gerar_resumo()` usa cliente sincrono OpenAI via `loop.run_in_executor(None, ...)`, bloqueando uma thread do pool padrao. Deveria usar cliente async OpenAI. | Esgotamento do thread pool sob buscas concorrentes | Medio |
-| TD-H04 | **Sem banco de dados.** Todo estado e efemero. Sem dados historicos de busca, sem persistencia de analytics, sem preferencias de usuario server-side. Limita evolucao do produto. | Nao e possivel construir features que requerem persistencia | Alto |
-| TD-H05 | **CORS allow_headers=\* e excessivamente permissivo.** Aceita qualquer header. Deveria limitar a Content-Type, X-API-Key, X-Request-ID. | Risco menor de seguranca, pratica nao-padrao | Baixo |
-| TD-H06 | **Funcoes serverless Vercel tem duracao maxima de 10s.** A rota de download faz buffer do arquivo Excel inteiro (`response.arrayBuffer()`) antes de retornar. Arquivos grandes podem exceder o limite de 10s ou 1024MB de memoria. | Falhas de download para arquivos grandes | Medio |
-
-#### 1.3 Severidade Media
-
-| ID | Descricao | Impacto | Esforco |
-|----|-----------|---------|---------|
-| TD-M01 | **Filtro de deadline desabilitado.** Campo `dataAberturaProposta` foi mal interpretado como prazo de submissao. Filtro comentado com TODO. Sem verificacao alternativa de deadline. | Usuarios veem licitacoes historicas irrelevantes | Medio |
-| TD-M02 | **Sem paginacao nos resultados.** Todos os resultados filtrados retornados em uma unica resposta. Conjuntos grandes afetam tempo de resposta e memoria. | Degradacao de performance com muitos resultados | Medio |
-| TD-M03 | **Modelo LLM hardcoded.** `gpt-4.1-nano` hardcoded em `llm.py` linha 131. Docker-compose expoe variavel `LLM_MODEL` mas o codigo a ignora. | Nao e possivel trocar modelos sem alterar codigo | Baixo |
-| TD-M04 | **Sem timeout para chamadas LLM.** Cliente OpenAI usa timeout padrao. Respostas longas do LLM podem bloquear o worker do thread pool indefinidamente. | Estrangulamento de threads | Baixo |
-| TD-M05 | **Estado global mutavel para DI.** `dependencies.py` usa globais a nivel de modulo sem framework de DI. Testes requerem patching cuidadoso. | Complexidade de teste, acoplamento oculto | Medio |
-| TD-M06 | **Sem versionamento de API.** Endpoints nao versionados (`/buscar` e nao `/v1/buscar`). Breaking changes afetam todos os clientes simultaneamente. | Evolucao de API dificultada | Medio |
-| TD-M07 | **Sem header Content-Security-Policy.** CSP ausente na config do Vercel. | Lacuna na mitigacao de XSS | Baixo |
-| TD-M08 | **Sem header Strict-Transport-Security.** HSTS ausente na config do Vercel. | Risco de downgrade de protocolo | Baixo |
-| TD-M09 | **MD5 usado para chaves de dedup.** `orchestrator.py` usa MD5 para hashing de chave composta. Embora o risco de colisao seja desprezivel para este caso, e um hash fraco por padroes modernos. | Risco teorico de colisao | Baixo |
-| TD-M10 | **dangerouslySetInnerHTML para tema no frontend.** Script inline em `layout.tsx` para prevenir flash de tema. Atualmente seguro (sem input de usuario), mas contorna protecao XSS do React. | Vetor potencial de XSS se modificado | Baixo |
-| TD-M11 | **Versao hardcoded em multiplos locais.** "0.3.0" aparece em `main.py` na definicao do app e na resposta do endpoint raiz. Sem single source of truth. | Risco de drift de versao | Baixo |
-
-#### 1.4 Severidade Baixa
-
-| ID | Descricao | Impacto | Esforco |
-|----|-----------|---------|---------|
-| TD-L01 | **is_healthy() usa httpx sincrono.** `ComprasGovSource.is_healthy()` e `TransparenciaSource.is_healthy()` fazem chamadas HTTP sincronas, bloqueando o event loop se chamadas de contexto async. Atualmente usado apenas em testes. | Chamada bloqueante em contexto async se usado | Baixo |
-| TD-L02 | **Sem codigos de erro estruturados.** Respostas de erro usam mensagens em portugues em texto livre. Sem codigos machine-readable para tratamento no cliente. | Tratamento de erros no cliente e fragil | Baixo |
-| TD-L03 | **Buscas salvas apenas em localStorage.** Sem persistencia server-side. Perdidas ao limpar browser. Sem sync cross-device. | Perda de dados, sem cross-device | Baixo |
-| TD-L04 | **test_placeholder.py existe.** Arquivo de teste vazio commitado como scaffolding. | Higiene de codigo | Baixo |
-| TD-L05 | **Conjuntos grandes de keywords/exclusoes.** Setor Vestuario tem ~130 keywords de inclusao e ~100 de exclusao via regex. Custo CPU mitigado por ordenacao fail-fast do filtro. | Preocupacao de performance em escala | Baixo |
-| TD-L06 | **filter_batch roda no ThreadPoolExecutor padrao.** Usa `loop.run_in_executor(None, ...)` que compartilha o executor padrao com chamadas LLM. Contencao possivel. | Contencao de recursos sob carga | Baixo |
-
----
-
-### 2. Debitos de Database
-
-**N/A** - Projeto stateless, sem banco de dados.
-
-O debito TD-H04 (ausencia de banco de dados) esta listado na Secao 1 como debito de sistema, pois impacta a evolucao arquitetural do produto como um todo.
-
----
-
-### 3. Debitos de Frontend/UX
-
-Consolidados de `docs/frontend/frontend-spec.md` - Secao 11: UX Debt Inventory.
-
-> :warning: **PENDENTE:** Revisao do @ux-design-expert
-
-| ID | Descricao | Severidade | Esforco |
-|----|-----------|------------|---------|
-| UXD-001 | **Termos multi-palavras impossiveis.** Espaco dispara criacao de token no input de termos, entao "camisa polo" se torna dois tokens separados. Necessario suporte a aspas ou delimitador alternativo. | **Alta** | Medio (3h) |
-| UXD-002 | **Sem estado de carregamento para fetch de setores.** `useSearchForm` busca setores no mount mas nao mostra indicador. Dropdown aparece vazio momentaneamente se backend estiver lento. | Media | Pequeno (1h) |
-| UXD-003 | **Sem pagina 404.** Falta `not-found.tsx` para rotas invalidas. | Baixa | Pequeno (1h) |
-| UXD-004 | **Sem atalho de teclado para busca.** Enter em campos de data nao submete. Sem Ctrl+Enter ou similar. | Baixa | Pequeno (1h) |
-| UXD-005 | **SavedSearchesDropdown usa div como backdrop.** Nao usa `<dialog>` nativo ou padrao ARIA listbox adequado. | Media | Medio (3h) |
-| UXD-006 | **SaveSearchDialog usa div, nao `<dialog>` nativo.** Focus trap manual funciona mas elemento nativo e preferido. | Media | Medio (2h) |
-| UXD-007 | **Sem elemento `<form>` envolvendo formulario.** Impede submissao nativa e autofill do browser. | Media | Pequeno (2h) |
-| UXD-008 | **Mixpanel importado incondicionalmente.** ~40KB mesmo sem token. Deveria usar import dinamico. | Baixa | Pequeno (1h) |
-| UXD-009 | **Sem confirmacao antes de page unload durante busca.** Usuario pode navegar para fora durante busca longa sem aviso. | Baixa | Pequeno (1h) |
-| UXD-010 | **ThemeProvider aplica 30+ propriedades CSS imperativamente.** Poderia usar data attribute + regras CSS para manutenibilidade. | Baixa | Grande (8h) |
-| UXD-011 | **Script FOUC no `<head>` duplica logica do ThemeProvider.** Subset handling pode divergir do ThemeProvider completo. | Media | Medio (3h) |
-| UXD-012 | **Sem indicador offline/rede.** Falhas de fetch mostram erros genericos. Sem estado dedicado de conectividade. | Media | Medio (4h) |
-| UXD-013 | **Footer sem conteudo significativo.** Linha unica de branding, sem links (privacidade, termos, ajuda). | Baixa | Pequeno (1h) |
-| UXD-014 | **Texto de SourceBadges sem acentos portugues.** "combinacoes" deveria ter acentos corretos. | Baixa | Trivial (15min) |
-| UXD-015 | **Sem auditoria de contraste de cores para os 5 temas.** Temas Sepia e Paperwhite nao verificados contra WCAG AA. | Media | Medio (4h) |
-| UXD-016 | **LoadingProgress tem 450+ linhas.** Gerencia barra de progresso, ETA, estagios, grid UF, carrossel, skeletons, analytics. Deveria decompor. | Media | Grande (6h) |
-| UXD-017 | **Setores fallback hardcoded.** 7 setores em `useSearchForm.ts` podem ficar desatualizados se backend mudar. | Baixa | Pequeno (1h) |
-| UXD-018 | **Cores Tailwind hardcoded em SearchSummary.** Badges de tipo usam `bg-blue-100`, `bg-purple-100` em vez de design tokens. Quebram nos temas Sepia/Paperwhite. | Baixa | Pequeno (1h) |
-| UXD-019 | **carouselData usa cores Tailwind hardcoded por categoria.** `bg-blue-50`, `bg-green-50`, etc. Nao utiliza tokens. | Baixa | Medio (2h) |
-| UXD-020 | **Sem atributo `noValidate` no form.** Validacao nativa do browser pode conflitar com validacao customizada. | Baixa | Trivial (5min) |
-
----
-
-### 4. Debitos Cruzados (Cross-cutting)
-
-Debitos que impactam tanto backend quanto frontend simultaneamente.
-
-#### 4.1 Seguranca Cross-layer
-
-| ID | Descricao | Areas | Severidade |
-|----|-----------|-------|------------|
-| XD-SEC-01 | **Headers de seguranca ausentes.** Sem CSP (TD-M07), sem HSTS (TD-M08), sem Referrer-Policy, sem Permissions-Policy. Afeta tanto a entrega do frontend (Vercel) quanto o backend (Railway). | Backend + Frontend | Media |
-| XD-SEC-02 | **Autenticacao fragil end-to-end.** API key unica compartilhada (TD-C02) combinada com bypass em dev. Frontend depende exclusivamente da BFF layer para seguranca. Sem rate limiting por usuario real. | Backend + Frontend | Critica |
-| XD-SEC-03 | **dangerouslySetInnerHTML + sem CSP.** Script inline para tema (TD-M10) combinado com ausencia de CSP (TD-M07) amplia superficie de ataque XSS. | Frontend (com impacto na seguranca geral) | Media |
-
-#### 4.2 Contratos de API
-
-| ID | Descricao | Areas | Severidade |
-|----|-----------|-------|------------|
-| XD-API-01 | **Sem versionamento de API (TD-M06).** Qualquer breaking change no backend quebra o frontend imediatamente. BFF mitiga parcialmente, mas nao elimina o risco. | Backend + Frontend | Media |
-| XD-API-02 | **Sem testes de contrato.** Tipos TypeScript no frontend e schemas Pydantic no backend nao sao validados entre si. Drift silencioso e possivel. | Backend + Frontend | Media |
-| XD-API-03 | **Codigos de erro nao estruturados (TD-L02).** Frontend faz parsing de mensagens de erro em texto livre do backend. Qualquer mudanca de wording quebra o tratamento de erros. | Backend + Frontend | Baixa |
-
-#### 4.3 Performance End-to-End
-
-| ID | Descricao | Areas | Severidade |
-|----|-----------|-------|------------|
-| XD-PERF-01 | **Download bufferizado em cadeia.** Backend gera Excel em memoria (TD-C01), envia para BFF, que faz buffer inteiro via `arrayBuffer()` (TD-H06), e entao envia para browser. Tres copias completas do arquivo em memoria simultaneamente. | Backend + Frontend | Alta |
-| XD-PERF-02 | **Sem paginacao end-to-end (TD-M02).** Backend retorna todos os resultados de uma vez, frontend renderiza tudo. Sem lazy loading ou virtualizacao. | Backend + Frontend | Media |
-| XD-PERF-03 | **Polling de intervalo fixo.** Frontend faz polling a cada 2s independentemente da duracao da busca. Sem backoff exponencial. Gera carga desnecessaria para buscas longas. | Frontend (com carga no Backend) | Baixa |
-
-#### 4.4 Cobertura de Testes Cross-cutting
-
-| ID | Descricao | Areas | Severidade |
-|----|-----------|-------|------------|
-| XD-TEST-01 | **Sem testes de integracao frontend-backend.** E2E tests dependem de backend live, sem mock server para CI. | Backend + Frontend | Media |
-| XD-TEST-02 | **Sem smoke tests pos-deploy.** Health endpoint existe mas sem suite de verificacao automatizada. | Infra + Backend + Frontend | Media |
-| XD-TEST-03 | **Sem testes de regressao visual.** Mudancas de tema (5 variantes) e responsividade nao verificadas automaticamente. | Frontend | Baixa |
-
----
-
-### 5. Matriz Preliminar de Priorizacao
-
-| ID | Debito | Area | Severidade | Impacto | Esforco | Prioridade Preliminar |
-|----|--------|------|------------|---------|---------|----------------------|
-| TD-C02 | Sem autenticacao de usuario | Sistema | Critica | Critico | Alto | **P0** |
-| XD-SEC-02 | Autenticacao fragil end-to-end | Cross-cutting | Critica | Critico | Alto | **P0** |
-| TD-C01 | Excel bytes duplicados memoria + Redis | Sistema | Critica | Alto | Medio | **P1** |
-| XD-PERF-01 | Download bufferizado em cadeia (3 copias) | Cross-cutting | Alta | Alto | Medio | **P1** |
-| TD-H02 | Jobs como tasks asyncio nao duraveis | Sistema | Alta | Alto | Alto | **P1** |
-| TD-C03 | 3 de 5 fontes desabilitadas (codigo morto) | Sistema | Critica | Medio | Alto | **P1** |
-| UXD-001 | Termos multi-palavras impossiveis | Frontend/UX | Alta | Alto | Medio (3h) | **P1** |
-| TD-H01 | In-memory job store como primario | Sistema | Alta | Alto | Medio | **P1** |
-| TD-H03 | OpenAI API sincrona no thread pool | Sistema | Alta | Medio | Medio | **P2** |
-| TD-H06 | Timeout Vercel 10s em downloads grandes | Sistema | Alta | Medio | Medio | **P2** |
-| TD-H04 | Sem banco de dados (limita evolucao) | Sistema | Alta | Alto | Alto | **P2** |
-| XD-API-01 | Sem versionamento de API | Cross-cutting | Media | Medio | Medio | **P2** |
-| XD-API-02 | Sem testes de contrato | Cross-cutting | Media | Medio | Medio | **P2** |
-| TD-M01 | Filtro de deadline desabilitado | Sistema | Media | Medio | Medio | **P2** |
-| TD-M02 / XD-PERF-02 | Sem paginacao nos resultados | Sistema + Cross | Media | Medio | Medio | **P2** |
-| UXD-015 | Sem auditoria de contraste (5 temas) | Frontend/UX | Media | Medio | Medio (4h) | **P2** |
-| UXD-016 | LoadingProgress 450+ linhas | Frontend/UX | Media | Baixo | Grande (6h) | **P2** |
-| XD-SEC-01 | Headers de seguranca ausentes | Cross-cutting | Media | Medio | Baixo | **P2** |
-| XD-SEC-03 | dangerouslySetInnerHTML + sem CSP | Cross-cutting | Media | Medio | Baixo | **P2** |
-| UXD-005 | SavedSearchesDropdown sem ARIA listbox | Frontend/UX | Media | Baixo | Medio (3h) | **P3** |
-| UXD-006 | SaveSearchDialog sem `<dialog>` nativo | Frontend/UX | Media | Baixo | Medio (2h) | **P3** |
-| UXD-007 | Sem elemento `<form>` | Frontend/UX | Media | Medio | Pequeno (2h) | **P3** |
-| UXD-011 | Script FOUC duplica logica do ThemeProvider | Frontend/UX | Media | Baixo | Medio (3h) | **P3** |
-| UXD-012 | Sem indicador offline/rede | Frontend/UX | Media | Medio | Medio (4h) | **P3** |
-| UXD-002 | Sem loading state para fetch de setores | Frontend/UX | Media | Baixo | Pequeno (1h) | **P3** |
-| TD-M05 | Estado global mutavel para DI | Sistema | Media | Medio | Medio | **P3** |
-| TD-M06 | Sem versionamento de API | Sistema | Media | Medio | Medio | **P3** |
-| XD-TEST-01 | Sem testes integracao frontend-backend | Cross-cutting | Media | Medio | Medio | **P3** |
-| XD-TEST-02 | Sem smoke tests pos-deploy | Cross-cutting | Media | Medio | Baixo | **P3** |
-| TD-M03 | Modelo LLM hardcoded | Sistema | Media | Baixo | Baixo | **P4** |
-| TD-M04 | Sem timeout para chamadas LLM | Sistema | Media | Medio | Baixo | **P4** |
-| TD-M07 | Sem CSP header | Sistema | Media | Baixo | Baixo | **P4** |
-| TD-M08 | Sem HSTS header | Sistema | Media | Baixo | Baixo | **P4** |
-| TD-M09 | MD5 para chaves de dedup | Sistema | Media | Baixo | Baixo | **P4** |
-| TD-M10 | dangerouslySetInnerHTML para tema | Sistema | Media | Baixo | Baixo | **P4** |
-| TD-M11 | Versao hardcoded em multiplos locais | Sistema | Media | Baixo | Baixo | **P4** |
-| TD-H05 | CORS allow_headers=* | Sistema | Alta | Baixo | Baixo | **P4** |
-| UXD-003 | Sem pagina 404 | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-004 | Sem atalho teclado para busca | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-008 | Mixpanel importado incondicionalmente | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-009 | Sem confirmacao page unload durante busca | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-010 | ThemeProvider imperativo (30+ props CSS) | Frontend/UX | Baixa | Baixo | Grande (8h) | **P4** |
-| UXD-013 | Footer sem conteudo significativo | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-014 | SourceBadges sem acentos | Frontend/UX | Baixa | Trivial | Trivial (15min) | **P4** |
-| UXD-017 | Setores fallback hardcoded | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-018 | Cores hardcoded em SearchSummary | Frontend/UX | Baixa | Baixo | Pequeno (1h) | **P4** |
-| UXD-019 | carouselData com cores hardcoded | Frontend/UX | Baixa | Baixo | Medio (2h) | **P4** |
-| UXD-020 | Sem noValidate no form | Frontend/UX | Baixa | Trivial | Trivial (5min) | **P4** |
-| XD-API-03 | Codigos de erro nao estruturados | Cross-cutting | Baixa | Baixo | Baixo | **P4** |
-| XD-PERF-03 | Polling intervalo fixo (sem backoff) | Cross-cutting | Baixa | Baixo | Baixo | **P4** |
-| XD-TEST-03 | Sem testes regressao visual | Cross-cutting | Baixa | Baixo | Medio | **P4** |
-| TD-L01 | is_healthy() usa httpx sincrono | Sistema | Baixa | Baixo | Baixo | **P5** |
-| TD-L02 | Sem codigos de erro estruturados | Sistema | Baixa | Baixo | Baixo | **P5** |
-| TD-L03 | Buscas salvas apenas em localStorage | Sistema | Baixa | Baixo | Baixo | **P5** |
-| TD-L04 | test_placeholder.py existe | Sistema | Baixa | Trivial | Trivial | **P5** |
-| TD-L05 | Conjuntos grandes de keywords/exclusoes | Sistema | Baixa | Baixo | Baixo | **P5** |
-| TD-L06 | filter_batch no ThreadPoolExecutor padrao | Sistema | Baixa | Baixo | Baixo | **P5** |
-
-**Legenda de Prioridade:**
-- **P0:** Resolver antes de qualquer feature nova (bloqueador)
-- **P1:** Resolver na proxima sprint / ciclo
-- **P2:** Planejar para o proximo milestone
-- **P3:** Backlog priorizado
-- **P4:** Backlog geral
-- **P5:** Nice-to-have / oportunistico
-
----
-
-### 6. Estatisticas Resumidas
+## Executive Summary
 
 | Metrica | Valor |
 |---------|-------|
-| **Total de debitos** | 52 |
-| **Criticos** | 4 (TD-C01, TD-C02, TD-C03, XD-SEC-02) |
-| **Altos** | 8 (TD-H01..H06, UXD-001, XD-PERF-01) |
-| **Medios** | 24 |
-| **Baixos** | 16 |
-| **Debitos de Sistema** | 20 |
-| **Debitos de Frontend/UX** | 20 |
-| **Debitos Cross-cutting** | 12 |
-| **Debitos de Database** | 0 (stateless) |
+| **Total de itens de debito** | **51** (24 SYS + 13 DB + 14 FE) |
+| **Criticos** | 3 (SYS-001, SYS-002, SYS-003) |
+| **Altos** | 10 (SYS-004..007, DB-001..003, FE-001, FE-005) |
+| **Medios** | 21 |
+| **Baixos** | 17 |
+| **Esforco total estimado** | ~240 horas |
+| **Esforco critico+alto** | ~85 horas |
 
-#### Estimativa de Esforco
+### Contexto
 
-| Area | Esforco Estimado |
-|------|-----------------|
-| Sistema (Backend) | 80-120 horas |
-| Frontend/UX | 40-55 horas |
-| Cross-cutting | 30-50 horas |
-| **Total** | **150-225 horas** |
-
-> **Nota:** Estimativas de esforco do frontend sao mais precisas (baseadas em horas especificas do frontend-spec.md). Estimativas do backend usam classificacao qualitativa (Baixo/Medio/Alto) do system-architecture.md, convertidas aproximadamente para: Baixo = 2-4h, Medio = 4-8h, Alto = 8-16h.
+O DescompLicita e uma plataforma de busca de licitacoes publicas brasileiras construida sobre Next.js 16 + FastAPI + SQLite + Redis. A plataforma esta em estagio POC com maturidade arquitetural significativa (404+ testes, 5 temas, ARIA excelente), mas com lacunas criticas em persistencia de dados, identidade de usuario, e qualidade de busca que devem ser resolvidas antes de ir para producao.
 
 ---
 
-### 7. Perguntas para Especialistas
+## ENFASE ESPECIAL: Busca e UX
 
-#### Para @ux-design-expert:
+### Acentuacao e Normalizacao
 
-1. **UXD-001 (termos multi-palavras):** Qual a abordagem preferida -- suporte a aspas ("camisa polo"), delimitador diferente (virgula), ou combinacao? Impacto na curva de aprendizado do usuario?
-2. **UXD-015 (contraste dos temas):** Existe uma ferramenta/processo preferido para auditoria dos 5 temas? Temas Sepia e Paperwhite devem ser mantidos ou podem ser removidos para reduzir superficie de teste?
-3. **UXD-016 (LoadingProgress):** Qual decomposicao e recomendada? ProgressBar + StageList + UfGrid + Carousel como sub-componentes?
-4. **Design System:** Prioridade entre: (a) extrair componentes `<TextInput>` e `<Button>`, (b) setup Storybook, (c) documentacao de design system? O que agrega mais valor primeiro?
-5. **UXD-005/UXD-006:** Migracao para `<dialog>` nativo e prioritaria dado que focus traps manuais ja estao funcionando?
-6. **Acessibilidade geral:** A nota B+ e adequada para o estagio POC, ou existem bloqueadores de acessibilidade que deveriam ser P0?
+#### Analise Completa do Stack
 
-#### Para @qa:
+A acentuacao e um aspecto **fundamental** para uma plataforma brasileira. A analise revela que o backend implementa normalizacao de acentos, mas ha lacunas significativas no tratamento end-to-end.
 
-1. **Cobertura de testes:** O target de 75% de cobertura de statements e adequado para o proximo milestone? Ou deveriam focar em areas especificas (hooks, API routes)?
-2. **Testes de contrato (XD-API-02):** Qual abordagem e recomendada -- Pact, schema validation compartilhado, ou outra?
-3. **E2E sem backend live (XD-TEST-01):** Mock server (MSW, json-server) ou Docker Compose para CI? Qual tradeoff e aceitavel?
-4. **Testes de regressao visual (XD-TEST-03):** Vale o investimento para um POC com 5 temas, ou e prematuro?
-5. **Smoke tests pos-deploy (XD-TEST-02):** Escopo minimo recomendado -- health check, busca simples, download?
-6. **Quality gates:** Existem metricas de qualidade (alem de cobertura) que deveriam ser enforced no CI?
-7. **Componentes sem teste:** ThemeProvider, RegionSelector, AnalyticsProvider, carouselData -- qual e a prioridade de cobertura?
+##### Backend: `filter.py` - normalize_text()
 
----
+O backend possui uma funcao `normalize_text()` (linhas 291-334) que realiza:
 
-### 8. Dependencias entre Debitos
+1. **Lowercase**: `text.lower()`
+2. **NFD decomposition**: `unicodedata.normalize("NFD", text)` -- decompoe caracteres acentuados em base + combining mark
+3. **Removing combining marks**: Filtra caracteres com categoria Unicode "Mn" (Mark, nonspacing)
+4. **Punctuation removal**: Substitui nao-alfanumericos por espacos
+5. **Whitespace normalization**: Espacos multiplos viram um so
+
+**Resultado:** `"licitacao"` e `"licitacao"` (sem acento) produzem o mesmo resultado normalizado. `"Jaleco Medico"` se torna `"jaleco medico"`.
+
+##### Keywords no sectors.py: Duplicacao Manual de Variantes
+
+As keyword sets contem **duplicatas manuais** para variantes com e sem acento:
 
 ```
-TD-C02 (sem auth) ──────────────> TD-H04 (sem database)
-  "Auth requer persistencia           "Database e pre-requisito
-   de usuarios"                        para muitas features"
-
-TD-C01 (Excel em memoria) ─────> TD-M02 (sem paginacao)
-  "Buffer grande porque                "Resultados grandes
-   retorna tudo de uma vez"             geram Excel grandes"
-
-TD-H06 (Vercel timeout) ───────> TD-C01 (Excel em memoria)
-  "Timeout causado por                 "Streaming resolveria
-   buffer completo"                     ambos os problemas"
-
-TD-M06 (sem API versioning) ───> XD-API-02 (sem contract tests)
-  "Versionamento sem contrato          "Contrato sem versao
-   e incompleto"                        e fragil"
-
-XD-SEC-01 (headers) ───────────> TD-M07 (sem CSP) + TD-M08 (sem HSTS)
-  "Resolver headers de seguranca       "CSP e HSTS sao subset
-   resolve ambos"                       do mesmo trabalho"
-
-UXD-010 (ThemeProvider imperativo) ──> UXD-011 (FOUC script duplica logica)
-  "Refatorar ThemeProvider              "Resolveria a duplicacao
-   para data-attributes"                automaticamente"
-
-UXD-015 (auditoria contraste) ──> UXD-018 + UXD-019 (cores hardcoded)
-  "Auditar primeiro, depois            "Cores hardcoded so podem
-   migrar para tokens"                  ser corrigidas apos auditoria"
-
-TD-H02 (jobs nao duraveis) ────> TD-H01 (in-memory store)
-  "Fila de tarefas duravel             "Eliminaria necessidade
-   (Celery/RQ)                          de dual-write store"
+"confeccao",       # sem acento
+"confeccao",       # com cedilha
+"confeccoes",      # sem acento plural
+"confeccoes",      # com acento plural
 ```
 
-**Cadeia critica:** TD-C01 -> TD-M02 -> TD-H06 (resolver paginacao + streaming resolve 3 debitos)
+Isso e **redundante** dado que `normalize_text()` ja remove acentos antes do matching. As ~130 keywords de inclusao e ~100 de exclusao incluem variantes desnecessarias. Isso nao causa bugs, mas aumenta o tamanho dos sets e a complexidade de manutencao.
 
-**Cadeia de seguranca:** TD-C02 -> TD-H04 (auth requer persistencia, ambos P0-P1)
+##### Lacuna 1: PNCP API nao suporta `palavraChave`
+
+O parametro `palavraChave` da API PNCP e **silenciosamente ignorado** (verificado 2026-03-07, documentado em `pncp_client.py` linha 503). Isso significa que:
+
+- **Toda filtragem e client-side**: o backend busca TODOS os registros para os UFs/datas/modalidades selecionados e depois aplica filtro de keywords localmente
+- Nao ha filtragem server-side por termo de busca
+- O volume de dados buscados e independente dos termos de busca
+
+##### Lacuna 2: Termos customizados do usuario nao sao normalizados na entrada
+
+Quando o usuario digita termos customizados (`termos_busca`), eles passam por `parse_multi_word_terms()` (main.py linhas 214-246) que faz apenas `term.strip().lower()`. **Nao ha normalizacao de acentos nos termos do usuario.**
+
+Porem, isso nao causa falsos negativos porque `match_keywords()` (filter.py linha 366) aplica `normalize_text()` em **ambos** os lados:
+- `objeto_norm = normalize_text(objeto)` -- normaliza o texto do PNCP
+- `kw_norm = normalize_text(kw)` -- normaliza cada keyword
+
+**Resultado:** Se o usuario digita `"licitacao"` (sem acento) ou `"licitacao"` (com acento e cedilha), ambos sao normalizados para `"licitacao"` antes do matching. **A busca funciona corretamente com ou sem acentos.**
+
+##### Lacuna 3: Display de resultados preserva acentos originais
+
+Os textos exibidos ao usuario (objeto da licitacao, nome do orgao, municipio) vem diretamente da API PNCP sem transformacao. Isso e **correto** -- o texto original com acentos e preservado para display. Nao ha risco de exibir texto sem acentos.
+
+##### Lacuna 4: Exclusion keywords e accent variants
+
+Os exclusion keywords tambem contem duplicatas de variantes com/sem acento (ex: `"confeccao de placa"` e `"confeccao de placa"` com cedilha). Mesma redundancia mencionada acima -- funcional mas desnecessaria.
+
+#### Avaliacao Geral: Acentuacao
+
+| Aspecto | Status | Risco |
+|---------|--------|-------|
+| Normalizacao no matching | **Funcional** | Nenhum |
+| Termos customizados do usuario | **Funcional** (normalize_text aplicado em ambos os lados) | Nenhum |
+| Display de resultados | **Correto** (preserva acentos originais) | Nenhum |
+| Keywords duplicadas (com/sem acento) | **Redundante** mas funcional | Baixo (manutencao) |
+| Filtragem server-side no PNCP | **Nao disponivel** (palavraChave ignorado) | Medio (volume) |
+
+> **PENDENTE:** Revisao do @data-engineer -- confirmar se ha edge cases com caracteres especiais alem de acentos (ex: cedilha isolada, til em "sao", hifens em "guarda-po").
 
 ---
 
-### 9. Quick Wins Identificados
+### Falsos Positivos e Falsos Negativos
 
-Debitos com baixo esforco e alto impacto relativo -- candidatos para acao imediata.
+#### Mecanismo de Busca Atual
 
-| ID | Debito | Esforco | Impacto | Justificativa |
-|----|--------|---------|---------|---------------|
-| UXD-014 | SourceBadges sem acentos | Trivial (15min) | UX | Correcao de 1 linha, melhora percepcao de qualidade |
-| UXD-020 | Sem noValidate no form | Trivial (5min) | UX | 1 atributo, previne conflito de validacao |
-| TD-L04 | test_placeholder.py | Trivial (5min) | Higiene | Remover arquivo vazio |
-| TD-H05 | CORS allow_headers=* | Baixo (1h) | Seguranca | Listar headers explicitamente, reducao de superficie |
-| TD-M07 + TD-M08 | Headers CSP + HSTS | Baixo (2h) | Seguranca | Adicionar headers em vercel.json, protecao imediata |
-| TD-M11 | Versao hardcoded | Baixo (1h) | Manutencao | Extrair para constante unica |
-| UXD-002 | Loading state para setores | Pequeno (1h) | UX | Spinner simples no dropdown |
-| UXD-003 | Pagina 404 | Pequeno (1h) | UX | Arquivo `not-found.tsx` simples |
-| UXD-008 | Mixpanel import condicional | Pequeno (1h) | Performance | Dynamic import, -40KB quando desabilitado |
-| UXD-009 | Confirmacao page unload | Pequeno (1h) | UX | `beforeunload` event handler |
-| UXD-013 | Footer com conteudo | Pequeno (1h) | UX | Links basicos de footer |
-| UXD-017 | Remover setores fallback hardcoded | Pequeno (1h) | Manutencao | Simplificar logica |
-| UXD-018 | Migrar cores SearchSummary para tokens | Pequeno (1h) | UX | Corrigir quebra em temas Sepia/Paperwhite |
+O sistema usa um **keyword matching engine baseado em regex** com as seguintes camadas:
 
-**Total estimado para todos os Quick Wins: ~12-14 horas**
+1. **Normalizacao** (NFD + lowercase + remove punctuation)
+2. **Exclusion check** (fail-fast): se qualquer exclusion keyword faz match, o item e rejeitado
+3. **Tier scoring** (quando habilitado por setor):
+   - Tier A (1.0): termos inequivocos ("uniforme", "fardamento")
+   - Tier B (0.7): termos fortes ("camiseta", "jaleco")
+   - Tier C (0.3): termos ambiguos ("camisa", "bota", "meia")
+   - Threshold: 0.6 (default)
+4. **Binary mode** (fallback): qualquer keyword match aprova
 
-Estes 13 itens representam ~25% dos debitos totais com ~7% do esforco total estimado.
+O matching usa `\b` (word boundary) com `re.escape()` para evitar regex injection.
+
+#### Fontes de Falsos Positivos
+
+| Fonte | Severidade | Exemplo | Mitigacao Existente |
+|-------|-----------|---------|---------------------|
+| Termos ambiguos (Tier C) | Media | "bota" (calcado vs. "bota de concreto") | Exclusion set + Tier C peso 0.3 |
+| "EPI" sozinho | Media | EPI de construcao civil (nao vestuario) | `EPI_ONLY_KEYWORDS` check -- rejeita se APENAS EPI fez match |
+| "confeccao" generico | Media | "confeccao de placas" | 30+ exclusion entries para "confeccao de X" |
+| Termos customizados sem exclusoes | **Alta** | Usuario busca "camisa" e recebe "confeccao de camisa de forca" | **Exclusoes sao DESATIVADAS para termos customizados** (main.py linha 543) |
+| Valor zero/null nao filtrado | Media | Items com valor R$ 0.00 passam (Registro de Precos) | Intencional, mas pode incluir items irrelevantes |
+
+**Achado critico:** Quando o usuario usa termos customizados (`termos_busca`), as exclusion keywords do setor sao **completamente ignoradas** (main.py linha 543: `exclusions=sector.exclusions if not custom_terms else set()`). Isso pode gerar falsos positivos significativos para termos ambiguos.
+
+#### Fontes de Falsos Negativos
+
+| Fonte | Severidade | Exemplo | Mitigacao Existente |
+|-------|-----------|---------|---------------------|
+| Stemming ausente | **Alta** | "uniformizar" nao casa com "uniforme" | Nenhuma -- nao ha stemming/lemmatizacao |
+| Sinonimos nao cobertos | Media | Termos regionais ou novos nao listados | Expansao manual dos keyword sets |
+| Threshold muito alto | Baixa | Item com apenas 1 keyword Tier C (score 0.3 < 0.6) e rejeitado | Intencional para reduzir ruido |
+| MAX_PAGES_PER_COMBO = 10 | **Alta** | Combos com 500+ items (ex: SP + Pregao Eletronico = 228 paginas) sao truncados em 10 paginas (500 items) | Truncation tracking no frontend (SourceBadges) |
+| Exclusoes excessivas | Baixa | "colete reflexivo para guarda" pode ser excluido por "colete balistico" proximity | Improvavel -- exclusoes usam frases especificas |
+
+**Achado critico sobre stemming:** O portugues brasileiro tem conjugacoes e derivacoes ricas. Sem stemming:
+
+- "uniformizado" nao casa com "uniforme"
+- "vestindo" nao casa com "vestimenta"
+- "confeccionado" nao casa com "confeccao"
+- "alimentar" nao casa com "alimento"
+
+O keyword set tenta compensar isso listando variantes manualmente (singular/plural, masculino/feminino), mas nao cobre formas verbais ou derivacoes.
+
+#### Busca por Termos Customizados: Qualidade
+
+Quando o usuario usa termos livres:
+
+1. **Parsing**: Suporta aspas para multi-word (`"camisa polo"`) e virgulas (main.py `parse_multi_word_terms`)
+2. **Matching**: Usa `normalize_text()` + word boundary regex (mesmo mecanismo dos setores)
+3. **Sem exclusoes**: Exclusion keywords do setor sao ignoradas (risco de falsos positivos)
+4. **Sem tiers**: Todos os termos sao tratados como Tier A (binary match, score 1.0)
+5. **Sem LLM keyword extraction**: Os termos do usuario sao usados literalmente -- nao ha expansao semantica via LLM
+
+#### Recomendacoes para Qualidade de Busca
+
+| # | Recomendacao | Esforco | Impacto |
+|---|-------------|---------|---------|
+| 1 | Implementar stemming PT-BR (RSLP ou Snowball) no `normalize_text()` | 8h | Alto -- elimina falsos negativos de flexao |
+| 2 | Manter exclusoes parciais para termos customizados (usar exclusoes do setor selecionado) | 2h | Alto -- reduz falsos positivos |
+| 3 | Remover variantes duplicadas de acentos nos keyword sets | 4h | Baixo -- limpeza de manutencao |
+| 4 | Adicionar fuzzy matching (distancia de Levenshtein) como fallback para typos | 8h | Medio |
+| 5 | Considerar full-text search (Elasticsearch/Typesense) para escala | 40h | Alto (longo prazo) |
+
+> **PENDENTE:** Revisao do @data-engineer
+> 1. Confirmar se o PNCP API realmente ignora `palavraChave` em todos os endpoints ou apenas no `/contratacoes/publicacao`
+> 2. Avaliar viabilidade de stemming RSLP vs. Snowball para portugues
+> 3. Definir se exclusoes devem ser aplicadas para termos customizados (trade-off: menos falsos positivos vs. possivelmente excluir items legitimos que o usuario buscou intencionalmente)
 
 ---
 
-*Documento gerado: 2026-03-09*
-*Fonte: Brownfield Discovery Fase 1 (system-architecture.md v3.0) + Fase 3 (frontend-spec.md v3.0)*
-*Fase 2 (Database): Pulada - arquitetura stateless*
-*Proximo passo: Revisao por @ux-design-expert e @qa*
+### Buscas de Grande Volume (30+ dias, 27 UFs)
+
+#### Analise do Pipeline para Cenarios Extremos
+
+O sistema tem protecoes contra buscas de grande volume, mas varios cenarios extremos podem causar degradacao significativa.
+
+##### Parametros de Controle Existentes
+
+| Parametro | Valor | Definido em |
+|-----------|-------|-------------|
+| `MAX_DATE_RANGE_DAYS` | 90 dias | config.py (env var) |
+| `MAX_PAGES_PER_COMBO` | 10 paginas (500 items) | config.py |
+| `MODALIDADE_REDUCTION_UF_THRESHOLD` | 10 UFs | config.py |
+| `DEFAULT_MODALIDADES` | 7 modalidades | config.py |
+| `PRIORITY_MODALIDADES` | 3 modalidades (>10 UFs) | config.py |
+| PNCP timeout (base) | 300s | config.py SOURCES_CONFIG |
+| PNCP timeout scaling | +15s por UF alem de 5 | orchestrator.py linha 220 |
+| Semaphore concurrency | 3 fetches simultaneos | async_pncp_client.py linha 417 |
+| Rate limit adaptativo | 0.3s base, ate 2.0s | async_pncp_client.py |
+| Circuit breaker | 3 timeouts consecutivos | async_pncp_client.py |
+| Frontend poll timeout | 10 minutos | useSearchJob.ts |
+| Max concurrent jobs | 10 | job_store.py |
+
+##### Cenario 1: 30 dias, 3 UFs (caso tipico)
+
+- Date chunks: 1 chunk (30 dias <= 30 max)
+- Modalidades: 7 (DEFAULT_MODALIDADES)
+- Tasks: 3 UFs x 7 modalidades = **21 combos**
+- Max pages: `min(10, max(2, 600/21))` = **10 paginas**
+- Volume maximo teorico: 21 x 500 = **10,500 items raw**
+- Tempo estimado: 60-180s (tipico)
+- **Status:** Funcional, dentro dos limites
+
+##### Cenario 2: 60 dias, 10 UFs (grande)
+
+- Date chunks: 2 chunks (60 dias / 30 = 2)
+- Modalidades: 7 (10 UFs = threshold exato, usa DEFAULT)
+- Tasks por chunk: 10 x 7 = **70 combos**
+- Max pages: `min(10, max(2, 600/70))` = **8 paginas**
+- Volume maximo teorico: 2 chunks x 70 x 400 = **56,000 items raw**
+- Tempo estimado: 180-400s
+- Timeout PNCP: 300 + (10-5)*15 = **375s**
+- **Status:** Provavelmente funcional, mas proximo dos limites
+
+##### Cenario 3: 90 dias, 27 UFs (extremo)
+
+- Date chunks: 3 chunks (90 dias / 30 = 3)
+- Modalidades: 3 (PRIORITY_MODALIDADES -- 27 > 10 threshold)
+- Tasks por chunk: 27 x 3 = **81 combos**
+- Max pages: `min(10, max(2, 600/81))` = **7 paginas**
+- Volume maximo teorico: 3 x 81 x 350 = **85,050 items raw**
+- Tempo estimado: 300-600s+ (potencialmente excedendo timeouts)
+- Timeout PNCP: 300 + (27-5)*15 = **630s** (10.5 min > frontend timeout de 10 min)
+- Semaphore: 3 concurrent com 81 combos = **27 batches sequenciais** por chunk
+- **Status:** **CRITICO** -- frontend timeout de 10 min provavelmente insuficiente
+
+##### Problemas Identificados para Grande Volume
+
+| Problema | Severidade | Detalhe |
+|----------|-----------|---------|
+| **Frontend timeout vs PNCP timeout** | Critica | Frontend desiste em 10 min; PNCP timeout para 27 UFs = 10.5 min. Race condition. |
+| **Redis memory para items** | Alta | 85K items serializados como JSON unico em `job:{id}:items`. Estimativa: ~50-100MB por job. |
+| **Paginacao carrega tudo** | Alta | `get_items_page()` desserializa TODOS os items e faz slice em Python (DB-009). Para 85K items: ~100MB por request de paginacao. |
+| **Excel para 85K items** | Alta | `create_excel()` em ThreadPoolExecutor com 85K rows. Memoria e tempo significativos. |
+| **LLM com 50 items max** | Baixa | LLM trunca em 50 items -- nao escala, mas tambem nao quebra. |
+| **Dedup com 85K items** | Media | MD5 hashing + dict lookup para 85K items. Funcional mas memoria significativa. |
+| **Filter batch CPU** | Media | Regex matching em 85K items. ThreadPoolExecutor(4) limita paralelismo. |
+| **Nenhum feedback de progresso granular** | Media | Frontend mostra stages (fetching/filtering/summarizing) mas nao progresso dentro de cada stage para grandes volumes. |
+
+##### Comportamento do Frontend para Resultados Grandes
+
+| Aspecto | Implementacao | Problema para Grande Volume |
+|---------|---------------|---------------------------|
+| Polling | Exponential backoff (1s -> 15s max) | Adequado |
+| Progress display | 5 stages + UF grid + carousel | Adequado |
+| Timeout | 10 min hard limit | Insuficiente para 27 UFs |
+| Result display | Paginado (20 items/page) | Adequado |
+| Items fetch | Client-side fetch por pagina | Cada fetch desserializa tudo no backend (DB-009) |
+| Error on timeout | "A consulta excedeu o tempo limite" | Mensagem generica -- sem sugestao de reduzir escopo |
+| Cancel button | Presente durante loading | Adequado |
+| Tab notifications | Browser notification on complete | Adequado para buscas longas |
+
+##### Recomendacoes para Grande Volume
+
+| # | Recomendacao | Esforco | Prioridade |
+|---|-------------|---------|------------|
+| 1 | **Alinhar frontend timeout com backend timeout**: calcular timeout dinamico baseado em UFs * dias | 4h | P1 |
+| 2 | **Advertencia proativa no frontend**: ao selecionar >15 UFs ou >30 dias, mostrar estimativa de tempo e sugerir reduzir escopo | 4h | P1 |
+| 3 | **Redis LIST para items** (DB-009): RPUSH items individuais, LRANGE para paginacao, elimina desserializacao completa | 4h | P2 |
+| 4 | **Progresso granular de fetching**: callback de progresso por UF + combo, nao apenas por source | 8h | P3 |
+| 5 | **Streaming Excel**: gerar Excel em chunks ou limitar items no Excel | 4h | P3 |
+| 6 | **Limitar UFs no frontend**: hard cap de 15 UFs ou aviso forte acima de 10 | 2h | P2 |
+| 7 | **Pre-computed data pipeline**: ingestion batch agendada do PNCP, eliminando busca on-demand | 40h | P4 (longo prazo) |
+
+> **PENDENTE:** Revisao do @data-engineer e @ux-expert
+> 1. @data-engineer: Qual o volume real observado para buscas de 27 UFs? Ha metricas de tempo de resposta?
+> 2. @data-engineer: Redis memory: qual o pico de uso observado? Ha risco de OOM?
+> 3. @ux-expert: Como comunicar ao usuario que buscas de grande volume podem demorar? Barra de progresso mais granular? Estimativa de tempo restante (ja existe ETA)?
+> 4. @ux-expert: Deve haver um hard cap no frontend para UFs ou date range, ou apenas um aviso?
+
+---
+
+## 1. Debitos de Sistema (SYS-xxx)
+
+*Fonte: `docs/architecture/system-architecture.md` Secao 10*
+
+### Severidade Critica
+
+#### SYS-001: SQLite em Filesystem Efemero (Railway)
+
+- **Impacto:** Persistencia de dados (historico de busca perdido a cada deploy)
+- **Esforco:** 16h
+- **Prioridade:** P1 -- Migrar para Supabase PostgreSQL
+
+#### SYS-002: Sem Modelo de Identidade de Usuario
+
+- **Impacto:** Seguranca e produto (API key unica compartilhada, sem user scoping)
+- **Esforco:** 24h
+- **Prioridade:** P1 -- Requerido antes de multi-tenant
+
+#### SYS-003: Implementacao JWT Customizada
+
+- **Impacto:** Seguranca (sem key rotation, sem audience/issuer, sem JWK)
+- **Esforco:** 4h
+- **Prioridade:** P1 -- Substituir por PyJWT
+
+### Severidade Alta
+
+#### SYS-004: CORS allow_headers=["*"]
+
+- **Impacto:** Seguranca (aceita qualquer header)
+- **Esforco:** 1h
+- **Prioridade:** P2
+
+#### SYS-005: Sem CSP ou HSTS Headers
+
+- **Impacto:** Seguranca (falta Content-Security-Policy e Strict-Transport-Security)
+- **Esforco:** 4h
+- **Prioridade:** P2
+
+#### SYS-006: Saved Searches Apenas em localStorage
+
+- **Impacto:** Produto/UX (sem persistencia server-side, sem sync cross-device)
+- **Esforco:** 8h
+- **Prioridade:** P2
+
+#### SYS-007: Auth Bypass em Dev Mode sem Safeguard
+
+- **Impacto:** Seguranca (API_KEY e JWT_SECRET nao definidos = bypass silencioso)
+- **Esforco:** 2h
+- **Prioridade:** P2
+
+### Severidade Media
+
+#### SYS-008: Version String Hardcoded
+
+- **Impacto:** Qualidade de codigo
+- **Esforco:** 2h
+- **Prioridade:** P3
+
+#### SYS-009: MD5 para Dedup Keys
+
+- **Impacto:** Qualidade de codigo (MD5 deprecated para seguranca, ok para hashing)
+- **Esforco:** 1h
+- **Prioridade:** P3
+
+#### SYS-010: Sem Timeout em Chamadas OpenAI
+
+- **Impacto:** Performance/confiabilidade (LLM call pode travar indefinidamente)
+- **Esforco:** 2h
+- **Prioridade:** P2
+
+#### SYS-011: Vercel Serverless Limits para Download Proxy
+
+- **Impacto:** Performance (BFF buffering nega streaming do backend)
+- **Esforco:** 4h
+- **Prioridade:** P3
+
+#### SYS-012: 3 Data Sources Depreciadas Referenciadas
+
+- **Impacto:** Qualidade de codigo
+- **Esforco:** 2h
+- **Prioridade:** P3
+
+#### SYS-013: In-Memory JobStore como Base do RedisJobStore
+
+- **Impacto:** Arquitetura (dual-write, acoplamento conceitual)
+- **Esforco:** 8h
+- **Prioridade:** P3
+
+#### SYS-014: Filter Engine Usa Regex para Keyword Matching
+
+- **Impacto:** Performance (~130 inclusion + ~100 exclusion patterns por item)
+- **Esforco:** 8h
+- **Prioridade:** P4
+
+#### SYS-015: Sem Retry nas Chamadas BFF Proxy
+
+- **Impacto:** Confiabilidade (network blips causam falha imediata)
+- **Esforco:** 4h
+- **Prioridade:** P3
+
+#### SYS-016: React 18 com Next.js 16
+
+- **Impacto:** Dependencias (impede React 19 features)
+- **Esforco:** 8h
+- **Prioridade:** P4
+
+#### SYS-017: Module Alias Mismatch Jest vs tsconfig
+
+- **Impacto:** Qualidade de codigo
+- **Esforco:** 2h
+- **Prioridade:** P3
+
+#### SYS-018: Transparencia Health Check Sincrono
+
+- **Impacto:** Qualidade de codigo (bloquearia event loop se chamado de async)
+- **Esforco:** 2h
+- **Prioridade:** P4
+
+### Severidade Baixa
+
+#### SYS-019: Deadline Filter Parcialmente Desabilitado
+
+- **Impacto:** Completude de feature
+- **Esforco:** 4h
+- **Prioridade:** P4
+
+#### SYS-020: Sem OpenAPI Schema para Items Response
+
+- **Impacto:** Documentacao de API
+- **Esforco:** 1h
+- **Prioridade:** P4
+
+#### SYS-021: Integration Tests Sao Placeholder
+
+- **Impacto:** Cobertura de testes
+- **Esforco:** 16h
+- **Prioridade:** P4
+
+#### SYS-022: Sem Docker Compose Profile para Frontend Dev
+
+- **Impacto:** Developer experience
+- **Esforco:** 2h
+- **Prioridade:** P5
+
+#### SYS-023: Mixpanel Carregado em Todas as Paginas
+
+- **Impacto:** Performance
+- **Esforco:** 2h
+- **Prioridade:** P5
+
+#### SYS-024: Sem Logging Estruturado no Frontend
+
+- **Impacto:** Observabilidade
+- **Esforco:** 4h
+- **Prioridade:** P5
+
+---
+
+## 2. Debitos de Database (DB-xxx)
+
+*Fonte: `supabase/docs/DB-AUDIT.md`*
+
+> **PENDENTE:** Revisao do @data-engineer
+
+### Severidade Alta
+
+#### DB-001: Sem Isolamento Multi-User/Multi-Tenant
+
+- **Descricao:** Tabelas `search_history` e `user_preferences` sem `user_id`. `/search-history` retorna buscas de todos os usuarios.
+- **Esforco:** 4h
+- **Prioridade:** P1
+
+#### DB-002: Storage Efemero no Railway/Vercel
+
+- **Descricao:** SQLite perde dados a cada deploy. Relacionado a SYS-001.
+- **Esforco:** 16h
+- **Prioridade:** P1
+
+#### DB-003: Sem Sistema de Migracao
+
+- **Descricao:** Schema via `CREATE TABLE IF NOT EXISTS` no startup. Sem Alembic/Supabase CLI.
+- **Esforco:** 8h
+- **Prioridade:** P1
+
+### Severidade Media
+
+#### DB-004: Tabela user_preferences Nao Utilizada
+
+- **Descricao:** 3 metodos implementados mas nunca chamados de nenhum endpoint.
+- **Esforco:** 1h
+- **Prioridade:** P3
+
+#### DB-005: API Key Comparison Vulneravel a Timing Attack
+
+- **Descricao:** Usa `==` ao inves de `hmac.compare_digest`. Relacionado a SYS-003.
+- **Esforco:** 0.5h
+- **Prioridade:** P2
+
+#### DB-006: Redis Write Amplification em Progress Updates
+
+- **Descricao:** Cada update de progresso serializa e escreve o JSON completo do job no Redis.
+- **Esforco:** 4h
+- **Prioridade:** P3
+
+#### DB-007: Sem Health Check do Database
+
+- **Descricao:** `/health` verifica Redis mas nao SQLite.
+- **Esforco:** 1h
+- **Prioridade:** P3
+
+#### DB-008: Sem Politica de Retencao/Cleanup para SQLite
+
+- **Descricao:** `search_history` cresce sem limite (mitigado pelo storage efemero).
+- **Esforco:** 2h
+- **Prioridade:** P3
+
+#### DB-009: Redis Items Desserializa Dataset Completo
+
+- **Descricao:** `get_items_page()` carrega TODOS os items do Redis e faz slice em Python. Critico para buscas de grande volume.
+- **Esforco:** 4h
+- **Prioridade:** P2
+
+### Severidade Baixa
+
+#### DB-010: Sem Estrategia de Backup
+
+- **Descricao:** Nenhum mecanismo de backup para SQLite ou Redis.
+- **Esforco:** 4h
+- **Prioridade:** P4
+
+#### DB-011: Graceful Degradation Esconde Falhas Silenciosamente
+
+- **Descricao:** Retorna resultados vazios quando conexao indisponivel sem metricas.
+- **Esforco:** 2h
+- **Prioridade:** P4
+
+#### DB-012: Supabase Env Vars Definidas mas Nao Utilizadas
+
+- **Descricao:** `.env.example` tem vars de Supabase sem integracao.
+- **Esforco:** 0.5h
+- **Prioridade:** P5
+
+#### DB-013: Sem Transaction Boundaries para Operacoes Multi-Step
+
+- **Descricao:** Cada metodo commit imediatamente. Aceitavel para operacoes single-statement atuais.
+- **Esforco:** 2h
+- **Prioridade:** P5
+
+---
+
+## 3. Debitos de Frontend/UX (FE-xxx)
+
+*Fonte: `docs/frontend/frontend-spec.md` Secao 11*
+
+> **PENDENTE:** Revisao do @ux-expert
+
+### Severidade Alta
+
+#### FE-001: Cores Hardcoded nos Badges de SearchSummary
+
+- **Descricao:** `bg-blue-100`, `text-blue-800`, `bg-purple-100` etc. bypassing o sistema de temas. Ilegivel em temas sepia/paperwhite.
+- **Esforco:** 1h
+- **Prioridade:** P2
+
+#### FE-005: Error Swallowing Silencioso no ItemsList
+
+- **Descricao:** `catch {}` vazio na paginacao. Usuario ve "Carregando..." perpetuo sem feedback de erro.
+- **Esforco:** 2h
+- **Prioridade:** P2
+
+### Severidade Media
+
+#### FE-004: Componente Spinner Ausente
+
+- **Descricao:** SVG spinner duplicado em SearchForm e SearchActions.
+- **Esforco:** 1h
+- **Prioridade:** P3
+
+#### FE-006: Componente Button Ausente
+
+- **Descricao:** Estilos de botao duplicados como inline Tailwind em 7+ componentes.
+- **Esforco:** 3h
+- **Prioridade:** P3
+
+#### FE-007: ink-muted Contraste Abaixo de WCAG AA
+
+- **Descricao:** `#5a6a7a` contra branco = ~4.1:1 (abaixo de 4.5:1 para texto normal).
+- **Esforco:** 1h
+- **Prioridade:** P2
+
+#### FE-008: Link /termos Quebrado no Footer
+
+- **Descricao:** Footer linka para `/termos` que nao existe.
+- **Esforco:** 2h
+- **Prioridade:** P3
+
+#### FE-011: Teste Ausente para SourceBadges
+
+- **Descricao:** Renderizacao condicional complexa sem teste dedicado.
+- **Esforco:** 2h
+- **Prioridade:** P3
+
+### Severidade Baixa
+
+#### FE-002: Cor Hardcoded no SourceBadges Warning
+
+- **Descricao:** `text-amber-600` ao inves de token semantico `text-warning`.
+- **Esforco:** 0.5h
+- **Prioridade:** P4
+
+#### FE-003: Dependencia UUID Desnecessaria
+
+- **Descricao:** `uuid` v13 pode ser substituido por `crypto.randomUUID()`.
+- **Esforco:** 0.5h
+- **Prioridade:** P4
+
+#### FE-009: Sem Error Fallback para Dynamic Imports
+
+- **Descricao:** EmptyState e ItemsList sem loading/error fallback.
+- **Esforco:** 1h
+- **Prioridade:** P4
+
+#### FE-010: Teste Ausente para RegionSelector
+
+- **Descricao:** Sem teste direto (testado indiretamente via UfSelector).
+- **Esforco:** 1.5h
+- **Prioridade:** P4
+
+#### FE-012: Tema Dim com Cobertura Incompleta de Tokens
+
+- **Descricao:** Dim quase identico a Dark (apenas canvas e surface-0 diferem).
+- **Esforco:** 2h
+- **Prioridade:** P4
+
+#### FE-013: SavedSearchesDropdown Retorna null Durante Loading
+
+- **Descricao:** Layout shift breve no header durante loading.
+- **Esforco:** 0.5h
+- **Prioridade:** P5
+
+#### FE-014: page.tsx e Monolitico Client Component
+
+- **Descricao:** 209 linhas de "use client" gerenciando todo o estado.
+- **Esforco:** 4h
+- **Prioridade:** P5
+
+---
+
+## 4. Matriz Preliminar de Priorizacao
+
+| ID | Debito | Area | Severidade | Impacto | Esforco (h) | Prioridade |
+|----|--------|------|-----------|---------|-------------|------------|
+| SYS-002 | Sem modelo de identidade de usuario | Seguranca/Produto | Critica | Muito Alto | 24 | P1 |
+| SYS-001 | SQLite em filesystem efemero | Persistencia | Critica | Muito Alto | 16 | P1 |
+| DB-002 | Storage efemero Railway/Vercel | Persistencia | Alta | Muito Alto | 16 | P1 |
+| DB-001 | Sem isolamento multi-user | Seguranca | Alta | Muito Alto | 4 | P1 |
+| DB-003 | Sem sistema de migracao | Engenharia | Alta | Alto | 8 | P1 |
+| SYS-003 | JWT customizada sem PyJWT | Seguranca | Critica | Alto | 4 | P1 |
+| SYS-007 | Auth bypass sem safeguard | Seguranca | Alta | Alto | 2 | P2 |
+| DB-005 | Timing attack em API key | Seguranca | Media | Medio | 0.5 | P2 |
+| SYS-004 | CORS allow_headers=["*"] | Seguranca | Alta | Alto | 1 | P2 |
+| SYS-005 | Sem CSP/HSTS headers | Seguranca | Alta | Alto | 4 | P2 |
+| SYS-010 | Sem timeout OpenAI | Confiabilidade | Media | Alto | 2 | P2 |
+| FE-005 | Error swallowing em ItemsList | UX | Alta | Alto | 2 | P2 |
+| FE-001 | Cores hardcoded em badges | UX/Temas | Alta | Alto | 1 | P2 |
+| FE-007 | ink-muted contraste < WCAG AA | Acessibilidade | Media | Alto | 1 | P2 |
+| DB-009 | Redis items desserializa tudo | Performance | Media | Alto (grande volume) | 4 | P2 |
+| SYS-006 | Saved searches so localStorage | Produto/UX | Alta | Medio | 8 | P2 |
+| SYS-015 | Sem retry nas chamadas BFF | Confiabilidade | Media | Medio | 4 | P3 |
+| SYS-008 | Version hardcoded | Codigo | Media | Baixo | 2 | P3 |
+| SYS-009 | MD5 para dedup keys | Codigo | Media | Baixo | 1 | P3 |
+| SYS-011 | Vercel limits para download | Performance | Media | Medio | 4 | P3 |
+| SYS-012 | Sources depreciadas referenciadas | Codigo | Media | Baixo | 2 | P3 |
+| SYS-013 | In-memory JobStore base class | Arquitetura | Media | Medio | 8 | P3 |
+| SYS-017 | Module alias mismatch | Codigo | Media | Baixo | 2 | P3 |
+| DB-004 | user_preferences nao utilizada | Codigo | Media | Baixo | 1 | P3 |
+| DB-006 | Redis write amplification | Performance | Media | Medio | 4 | P3 |
+| DB-007 | Sem health check DB | Observabilidade | Media | Medio | 1 | P3 |
+| DB-008 | Sem cleanup/retencao SQLite | Operacoes | Media | Baixo | 2 | P3 |
+| FE-004 | Spinner component ausente | Codigo/UX | Media | Baixo | 1 | P3 |
+| FE-006 | Button component ausente | Codigo/UX | Media | Medio | 3 | P3 |
+| FE-008 | Link /termos quebrado | UX | Media | Medio | 2 | P3 |
+| FE-011 | Teste SourceBadges ausente | Testes | Media | Medio | 2 | P3 |
+| SYS-014 | Filter engine usa regex | Performance | Media | Medio (grande volume) | 8 | P4 |
+| SYS-016 | React 18 com Next.js 16 | Dependencias | Media | Medio | 8 | P4 |
+| SYS-018 | Transparencia health check sync | Codigo | Media | Baixo | 2 | P4 |
+| SYS-019 | Deadline filter parcial | Feature | Baixa | Baixo | 4 | P4 |
+| SYS-020 | Sem OpenAPI para items | Documentacao | Baixa | Baixo | 1 | P4 |
+| SYS-021 | Integration tests placeholder | Testes | Baixa | Medio | 16 | P4 |
+| DB-010 | Sem backup strategy | Operacoes | Baixa | Medio | 4 | P4 |
+| DB-011 | Degradation esconde falhas | Observabilidade | Baixa | Baixo | 2 | P4 |
+| FE-002 | Cor hardcoded SourceBadges | UX/Temas | Baixa | Baixo | 0.5 | P4 |
+| FE-003 | UUID dependency desnecessaria | Bundle | Baixa | Baixo | 0.5 | P4 |
+| FE-009 | Sem fallback dynamic imports | UX | Baixa | Baixo | 1 | P4 |
+| FE-010 | Teste RegionSelector ausente | Testes | Baixa | Baixo | 1.5 | P4 |
+| FE-012 | Tema Dim incompleto | UX/Temas | Baixa | Baixo | 2 | P4 |
+| SYS-022 | Sem Docker profile frontend dev | DX | Baixa | Baixo | 2 | P5 |
+| SYS-023 | Mixpanel em todas as paginas | Performance | Baixa | Baixo | 2 | P5 |
+| SYS-024 | Sem logging estruturado frontend | Observabilidade | Baixa | Baixo | 4 | P5 |
+| DB-012 | Supabase env vars nao usadas | Codigo | Baixa | Baixo | 0.5 | P5 |
+| DB-013 | Sem transaction boundaries | Engenharia | Baixa | Baixo | 2 | P5 |
+| FE-013 | SavedSearches null durante load | UX | Baixa | Baixo | 0.5 | P5 |
+| FE-014 | page.tsx monolitico | Arquitetura | Baixa | Baixo | 4 | P5 |
+
+**Nota sobre sobreposicao:** SYS-001 e DB-002 descrevem o mesmo problema (SQLite efemero). Uma migracao para Supabase (estimada em 24-32h pela auditoria DB) resolveria simultaneamente: SYS-001, DB-001, DB-002, DB-003, DB-008, DB-010, DB-012.
+
+---
+
+## 5. Perguntas para Especialistas
+
+### Para @data-engineer
+
+1. **Acentuacao:** A funcao `normalize_text()` cobre todos os edge cases do portugues brasileiro? Ha caracteres especificos (cedilha isolada, til em "ao", hifens em "guarda-po") que podem falhar no NFD decomposition?
+
+2. **Search quality -- stemming:** Qual a viabilidade de implementar stemming RSLP (Removedor de Sufixos da Lingua Portuguesa) ou Snowball no `normalize_text()`? Qual o impacto no tempo de filtragem para 85K items?
+
+3. **Search quality -- exclusoes para termos customizados:** Atualmente exclusoes sao desativadas para termos customizados. Isso e intencional? Deve haver ao menos um subset de exclusoes universais (ex: "uniformizacao de procedimento")?
+
+4. **PNCP API palavraChave:** O parametro e realmente ignorado em todos os endpoints? Ha algum endpoint alternativo que suporte filtragem server-side?
+
+5. **Grande volume -- Redis:** Qual o pico de memoria Redis observado em producao? Buscas de 27 UFs x 90 dias estao causando problemas?
+
+6. **Grande volume -- DB-009:** A migracao para Redis LIST (RPUSH/LRANGE) e viavel? Qual seria o impacto na serializacao/desserializacao de items individuais?
+
+7. **Supabase migration:** Qual o plano de migracao preferido? Supabase Python client vs asyncpg direto? Alembic vs Supabase CLI para migracoes?
+
+### Para @ux-expert
+
+1. **Grande volume -- feedback:** O LoadingProgress atual (5 stages, UF grid, carousel) e suficiente para buscas de 5+ minutos? O ETA estimado e preciso para grandes volumes?
+
+2. **Grande volume -- limites proativos:** Devemos avisar o usuario ao selecionar >10 UFs ou >30 dias? Qual a melhor abordagem UX (banner, tooltip, confirmacao modal)?
+
+3. **Search quality -- display de resultados:** Os badges de tipo (licitacao/ata) sao confusos para usuarios? O EmptyState com filter breakdown e compreensivel?
+
+4. **FE-005 -- erro silencioso na paginacao:** Qual o design preferido para erro de paginacao? Inline retry? Toast notification? Banner?
+
+5. **FE-007 -- ink-muted contraste:** O valor atual de `#5a6a7a` (4.1:1) e aceitavel para metadados que nao sao conteudo primario? Ou devemos atender WCAG AA estritamente (4.5:1)?
+
+6. **Acentuacao -- input do usuario:** O campo de busca deve normalizar acentos visualmente (ex: mostrar preview do termo normalizado)? Ou isso confundiria o usuario?
+
+7. **FE-012 -- Tema Dim:** O tema Dim deveria ter identidade visual distinta do Dark? Ou a diferenca sutil (apenas canvas/surface) e aceitavel?
+
+---
+
+*Documento gerado por @architect (Atlas) com base em analise abrangente do codebase. Todos os caminhos de arquivo, numeros de versao, e detalhes arquiteturais verificados contra o codigo-fonte no commit 5e56b38d.*
