@@ -25,6 +25,14 @@ try {
   console.warn('   Install with: npm install --save-dev @testing-library/jest-dom')
 }
 
+// Mock AuthContext to provide a default unauthenticated state for all tests.
+// Components that use useAuth() will receive user: null (localStorage-only mode).
+// Tests that need an authenticated user should override this mock locally.
+jest.mock('./app/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: null, session: null, loading: false, signUp: jest.fn(), signIn: jest.fn(), signOut: jest.fn() }),
+  AuthProvider: ({ children }) => children,
+}));
+
 // Mock Next.js router (when Next.js is installed)
 try {
   const { useRouter } = require('next/router')

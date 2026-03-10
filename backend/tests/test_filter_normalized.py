@@ -19,7 +19,7 @@ class TestFilterWithNormalizedFields:
             "valor_estimado": 100_000.0,
             "objeto": "Aquisição de uniformes escolares",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -30,7 +30,7 @@ class TestFilterWithNormalizedFields:
             "valor_estimado": 100_000.0,
             "objeto": "Fornecimento de jalecos hospitalares",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -40,7 +40,7 @@ class TestFilterWithNormalizedFields:
             "uf": "SP",
             "objeto": "Uniformes",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -51,7 +51,7 @@ class TestFilterWithNormalizedFields:
             "valor_estimado": 30_000.0,
             "objeto": "Uniformes",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is False
         assert "fora da faixa" in motivo
 
@@ -62,7 +62,7 @@ class TestFilterWithNormalizedFields:
             "valor_estimado": 100_000.0,
             "objeto": "Aquisição de notebooks e impressoras",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is False
         assert "keywords" in motivo.lower() or "setor" in motivo.lower()
 
@@ -73,7 +73,7 @@ class TestFilterWithNormalizedFields:
             "valorTotalEstimado": 100_000.0,
             "objetoCompra": "Uniformes escolares",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -86,7 +86,7 @@ class TestFilterWithNormalizedFields:
             "objetoCompra": "Uniformes escolares",
             "objeto": "Something else",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
 
     def test_to_legacy_dict_works_with_filter(self):
@@ -115,7 +115,7 @@ class TestFilterWithNormalizedFields:
         )
 
         legacy = record.to_legacy_dict()
-        aprovada, motivo = filter_licitacao(legacy, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(legacy, {"SP"})
         assert aprovada is True
         assert motivo is None
 

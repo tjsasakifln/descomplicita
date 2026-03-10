@@ -21,15 +21,15 @@ const mockSearches = [
   },
 ];
 
-const mockLoadSearch = jest.fn((id: string) => mockSearches.find(s => s.id === id) || null);
+const mockLoadSearch = jest.fn();
 
 jest.mock('../../hooks/useSavedSearches', () => ({
   useSavedSearches: () => ({
     searches: mockSearches,
     loading: false,
-    deleteSearch: jest.fn(() => true),
+    deleteSearch: jest.fn(() => Promise.resolve(true)),
     loadSearch: mockLoadSearch,
-    clearAll: jest.fn(),
+    clearAll: jest.fn(() => Promise.resolve()),
   }),
 }));
 
@@ -38,6 +38,9 @@ describe('SavedSearchesDropdown ARIA Listbox (UXD-005)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLoadSearch.mockImplementation((id: string) =>
+      Promise.resolve(mockSearches.find((s) => s.id === id) ?? null)
+    );
   });
 
   it('should have role="listbox" on the search list', () => {

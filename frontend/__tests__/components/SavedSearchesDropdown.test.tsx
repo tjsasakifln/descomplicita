@@ -32,8 +32,8 @@ const mockSearches = [
   },
 ];
 
-const mockDeleteSearch = jest.fn(() => true);
-const mockLoadSearch = jest.fn((id: string) => mockSearches.find(s => s.id === id) || null);
+const mockDeleteSearch = jest.fn();
+const mockLoadSearch = jest.fn();
 const mockClearAll = jest.fn();
 
 // The component uses relative import ../../hooks/useSavedSearches
@@ -58,6 +58,12 @@ describe('SavedSearchesDropdown', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    // Default async implementations (return Promises to match hook's async API)
+    mockDeleteSearch.mockResolvedValue(true);
+    mockLoadSearch.mockImplementation((id: string) =>
+      Promise.resolve(mockSearches.find((s) => s.id === id) ?? null)
+    );
+    mockClearAll.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

@@ -69,7 +69,7 @@ def audit_sector(items: list[dict], sector: SectorConfig) -> dict:
 
         # Full filter (using sector keywords)
         fake_lic = {"uf": uf, "valorTotalEstimado": valor, "objetoCompra": objeto}
-        ok, reason = filter_licitacao(
+        ok, reason, _kw, _sc = filter_licitacao(
             fake_lic, ufs_set,
             keywords=sector.keywords,
             exclusions=sector.exclusions,
@@ -119,7 +119,7 @@ def analyze_cross_sector_conflicts(items: list[dict]) -> list[dict]:
 
         matching_sectors = []
         for sector in SECTORS.values():
-            ok, _ = filter_licitacao(
+            ok, _, _kw2, _sc2 = filter_licitacao(
                 fake_lic, ufs_set,
                 keywords=sector.keywords,
                 exclusions=sector.exclusions,

@@ -3,7 +3,7 @@ import type { UseSearchFormReturn } from "./useSearchForm";
 
 interface UseSaveDialogParams {
   form: UseSearchFormReturn;
-  saveNewSearch: (name: string, params: any) => any;
+  saveNewSearch: (name: string, params: any) => Promise<any> | any;
   trackEvent: (name: string, props?: Record<string, any>) => void;
   hasResult: boolean;
 }
@@ -36,27 +36,29 @@ export function useSaveDialog({ form, saveNewSearch, trackEvent, hasResult }: Us
   }, [hasResult, form.searchMode, form.setores, form.setorId, form.termosArray]);
 
   const confirmSaveSearch = useCallback(() => {
-    try {
-      saveNewSearch(saveSearchName || "Busca sem nome", {
-        ufs: Array.from(form.ufsSelecionadas),
-        dataInicial: form.dataInicial,
-        dataFinal: form.dataFinal,
-        searchMode: form.searchMode,
-        setorId: form.searchMode === "setor" ? form.setorId : undefined,
-        termosBusca: form.searchMode === "termos" ? form.termosArray.join(" ") : undefined,
-      });
-      trackEvent("saved_search_created", {
-        search_name: saveSearchName,
-        search_mode: form.searchMode,
-        ufs: Array.from(form.ufsSelecionadas),
-        uf_count: form.ufsSelecionadas.size,
-      });
-      setShowSaveDialog(false);
-      setSaveSearchName("");
-      setSaveError(null);
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Erro ao salvar busca");
-    }
+    void (async () => {
+      try {
+        await saveNewSearch(saveSearchName || "Busca sem nome", {
+          ufs: Array.from(form.ufsSelecionadas),
+          dataInicial: form.dataInicial,
+          dataFinal: form.dataFinal,
+          searchMode: form.searchMode,
+          setorId: form.searchMode === "setor" ? form.setorId : undefined,
+          termosBusca: form.searchMode === "termos" ? form.termosArray.join(" ") : undefined,
+        });
+        trackEvent("saved_search_created", {
+          search_name: saveSearchName,
+          search_mode: form.searchMode,
+          ufs: Array.from(form.ufsSelecionadas),
+          uf_count: form.ufsSelecionadas.size,
+        });
+        setShowSaveDialog(false);
+        setSaveSearchName("");
+        setSaveError(null);
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : "Erro ao salvar busca");
+      }
+    })();
   }, [saveNewSearch, saveSearchName, form, trackEvent]);
 
   const cancelSaveDialog = useCallback(() => {

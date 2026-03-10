@@ -302,7 +302,7 @@ class TestFilterLicitacao:
             "valorTotalEstimado": 100_000.0,
             "objetoCompra": "Aquisição de uniformes escolares",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP", "MG"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP", "MG"})
         assert aprovada is False
         assert "UF 'RJ' não selecionada" in motivo
 
@@ -315,21 +315,21 @@ class TestFilterLicitacao:
             "objetoCompra": "Aquisição de uniformes escolares",
             "dataAberturaProposta": future_date,
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP", "RJ"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP", "RJ"})
         assert aprovada is True
         assert motivo is None
 
     def test_passes_valor_none_to_keyword_check(self):
         """Items with no value should skip value filter (common in Registro de Preços)."""
         licitacao = {"uf": "SP", "objetoCompra": "Uniformes escolares"}
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         # Should reach keyword check, not be rejected by value filter
         assert aprovada is True or "keyword" in (motivo or "").lower() or "Não contém" in (motivo or "")
 
     def test_passes_valor_zero_to_keyword_check(self):
         """Items with valor=0.0 should skip value filter (common in PNCP)."""
         licitacao = {"uf": "SP", "valorTotalEstimado": 0.0, "objetoCompra": "Uniformes escolares"}
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True or "Não contém" in (motivo or "")
 
     def test_rejects_valor_below_min(self):
@@ -339,7 +339,7 @@ class TestFilterLicitacao:
             "valorTotalEstimado": 30_000.0,  # Below 50k default
             "objetoCompra": "Uniformes escolares",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is False
         assert "Valor" in motivo
         assert "fora da faixa" in motivo
@@ -351,7 +351,7 @@ class TestFilterLicitacao:
             "valorTotalEstimado": 6_000_000.0,  # Above 5M default
             "objetoCompra": "Uniformes escolares",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is False
         assert "Valor" in motivo
         assert "fora da faixa" in motivo
@@ -365,7 +365,7 @@ class TestFilterLicitacao:
             "objetoCompra": "Uniformes escolares",
             "dataAberturaProposta": future_date,
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -379,7 +379,7 @@ class TestFilterLicitacao:
             "dataAberturaProposta": future_date,
         }
         # Custom range: 100k-200k (should reject 75k)
-        aprovada, _ = filter_licitacao(
+        aprovada, _, _kw2, _sc2 = filter_licitacao(
             licitacao, {"SP"}, valor_min=100_000, valor_max=200_000
         )
         assert aprovada is False
@@ -391,7 +391,7 @@ class TestFilterLicitacao:
             "valorTotalEstimado": 100_000.0,
             "objetoCompra": "Aquisição de notebooks e impressoras",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is False
         assert "keywords" in motivo.lower() or "setor" in motivo.lower()
 
@@ -404,7 +404,7 @@ class TestFilterLicitacao:
             "objetoCompra": "Aquisição de uniformes escolares",
             "dataAberturaProposta": future_date,
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -427,7 +427,7 @@ class TestFilterLicitacao:
             "objetoCompra": "Uniformes",
             "dataAberturaProposta": past_date,
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True  # Now accepts historical bids
         assert motivo is None
 
@@ -440,7 +440,7 @@ class TestFilterLicitacao:
             "objetoCompra": "Uniformes escolares",
             "dataAberturaProposta": future_date,
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -451,7 +451,7 @@ class TestFilterLicitacao:
             "valorTotalEstimado": 100_000.0,
             "objetoCompra": "Uniformes",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True  # Missing date doesn't fail the filter
         assert motivo is None
 
@@ -463,7 +463,7 @@ class TestFilterLicitacao:
             "objetoCompra": "Uniformes",
             "dataAberturaProposta": "invalid-date-format",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True  # Malformed date doesn't fail the filter
         assert motivo is None
 
@@ -475,7 +475,7 @@ class TestFilterLicitacao:
             "valorTotalEstimado": 30_000.0,  # Also wrong value
             "objetoCompra": "Software",  # Also wrong keywords
         }
-        aprovada, motivo = filter_licitacao(licitacao_wrong_uf, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao_wrong_uf, {"SP"})
         assert aprovada is False
         # Should fail on UF (first check), not mention value or keywords
         assert "UF" in motivo
@@ -515,7 +515,7 @@ class TestFilterLicitacao:
 
         # All should be accepted
         for i, bid in enumerate(historical_bids):
-            aprovada, motivo = filter_licitacao(bid, {"SP", "RJ", "MG"})
+            aprovada, motivo, _kw, _sc = filter_licitacao(bid, {"SP", "RJ", "MG"})
             assert aprovada is True, f"Bid {i+1} should be accepted, but got: {motivo}"
             assert motivo is None
 
@@ -559,7 +559,7 @@ class TestFilterLicitacao:
             "codigoCompra": "12345678",
             "nomeOrgao": "Prefeitura Municipal de São Paulo",
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP", "RJ", "MG"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP", "RJ", "MG"})
         assert aprovada is True
         assert motivo is None
 
@@ -574,7 +574,7 @@ class TestFilterLicitacao:
             "objetoCompra": "Uniformes",
             "dataAberturaProposta": future_date_z,
         }
-        aprovada, motivo = filter_licitacao(licitacao, {"SP"})
+        aprovada, motivo, _kw, _sc = filter_licitacao(licitacao, {"SP"})
         assert aprovada is True
         assert motivo is None
 
@@ -843,7 +843,7 @@ class TestSectorValueRanges:
             "objetoCompra": "Medicamentos diversos",
         }
         sector = SECTORS["saude"]
-        aprovada, _ = filter_licitacao(
+        aprovada, _, _kw2, _sc2 = filter_licitacao(
             licitacao, {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
@@ -859,7 +859,7 @@ class TestSectorValueRanges:
             "objetoCompra": "Registro de precos para medicamentos",
         }
         sector = SECTORS["saude"]
-        aprovada, _ = filter_licitacao(
+        aprovada, _, _kw2, _sc2 = filter_licitacao(
             licitacao, {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
@@ -875,7 +875,7 @@ class TestSectorValueRanges:
             "objetoCompra": "Reforma predial",
         }
         sector = SECTORS["engenharia"]
-        aprovada, motivo = filter_licitacao(
+        aprovada, motivo, _kw, _sc = filter_licitacao(
             licitacao, {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
@@ -1033,3 +1033,61 @@ class TestCustomTermsWithSectorExclusions:
             exclusions={"confeccao de placa"},
         )
         assert approved2 is False, "Non-accented exclusion should match accented input"
+
+
+class TestMatchedKeywordsInResponse:
+    """FE-015: Verify matched_keywords and relevance_score are attached to items."""
+
+    def _make_bid(self, objeto: str, uf: str = "SP") -> dict:
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        return {
+            "uf": uf,
+            "valorTotalEstimado": 100_000.0,
+            "objetoCompra": objeto,
+            "dataFimReceberPropostas": future,
+        }
+
+    def test_filter_licitacao_returns_matched_keywords(self):
+        """filter_licitacao should return matched keywords for approved bids."""
+        bid = self._make_bid("Aquisição de uniformes escolares")
+        aprovada, motivo, kw_found, score = filter_licitacao(bid, {"SP"})
+        assert aprovada is True
+        assert motivo is None
+        assert isinstance(kw_found, list)
+        assert len(kw_found) > 0
+        assert "uniforme" in kw_found or "uniformes" in kw_found
+        assert score > 0
+
+    def test_filter_licitacao_returns_empty_keywords_for_rejected(self):
+        """filter_licitacao should return empty keywords for rejected bids."""
+        bid = self._make_bid("Aquisição de uniformes escolares", uf="RJ")
+        aprovada, motivo, kw_found, score = filter_licitacao(bid, {"SP"})
+        assert aprovada is False
+        assert kw_found == []
+        assert score == 0.0
+
+    def test_filter_batch_attaches_matched_keywords(self):
+        """filter_batch should attach matched_keywords to each approved item."""
+        bids = [
+            self._make_bid("Confecção de fardamento militar"),
+            self._make_bid("Compra de material de escritório"),
+        ]
+        approved, stats = filter_batch(bids, {"SP"})
+        assert len(approved) >= 1
+        for item in approved:
+            assert "matched_keywords" in item
+            assert isinstance(item["matched_keywords"], list)
+            assert len(item["matched_keywords"]) > 0
+            assert "relevance_score" in item
+            assert isinstance(item["relevance_score"], float)
+            assert item["relevance_score"] > 0
+
+    def test_filter_batch_score_is_rounded(self):
+        """Relevance score should be rounded to 2 decimal places."""
+        bid = self._make_bid("Aquisição de uniformes e fardas")
+        approved, _ = filter_batch([bid], {"SP"})
+        assert len(approved) == 1
+        score_str = str(approved[0]["relevance_score"])
+        # At most 2 decimal places
+        if "." in score_str:
+            assert len(score_str.split(".")[1]) <= 2

@@ -460,7 +460,7 @@ def filter_licitacao(
     keywords_b: Set[str] | None = None,
     keywords_c: Set[str] | None = None,
     threshold: float = 0.6,
-) -> Tuple[bool, Optional[str]]:
+) -> Tuple[bool, Optional[str], List[str], float]:
     """
     Apply all filters to a single procurement bid (fail-fast sequential filtering).
 
@@ -480,6 +480,8 @@ def filter_licitacao(
         Tuple containing:
         - bool: True if bid passes all filters, False otherwise
         - Optional[str]: Rejection reason if rejected, None if approved
+        - List[str]: Matched keywords (empty if rejected)
+        - float: Relevance score (0.0 if rejected)
 
     Examples:
         >>> bid = {
@@ -489,16 +491,16 @@ def filter_licitacao(
         ...     "dataAberturaProposta": "2026-12-31T10:00:00Z"
         ... }
         >>> filter_licitacao(bid, {"SP"})
-        (True, None)
+        (True, None, ['uniforme'], 1.0)
 
         >>> bid_rejected = {"uf": "RJ", "valorTotalEstimado": 100000.0}
         >>> filter_licitacao(bid_rejected, {"SP"})
-        (False, "UF 'RJ' não selecionada")
+        (False, "UF 'RJ' não selecionada", [], 0.0)
     """
     # 1. UF Filter (fastest check)
     uf = licitacao.get("uf", "")
     if uf not in ufs_selecionadas:
-        return False, f"UF '{uf}' não selecionada"
+        return False, f"UF '{uf}' não selecionada", [], 0.0
 
     # 2. Value Range Filter
     # Support both PNCP field name and NormalizedRecord field name
@@ -511,14 +513,14 @@ def filter_licitacao(
     # legitimate procurement items — skip the value check for them.
     if valor is not None and valor > 0:
         if not (valor_min <= valor <= valor_max):
-            return False, f"Valor R$ {valor:,.2f} fora da faixa"
+            return False, f"Valor R$ {valor:,.2f} fora da faixa", [], 0.0
 
     # 3. Keyword Filter (most expensive - regex matching)
     kw = keywords if keywords is not None else KEYWORDS_UNIFORMES
     exc = exclusions if exclusions is not None else KEYWORDS_EXCLUSAO
     # Support both PNCP field name and NormalizedRecord field name
     objeto = licitacao.get("objetoCompra") or licitacao.get("objeto", "")
-    match, keywords_found, _score = match_keywords(
+    match, keywords_found, kw_score = match_keywords(
         objeto, kw, exc,
         epi_only_keywords=epi_only_keywords,
         keywords_a=keywords_a, keywords_b=keywords_b,
@@ -526,7 +528,7 @@ def filter_licitacao(
     )
 
     if not match:
-        return False, "Não contém keywords do setor"
+        return False, "Não contém keywords do setor", [], 0.0
 
     # 4. Deadline Filter (TD-M01) — uses dataFimReceberPropostas
     # The field dataAberturaProposta is the proposal OPENING date (not deadline).
@@ -541,11 +543,11 @@ def filter_licitacao(
             from datetime import timezone
             now = datetime.now(timezone.utc)
             if data_fim < now:
-                return False, "Prazo de submissão encerrado"
+                return False, "Prazo de submissão encerrado", [], 0.0
         except (ValueError, TypeError):
             pass  # Unparseable date — don't reject, let it through
 
-    return True, None
+    return True, None, keywords_found, kw_score
 
 
 def filter_batch(
@@ -612,12 +614,14 @@ def filter_batch(
     }
 
     for lic in licitacoes:
-        aprovada, motivo = filter_licitacao(
+        aprovada, motivo, kw_found, kw_score = filter_licitacao(
             lic, ufs_selecionadas, valor_min, valor_max, keywords, exclusions,
             epi_only_keywords, keywords_a, keywords_b, keywords_c, threshold,
         )
 
         if aprovada:
+            lic["matched_keywords"] = kw_found
+            lic["relevance_score"] = round(kw_score, 2)
             aprovadas.append(lic)
             stats["aprovadas"] += 1
         else:

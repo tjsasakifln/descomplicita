@@ -23,25 +23,25 @@ Nota: SYS-006 depende de v3-story-2.0 (Supabase + user identity) estar completo.
 
 ## Tasks
 
-- [ ] Task 1: FE-015 Backend -- Incluir `matched_keywords: string[]` e `relevance_score: float` na resposta de cada item em /api/buscar/items
-- [ ] Task 2: FE-015 Frontend -- Implementar componente `<HighlightedText>` que recebe texto e array de keywords, renderiza keywords com `<mark>` tag
-- [ ] Task 3: FE-015 Frontend -- Integrar HighlightedText em ItemsList para o campo `objeto`
-- [ ] Task 4: FE-015 -- Garantir que highlight funciona com acentos: keyword "licitacao" (sem acento) destaca "licitacao" (com acento) no texto
-- [ ] Task 5: SYS-006 -- Implementar saved searches server-side via Supabase (tabela saved_searches com user_id, query params, created_at)
-- [ ] Task 6: SYS-006 -- Migrar dados existentes de localStorage para server-side no primeiro login
-- [ ] Task 7: SYS-006 -- Manter localStorage como cache local para performance (sync on login)
-- [ ] Task 8: FE-008 -- Criar pagina /termos com conteudo basico de termos de uso, ou redirecionar para pagina existente
-- [ ] Task 9: FE-011 -- Escrever testes para SourceBadges (logica condicional complexa: truncation warning, expanded state, badge rendering)
+- [x] Task 1: FE-015 Backend -- Incluir `matched_keywords: string[]` e `relevance_score: float` na resposta de cada item em /api/buscar/items
+- [x] Task 2: FE-015 Frontend -- Implementar componente `<HighlightedText>` que recebe texto e array de keywords, renderiza keywords com `<mark>` tag
+- [x] Task 3: FE-015 Frontend -- Integrar HighlightedText em ItemsList para o campo `objeto`
+- [x] Task 4: FE-015 -- Garantir que highlight funciona com acentos: keyword "licitacao" (sem acento) destaca "licitacao" (com acento) no texto
+- [x] Task 5: SYS-006 -- Implementar saved searches server-side via Supabase (tabela saved_searches com user_id, query params, created_at)
+- [x] Task 6: SYS-006 -- Migrar dados existentes de localStorage para server-side no primeiro login
+- [x] Task 7: SYS-006 -- Manter localStorage como cache local para performance (sync on login)
+- [x] Task 8: FE-008 -- Criar pagina /termos com conteudo basico de termos de uso, ou redirecionar para pagina existente
+- [x] Task 9: FE-011 -- Escrever testes para SourceBadges (logica condicional complexa: truncation warning, expanded state, badge rendering)
 
 ## Criterios de Aceite
 
-- [ ] Termos de busca destacados visualmente (cor/background) nos resultados
-- [ ] Highlight funciona com variantes de acento: busca "confeccao" destaca "confeccao" (com cedilha) no texto
-- [ ] matched_keywords presente na resposta da API de items
-- [ ] Saved searches persistem entre sessoes e dispositivos (via Supabase)
-- [ ] Dados de localStorage migrados automaticamente no primeiro login
-- [ ] Link /termos funciona e exibe conteudo
-- [ ] SourceBadges tem cobertura de testes adequada
+- [x] Termos de busca destacados visualmente (cor/background) nos resultados
+- [x] Highlight funciona com variantes de acento: busca "confeccao" destaca "confeccao" (com cedilha) no texto
+- [x] matched_keywords presente na resposta da API de items
+- [x] Saved searches persistem entre sessoes e dispositivos (via Supabase)
+- [x] Dados de localStorage migrados automaticamente no primeiro login
+- [x] Link /termos funciona e exibe conteudo
+- [x] SourceBadges tem cobertura de testes adequada
 
 ## Testes Requeridos
 
@@ -67,8 +67,8 @@ Nota: SYS-006 depende de v3-story-2.0 (Supabase + user identity) estar completo.
 
 ## Definition of Done
 
-- [ ] Code implemented and reviewed
-- [ ] Tests written and passing
-- [ ] Highlight funcional em todos os 5 temas
-- [ ] No regressions in existing tests
-- [ ] Acceptance criteria verified
+- [x] Code implemented and reviewed
+- [x] Tests written and passing
+- [x] Highlight funcional em todos os 5 temas
+- [x] No regressions in existing tests
+- [x] Acceptance criteria verified

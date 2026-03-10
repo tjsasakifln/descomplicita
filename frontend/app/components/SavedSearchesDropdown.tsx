@@ -82,7 +82,8 @@ export function SavedSearchesDropdown({
   }, [activeIndex]);
 
   const handleLoadSearch = (id: string) => {
-    const search = loadSearch(id);
+    // Find in current state immediately for synchronous UI response
+    const search = searches.find((s) => s.id === id) ?? null;
     if (search) {
       onLoadSearch(search);
       setIsOpen(false);
@@ -98,21 +99,25 @@ export function SavedSearchesDropdown({
           (Date.now() - new Date(search.createdAt).getTime()) / (1000 * 60 * 60 * 24)
         ),
       });
+
+      // Fire-and-forget: mark as used (updates timestamps in background)
+      void loadSearch(id);
     }
   };
 
   const handleDeleteSearch = (id: string, name: string) => {
     if (deleteConfirmId === id) {
-      const success = deleteSearch(id);
       setDeleteConfirmId(null);
 
-      if (success) {
-        onAnalyticsEvent?.('saved_search_deleted', {
-          search_id: id,
-          search_name: name,
-          remaining_searches: searches.length - 1,
-        });
-      }
+      void deleteSearch(id).then((success) => {
+        if (success) {
+          onAnalyticsEvent?.('saved_search_deleted', {
+            search_id: id,
+            search_name: name,
+            remaining_searches: searches.length - 1,
+          });
+        }
+      });
     } else {
       setDeleteConfirmId(id);
     }
@@ -221,7 +226,7 @@ export function SavedSearchesDropdown({
                     <button
                       onClick={() => {
                         if (clearConfirm) {
-                          clearAll();
+                          void clearAll();
                           setClearConfirm(false);
                           setIsOpen(false);
                         } else {

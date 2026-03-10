@@ -185,6 +185,14 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Keyword highlight mark — theme-aware via CSS custom property */
+mark {
+  background-color: var(--color-highlight-bg, #fef08a);
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 2px;
+}
+
 /* Subtle background texture — document/official aesthetic */
 body::before {
   content: '';

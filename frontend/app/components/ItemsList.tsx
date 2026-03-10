@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Pagination } from "./Pagination";
+import { HighlightedText } from "./HighlightedText";
 
 interface ProcurementItem {
   objeto?: string;
@@ -11,6 +12,8 @@ interface ProcurementItem {
   dataPublicacao?: string;
   link?: string;
   tipo?: string;
+  matched_keywords?: string[];
+  relevance_score?: number;
   [key: string]: unknown;
 }
 
@@ -139,7 +142,14 @@ export function ItemsList({ jobId, totalFiltered }: ItemsListProps) {
                     </span>
                   )}
                   <p className="text-sm font-medium text-ink line-clamp-2">
-                    {item.objeto || "Sem descricao"}
+                    {item.objeto ? (
+                      <HighlightedText
+                        text={item.objeto}
+                        keywords={item.matched_keywords || []}
+                      />
+                    ) : (
+                      "Sem descricao"
+                    )}
                   </p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-ink-muted">
                     {item.orgao && <span>{item.orgao}</span>}

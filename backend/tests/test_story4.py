@@ -110,7 +110,7 @@ class TestDeadlineFilter:
         """Bid with future deadline should pass."""
         future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
         bid = self._make_bid(data_fim=future)
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         assert approved is True
         assert reason is None
 
@@ -118,34 +118,34 @@ class TestDeadlineFilter:
         """Bid with past deadline should be rejected."""
         past = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
         bid = self._make_bid(data_fim=past)
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         assert approved is False
         assert "Prazo de submissão encerrado" in reason
 
     def test_bid_without_deadline_passes(self):
         """Bid without dataFimReceberPropostas should pass (no filter applied)."""
         bid = self._make_bid()
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         assert approved is True
 
     def test_bid_with_z_suffix_deadline(self):
         """Should handle ISO dates with 'Z' suffix."""
         past = "2025-01-01T10:00:00Z"
         bid = self._make_bid(data_fim=past)
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         assert approved is False
 
     def test_bid_with_offset_deadline(self):
         """Should handle ISO dates with timezone offset."""
         past = "2025-01-01T10:00:00+00:00"
         bid = self._make_bid(data_fim=past)
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         assert approved is False
 
     def test_bid_with_unparseable_deadline_passes(self):
         """Should not reject bids with malformed dates."""
         bid = self._make_bid(data_fim="not-a-date")
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         assert approved is True  # Unparseable → don't reject
 
     def test_filter_batch_counts_deadline_rejections(self):
@@ -167,7 +167,7 @@ class TestDeadlineFilter:
         """Bid with deadline exactly now should be rejected (already passed)."""
         now = datetime.now(timezone.utc).isoformat()
         bid = self._make_bid(data_fim=now)
-        approved, reason = filter_licitacao(bid, {"SP"})
+        approved, reason, _kw, _sc = filter_licitacao(bid, {"SP"})
         # Could be either depending on timing, but should not crash
         assert isinstance(approved, bool)
 

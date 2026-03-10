@@ -83,7 +83,7 @@ def audit_filter(items: list[dict]) -> dict:
         kw_match_no_exc, kw_found_no_exc, _score = match_keywords(objeto, KEYWORDS_UNIFORMES, None)
 
         # Run full filter
-        approved, reason = filter_licitacao(item, ufs_set)
+        approved, reason, _kw, _sc = filter_licitacao(item, ufs_set)
 
         entry = {
             "objeto": objeto[:300],
