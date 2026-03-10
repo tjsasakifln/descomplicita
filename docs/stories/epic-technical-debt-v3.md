@@ -76,7 +76,7 @@ Nota: ~123h de items P4/P5 ficam no Backlog para sprints futuros.
 
 | Risco | Severidade | Mitigacao |
 |-------|-----------|-----------|
-| **PNCP palavraChave nao funciona** -- volume permanece alto, truncamento mantido | Alta | Manter plano de DB-009 (Redis LIST) + DB-015 (dual-write). Re-priorizar se spike confirmar que parametro funciona. |
+| ~~**PNCP palavraChave nao funciona**~~ **CONFIRMADO (2026-03-09)** -- parametro e silenciosamente ignorado pela API PNCP | Alta | Plano original MANTIDO: DB-009 (Redis LIST) + DB-015 (dual-write) continuam em v3-story-2.2. Ver v3-story-1.0 para evidencias. |
 | **Timeout race condition** -- frontend 10min vs backend 10.5min para 27 UFs | Critica | v3-story-1.1 alinha timeouts. Frontend timeout dinamico baseado em UFs. |
 | **Memory OOM em Railway 512MB** -- busca de 85K items = ~460MB pico | Critica | v3-story-2.2 implementa Redis LIST + elimina dual-write. Reduz pico para ~200MB. |
 | **Migracao Supabase afeta 7+ items** -- risco de regressao ampla | Alta | Planejar como unidade atomica em v3-story-2.0. Testes de integracao antes de merge. |
@@ -94,6 +94,16 @@ v3-story-2.0 (Supabase) ---> v3-story-3.0 (saved searches server-side depende de
 v3-story-2.1 (stemming) ----> Independente, mas validar com golden suite
 v3-story-3.0 (UX) ----------> FE-015 requer backend matched_keywords (pode ser paralelo)
 ```
+
+---
+
+## Decisoes Registradas
+
+### v3-story-1.0: Spike palavraChave (2026-03-09)
+
+**Resultado: NEGATIVO.** O parametro `palavraChave` e silenciosamente ignorado pela API PNCP (`/api/consulta/v1/contratacoes/publicacao`). Testado com 7 variantes (termos reais, nonsense, acentuado, snake_case, "q") -- todos retornaram exatamente 1532 registros, identico ao baseline sem keyword.
+
+**Impacto:** Prioridades de DB-009, DB-015, e timeout alignment MANTIDAS sem alteracao. O plano original de sprints 2-3 permanece intacto. A filtragem client-side via `filter_batch()` continua sendo a unica opcao viavel.
 
 ---
 

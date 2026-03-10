@@ -1,0 +1,67 @@
+{
+  "spike": "v3-story-1.0",
+  "date": "2026-03-09",
+  "date_range": "20260302-20260308",
+  "api_endpoint": "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao",
+  "filtering_works": false,
+  "conclusion": "palavraChave parameter is silently ignored by PNCP consulta API",
+  "evidence": {
+    "baseline_no_keyword": {
+      "totalRegistros": 1532,
+      "status": 200
+    },
+    "with_uniforme": {
+      "totalRegistros": 1532,
+      "status": 200,
+      "param": "palavraChave=uniforme"
+    },
+    "with_confeccao": {
+      "totalRegistros": 1532,
+      "status": 200,
+      "param": "palavraChave=confeccao"
+    },
+    "with_nonsense_term": {
+      "totalRegistros": 1532,
+      "status": 200,
+      "param": "palavraChave=xyzzy_nonexistent_term_12345"
+    },
+    "with_underscore_variant": {
+      "totalRegistros": 1532,
+      "status": 200,
+      "param": "palavra_chave=uniforme"
+    },
+    "with_q_param": {
+      "totalRegistros": 1532,
+      "status": 200,
+      "param": "q=uniforme"
+    },
+    "with_accented_term": {
+      "totalRegistros": 1532,
+      "status": 200,
+      "param": "palavraChave=confeccao (accented)"
+    }
+  },
+  "parameters_tested": [
+    "palavraChave (camelCase)",
+    "palavra_chave (snake_case)",
+    "q (generic query)"
+  ],
+  "terms_tested": [
+    "uniforme",
+    "confeccao",
+    "confeccao (accented)",
+    "xyzzy_nonexistent_term_12345"
+  ],
+  "test_conditions": {
+    "uf": "SP",
+    "modalidade": 6,
+    "date_range_days": 7,
+    "page_size": 50
+  },
+  "impact": {
+    "DB-009_priority_unchanged": true,
+    "DB-015_priority_unchanged": true,
+    "timeout_alignment_unchanged": true,
+    "original_v3_sprint_plan_confirmed": true
+  }
+}
