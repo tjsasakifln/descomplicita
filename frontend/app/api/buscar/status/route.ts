@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendHeaders } from "@/app/lib/backendAuth";
+import { getBackendHeaders } from "@/lib/backendAuth";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 
