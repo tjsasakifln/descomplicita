@@ -17,6 +17,8 @@ Exemplo de uso:
     ...     f.write(buffer.getvalue())
 """
 
+import csv
+import io
 import re
 from datetime import datetime
 from io import BytesIO
@@ -24,6 +26,9 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
+# Maximum items in Excel export; above this, CSV is offered (v3-story-2.2)
+EXCEL_ITEM_LIMIT = 10_000
 
 # Regex to strip illegal XML 1.0 control characters that openpyxl rejects.
 # Keeps tab (\x09), newline (\x0a), and carriage return (\x0d).
@@ -235,3 +240,51 @@ def parse_datetime(value: str | None) -> datetime | None:
         return datetime.strptime(value, "%Y-%m-%d")
     except (ValueError, AttributeError):
         return None
+
+
+def create_csv(licitacoes: list[dict]) -> bytes:
+    """Generate CSV from procurement items (v3-story-2.2).
+
+    Used for large volumes (>10K items) where Excel would consume too much
+    memory. Returns UTF-8-BOM encoded bytes for Excel compatibility.
+
+    Args:
+        licitacoes: Lista de dicionários com dados das licitações.
+
+    Returns:
+        CSV file content as bytes (UTF-8 with BOM).
+    """
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+
+    # Header
+    writer.writerow([
+        "Tipo", "Objeto", "Órgão", "UF", "Município",
+        "Valor Estimado", "Modalidade", "Publicação", "Início", "Link",
+    ])
+
+    for lic in licitacoes:
+        tipo = "Ata RP" if lic.get("tipo") == "ata_registro_preco" else "Licitação"
+        cnpj = lic.get("cnpj", "")
+        ano = lic.get("anoCompra", "")
+        seq = lic.get("sequencialCompra", "")
+        link = lic.get("linkPncp") or (
+            f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seq}"
+            if cnpj and ano and seq
+            else f"https://pncp.gov.br/app/editais?q={lic.get('codigoCompra', '')}"
+        )
+        writer.writerow([
+            tipo,
+            _sanitize(lic.get("objetoCompra", "")),
+            _sanitize(lic.get("nomeOrgao", "")),
+            lic.get("uf", ""),
+            _sanitize(lic.get("municipio", "")),
+            lic.get("valorTotalEstimado", ""),
+            _sanitize(lic.get("modalidadeNome", "")),
+            lic.get("dataPublicacaoPncp", ""),
+            lic.get("dataAberturaProposta", ""),
+            link,
+        ])
+
+    # UTF-8 BOM for Excel compatibility
+    return b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8")

@@ -33,14 +33,17 @@ class TestRedisJobStore:
         assert args[0][0] == "job:j1"
 
     @pytest.mark.asyncio
-    async def test_update_progress_writes_to_redis(self, store, mock_redis):
+    async def test_update_progress_skips_redis_write(self, store, mock_redis):
+        """DB-006: Progress updates are in-memory only (no write amplification)."""
         await store.create("j1")
         mock_redis.setex.reset_mock()
         await store.update_progress("j1", phase="fetching")
-        mock_redis.setex.assert_called_once()
-        data = json.loads(mock_redis.setex.call_args[0][2])
-        assert data["status"] == "running"
-        assert data["progress"]["phase"] == "fetching"
+        # DB-006: Progress is transient — no Redis write on progress updates
+        mock_redis.setex.assert_not_called()
+        # But in-memory state is updated
+        job = await store.get("j1")
+        assert job.status == "running"
+        assert job.progress["phase"] == "fetching"
 
     @pytest.mark.asyncio
     async def test_complete_writes_to_redis(self, store, mock_redis):

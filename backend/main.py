@@ -814,6 +814,8 @@ async def run_search_job(
                 },
                 "dedup_removed": orch_result.dedup_removed,
                 "truncated_combos": orch_result.truncated_combos,
+                "export_limited": False,
+                "excel_item_limit": None,
             }
             await job_store.complete(job_id, result)
             logger.info(
@@ -837,8 +839,19 @@ async def run_search_job(
                 logger.info("[job=%s] Fallback summary generated successfully", job_id)
                 return r
 
+        # v3-story-2.2: Limit Excel to 10K items for memory safety
+        from excel import EXCEL_ITEM_LIMIT
+        excel_items = licitacoes_filtradas[:EXCEL_ITEM_LIMIT]
+        export_limited = len(licitacoes_filtradas) > EXCEL_ITEM_LIMIT
+
+        if export_limited:
+            logger.info(
+                "[job=%s] Excel limited to %d items (total: %d) — CSV available for full dataset",
+                job_id, EXCEL_ITEM_LIMIT, len(licitacoes_filtradas),
+            )
+
         def _generate_excel():
-            buf = create_excel(licitacoes_filtradas)
+            buf = create_excel(excel_items)
             excel_bytes = buf.read()
             logger.info("[job=%s] Excel report generated (%s bytes)", job_id, len(excel_bytes))
             return excel_bytes
@@ -894,6 +907,8 @@ async def run_search_job(
             },
             "dedup_removed": orch_result.dedup_removed,
             "truncated_combos": orch_result.truncated_combos,
+            "export_limited": export_limited,
+            "excel_item_limit": EXCEL_ITEM_LIMIT if export_limited else None,
         }
 
         # Legacy fallback: include excel_bytes in result if streaming is disabled
@@ -1051,9 +1066,15 @@ async def job_items(
 async def job_download(
     job_id: str,
     request: Request,
+    format: str = "xlsx",
     job_store=Depends(get_job_store),
 ):
-    """Download the Excel file for a completed search job as a streaming response."""
+    """Download the Excel/CSV file for a completed search job.
+
+    Query params:
+        format: "xlsx" (default) or "csv". CSV includes all items even
+                when Excel is limited to 10K (v3-story-2.2).
+    """
     job = await job_store.get(job_id)
     if not job:
         raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
@@ -1061,6 +1082,33 @@ async def job_download(
     if job.status != "completed":
         raise error_response(ErrorCode.JOB_NOT_COMPLETED, status_code=409)
 
+    # v3-story-2.2: CSV download — generated on-demand from Redis LIST
+    if format == "csv":
+        from excel import create_csv
+        all_items = await job_store.get_all_items(job_id)
+        if not all_items:
+            raise error_response(ErrorCode.DOWNLOAD_NOT_AVAILABLE, status_code=404)
+        csv_bytes = create_csv(all_items)
+        filename = f"descomplicita_{job_id[:8]}.csv"
+
+        async def _stream_csv():
+            stream = BytesIO(csv_bytes)
+            while True:
+                chunk = stream.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+
+        return StreamingResponse(
+            _stream_csv(),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(csv_bytes)),
+            },
+        )
+
+    # Default: Excel download
     # TD-C01/XD-PERF-01: Retrieve Excel from dedicated storage (no memory duplication)
     if ENABLE_STREAMING_DOWNLOAD:
         excel_bytes = await job_store.get_excel(job_id)
@@ -1080,8 +1128,6 @@ async def job_download(
     filename = f"descomplicita_{job_id[:8]}.xlsx"
 
     # TD-H06: Chunked streaming to avoid Vercel timeout on large files.
-    # Yields 64KB chunks instead of buffering the entire response,
-    # keeping the connection alive within Vercel's 10s (free) / 60s (pro) limit.
     async def _stream_chunks():
         stream = BytesIO(excel_bytes)
         while True:

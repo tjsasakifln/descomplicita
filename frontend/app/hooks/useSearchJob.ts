@@ -380,6 +380,58 @@ export function useSearchJob(
     }
   }, [trackEvent, result]);
 
+  const handleDownloadCsv = useCallback(async (params: {
+    downloadId: string;
+    sectorName: string;
+    dataInicial: string;
+    dataFinal: string;
+  }) => {
+    setDownloadError(null);
+    setDownloadLoading(true);
+
+    trackEvent("csv_download_started", {
+      download_id: params.downloadId,
+      total_filtered: result?.total_filtrado || 0,
+    });
+
+    try {
+      const response = await fetch(`/api/download?id=${params.downloadId}&format=csv`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("Arquivo expirado. Faca uma nova busca para gerar o CSV.");
+        }
+        throw new Error("Nao foi possivel baixar o arquivo. Tente novamente.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const setorLabel = params.sectorName.replace(/\s+/g, "_");
+      const filename = `DescompLicita_${setorLabel}_${params.dataInicial}_a_${params.dataFinal}.csv`;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      trackEvent("csv_download_completed", {
+        download_id: params.downloadId,
+        file_size_bytes: blob.size,
+        total_filtered: result?.total_filtrado || 0,
+      });
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Nao foi possivel baixar o arquivo.";
+      setDownloadError(errorMessage);
+      trackEvent("csv_download_failed", {
+        download_id: params.downloadId,
+        error_message: errorMessage,
+      });
+    } finally {
+      setDownloadLoading(false);
+    }
+  }, [trackEvent, result]);
+
   const clearResult = useCallback(() => {
     setResult(null);
     setRawCount(0);
@@ -401,6 +453,7 @@ export function useSearchJob(
     buscar,
     handleCancel,
     handleDownload,
+    handleDownloadCsv,
     clearResult,
   };
 }

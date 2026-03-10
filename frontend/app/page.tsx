@@ -97,6 +97,16 @@ export default function HomePage() {
     });
   }, [job, form.sectorName, form.dataInicial, form.dataFinal]);
 
+  const handleDownloadCsv = useCallback(async () => {
+    if (!job.result?.download_id) return;
+    await job.handleDownloadCsv({
+      downloadId: job.result.download_id,
+      sectorName: form.sectorName,
+      dataInicial: form.dataInicial,
+      dataFinal: form.dataFinal,
+    });
+  }, [job, form.sectorName, form.dataInicial, form.dataFinal]);
+
   const handleLoadSearch = useCallback((search: SavedSearch) => {
     form.loadSearchParams(search.searchParams);
   }, [form]);
@@ -184,7 +194,8 @@ export default function HomePage() {
             <ItemsList jobId={job.result!.download_id} totalFiltered={job.result!.total_filtrado} />
             <SearchActions result={job.result!} rawCount={job.rawCount} sectorName={form.sectorName}
               downloadLoading={job.downloadLoading} downloadError={job.downloadError}
-              isMaxCapacity={isMaxCapacity} onDownload={handleDownload} onSaveSearch={save.handleSaveSearch} />
+              isMaxCapacity={isMaxCapacity} onDownload={handleDownload} onDownloadCsv={handleDownloadCsv}
+              onSaveSearch={save.handleSaveSearch} />
           </div>
         )}
       </main>

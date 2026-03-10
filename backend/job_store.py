@@ -184,3 +184,13 @@ class JobStore:
         start = (page - 1) * page_size
         end = start + page_size
         return items[start:end], total
+
+    async def get_items_count(self, job_id: str) -> int:
+        """Return total item count without loading items."""
+        async with self._lock:
+            return len(self._items.get(job_id, []))
+
+    async def get_all_items(self, job_id: str) -> list:
+        """Return all items for a job (used for CSV export)."""
+        async with self._lock:
+            return list(self._items.get(job_id, []))

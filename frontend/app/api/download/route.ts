@@ -4,6 +4,7 @@ import { getBackendHeaders } from "@/lib/backendAuth";
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const id = searchParams.get("id");
+  const format = searchParams.get("format") || "xlsx";
 
   if (!id) {
     return NextResponse.json(
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   // Proxy the download request to the backend streaming endpoint
   let response: Response;
   try {
-    response = await fetch(`${backendUrl}/buscar/${id}/download`, {
+    response = await fetch(`${backendUrl}/buscar/${id}/download?format=${format}`, {
       headers,
     });
   } catch (error) {
@@ -44,14 +45,16 @@ export async function GET(request: NextRequest) {
 
   // Stream the binary response through
   const contentType = response.headers.get("content-type") ||
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    (format === "csv"
+      ? "text/csv; charset=utf-8"
+      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   const contentDisposition = response.headers.get("content-disposition") ||
-    `attachment; filename="descomplicita_${new Date().toISOString().split("T")[0]}.xlsx"`;
+    `attachment; filename="descomplicita_${new Date().toISOString().split("T")[0]}.${format === "csv" ? "csv" : "xlsx"}"`;
 
   const buffer = await response.arrayBuffer();
   const uint8Array = new Uint8Array(buffer);
 
-  console.log(`Download served: ${id} (${uint8Array.length} bytes)`);
+  console.log(`Download served: ${id} format=${format} (${uint8Array.length} bytes)`);
 
   return new NextResponse(uint8Array, {
     headers: {

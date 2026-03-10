@@ -61,6 +61,8 @@ export interface BuscaResult {
   source_stats: Record<string, SourceStats>;
   dedup_removed: number;
   truncated_combos: number;
+  export_limited?: boolean;
+  excel_item_limit?: number | null;
 }
 
 /** Form validation errors */

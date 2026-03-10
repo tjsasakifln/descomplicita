@@ -5,12 +5,17 @@ only as a read-through optimization for the current process.
 
 Excel bytes are stored in a separate Redis key (not base64-encoded in the
 job JSON) to eliminate memory duplication (TD-C01/XD-PERF-01).
+
+v3-story-2.2 optimizations:
+- DB-009: Items stored as Redis LIST (RPUSH/LRANGE) for O(1) pagination
+- DB-015: Dual-write eliminated — Redis is sole item storage when available
+- DB-006: Progress updates skip Redis (transient data, in-memory only)
 """
 
 import json
 import logging
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from job_store import JobStore, SearchJob
 
@@ -21,6 +26,9 @@ REDIS_JOB_TTL = 86400
 
 # Default TTL for Excel data: 2 hours (shorter than job metadata)
 REDIS_EXCEL_TTL = 7200
+
+# Batch size for RPUSH operations to avoid huge argument lists
+_RPUSH_BATCH_SIZE = 500
 
 
 class RedisJobStore(JobStore):
@@ -111,12 +119,14 @@ class RedisJobStore(JobStore):
         return job
 
     async def update_progress(self, job_id: str, **kwargs: object) -> None:
-        """Update progress in both in-memory cache and Redis."""
+        """Update progress in-memory only (DB-006: no Redis write amplification).
+
+        Progress is transient — only needed while the job is running in this
+        process. Full job state is persisted to Redis on state transitions
+        (create/complete/fail). If the process dies mid-search, the job is
+        lost regardless, so there is no value in persisting every tick.
+        """
         await super().update_progress(job_id, **kwargs)
-        async with self._lock:
-            job = self._jobs.get(job_id)
-        if job:
-            await self._redis_set(job)
 
     async def complete(self, job_id: str, result: Dict) -> None:
         """Mark job complete in both in-memory cache and Redis."""
@@ -186,48 +196,92 @@ class RedisJobStore(JobStore):
             return None
 
     # ------------------------------------------------------------------
-    # Paginated items storage (TD-M02)
+    # Paginated items storage (DB-009 + DB-015)
+    #
+    # Items are stored as a Redis LIST via RPUSH (one JSON string per item).
+    # Pagination uses LRANGE for O(1) page retrieval without deserializing
+    # the entire dataset. Count uses LLEN.
+    #
+    # DB-015: No dual-write — items are NOT stored in self._items when
+    # Redis is available. In-memory fallback only if Redis write fails.
     # ------------------------------------------------------------------
 
     def _items_key(self, job_id: str) -> str:
         return f"job:{job_id}:items"
 
     async def store_items(self, job_id: str, items: list) -> None:
-        """Store filtered items for paginated retrieval in Redis."""
-        # Also store in-memory for the current process
-        await super().store_items(job_id, items)
+        """Store filtered items as a Redis LIST (DB-009/DB-015).
+
+        Each item is stored individually via RPUSH, enabling efficient
+        LRANGE pagination without full deserialization.
+
+        Falls back to in-memory storage if Redis write fails.
+        """
+        key = self._items_key(job_id)
         try:
-            await self._redis.setex(
-                self._items_key(job_id),
-                self._redis_ttl,
-                json.dumps(items),
+            pipe = self._redis.pipeline()
+            pipe.delete(key)
+            # RPUSH in batches to avoid huge argument lists
+            for i in range(0, len(items), _RPUSH_BATCH_SIZE):
+                batch = [json.dumps(item) for item in items[i:i + _RPUSH_BATCH_SIZE]]
+                if batch:
+                    pipe.rpush(key, *batch)
+            pipe.expire(key, self._redis_ttl)
+            await pipe.execute()
+            logger.debug(
+                "Items stored for job %s (%d items) via Redis LIST",
+                job_id, len(items),
             )
-            logger.debug("Items stored for job %s (%d items)", job_id, len(items))
         except Exception as e:
-            logger.warning("Failed to store items for job %s: %s", job_id, e)
+            logger.warning(
+                "Redis LIST store failed for job %s: %s — in-memory fallback",
+                job_id, e,
+            )
+            await super().store_items(job_id, items)
 
     async def get_items_page(
         self, job_id: str, page: int = 1, page_size: int = 20
     ) -> tuple:
-        """Return a page of items and total count.
+        """Return a page of items and total count via LRANGE (DB-009).
 
-        Tries in-memory first, falls back to Redis.
+        Uses LLEN for count and LRANGE for the page slice — no full
+        deserialization needed. Falls back to in-memory if Redis fails.
         """
-        # Try in-memory first
-        items_page, total = await super().get_items_page(job_id, page, page_size)
-        if total > 0:
-            return items_page, total
-
-        # Fallback to Redis
         try:
-            raw = await self._redis.get(self._items_key(job_id))
-            if not raw:
-                return [], 0
-            items = json.loads(raw)
-            total = len(items)
+            total = await self._redis.llen(self._items_key(job_id))
+            if total == 0:
+                # May be in-memory fallback from failed Redis write
+                return await super().get_items_page(job_id, page, page_size)
             start = (page - 1) * page_size
-            end = start + page_size
-            return items[start:end], total
+            end = start + page_size - 1  # LRANGE end is inclusive
+            raw_items = await self._redis.lrange(self._items_key(job_id), start, end)
+            items = [json.loads(item) for item in raw_items]
+            return items, total
         except Exception as e:
-            logger.warning("Failed to retrieve items for job %s: %s", job_id, e)
-            return [], 0
+            logger.warning(
+                "Redis LRANGE failed for job %s: %s — in-memory fallback",
+                job_id, e,
+            )
+            return await super().get_items_page(job_id, page, page_size)
+
+    async def get_items_count(self, job_id: str) -> int:
+        """Return total item count via LLEN (DB-009) — no deserialization."""
+        try:
+            count = await self._redis.llen(self._items_key(job_id))
+            if count > 0:
+                return count
+            return await super().get_items_count(job_id)
+        except Exception as e:
+            logger.warning("Redis LLEN failed for job %s: %s", job_id, e)
+            return await super().get_items_count(job_id)
+
+    async def get_all_items(self, job_id: str) -> list:
+        """Return all items from Redis LIST (for CSV export)."""
+        try:
+            raw_items = await self._redis.lrange(self._items_key(job_id), 0, -1)
+            if raw_items:
+                return [json.loads(item) for item in raw_items]
+            return await super().get_all_items(job_id)
+        except Exception as e:
+            logger.warning("Redis LRANGE (all) failed for job %s: %s", job_id, e)
+            return await super().get_all_items(job_id)

@@ -10,6 +10,7 @@ interface SearchActionsProps {
   downloadError: string | null;
   isMaxCapacity: boolean;
   onDownload: () => void;
+  onDownloadCsv?: () => void;
   onSaveSearch: () => void;
 }
 
@@ -21,6 +22,7 @@ export function SearchActions({
   downloadError,
   isMaxCapacity,
   onDownload,
+  onDownloadCsv,
   onSaveSearch,
 }: SearchActionsProps) {
   return (
@@ -49,10 +51,30 @@ export function SearchActions({
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Baixar Excel ({result.resumo.total_oportunidades} licitações)
+            Baixar Excel ({result.export_limited
+              ? `${(result.excel_item_limit ?? 10000).toLocaleString("pt-BR")} de ${result.resumo.total_oportunidades.toLocaleString("pt-BR")}`
+              : result.resumo.total_oportunidades.toLocaleString("pt-BR")
+            } licitações)
           </>
         )}
       </button>
+
+      {/* Export limit message + CSV download (v3-story-2.2) */}
+      {result.export_limited && onDownloadCsv && (
+        <div className="p-3 sm:p-4 bg-warning-subtle border border-warning/20 rounded-card" role="status">
+          <p className="text-sm font-medium text-warning-fg mb-2">
+            Exportação Excel limitada a {(result.excel_item_limit ?? 10000).toLocaleString("pt-BR")} itens.
+          </p>
+          <button
+            onClick={onDownloadCsv}
+            disabled={downloadLoading}
+            className="text-sm text-brand-navy font-medium underline hover:text-brand-blue-hover
+                       disabled:text-ink-muted disabled:no-underline disabled:cursor-not-allowed"
+          >
+            Baixar CSV completo ({result.resumo.total_oportunidades.toLocaleString("pt-BR")} licitações)
+          </button>
+        </div>
+      )}
 
       {/* Save Search Button */}
       <button
