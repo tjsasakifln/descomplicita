@@ -17,12 +17,24 @@ Exemplo de uso:
     ...     f.write(buffer.getvalue())
 """
 
+import re
 from datetime import datetime
 from io import BytesIO
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
+# Regex to strip illegal XML 1.0 control characters that openpyxl rejects.
+# Keeps tab (\x09), newline (\x0a), and carriage return (\x0d).
+_ILLEGAL_XML_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def _sanitize(value: str | None) -> str:
+    """Remove illegal XML control characters from a string."""
+    if not value:
+        return ""
+    return _ILLEGAL_XML_CHARS_RE.sub("", value)
 
 
 def create_excel(licitacoes: list[dict]) -> BytesIO:
@@ -97,23 +109,23 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
         ws.cell(row=row_idx, column=1, value=tipo_label)
 
         # B: Objeto
-        ws.cell(row=row_idx, column=2, value=lic.get("objetoCompra", ""))
+        ws.cell(row=row_idx, column=2, value=_sanitize(lic.get("objetoCompra", "")))
 
         # C: Órgão
-        ws.cell(row=row_idx, column=3, value=lic.get("nomeOrgao", ""))
+        ws.cell(row=row_idx, column=3, value=_sanitize(lic.get("nomeOrgao", "")))
 
         # D: UF
         ws.cell(row=row_idx, column=4, value=lic.get("uf", ""))
 
         # E: Município
-        ws.cell(row=row_idx, column=5, value=lic.get("municipio", ""))
+        ws.cell(row=row_idx, column=5, value=_sanitize(lic.get("municipio", "")))
 
         # F: Valor (formatado como moeda)
         valor_cell = ws.cell(row=row_idx, column=6, value=lic.get("valorTotalEstimado"))
         valor_cell.number_format = currency_format
 
         # G: Modalidade
-        ws.cell(row=row_idx, column=7, value=lic.get("modalidadeNome", ""))
+        ws.cell(row=row_idx, column=7, value=_sanitize(lic.get("modalidadeNome", "")))
 
         # H: Data Publicação
         data_pub = parse_datetime(lic.get("dataPublicacaoPncp"))

@@ -32,6 +32,12 @@ OPTIONAL_AUTH_PATHS = {
     "/buscar", "/setores", "/search-history", "/exportar",
 }
 
+# Path prefixes that allow anonymous access (for sub-routes like /buscar/{job_id}/status)
+OPTIONAL_AUTH_PREFIXES = (
+    "/buscar/",
+    "/search-history/",
+)
+
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """Validate authentication on all requests except public paths.
@@ -119,7 +125,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                 )
 
         # No valid auth provided — allow anonymous for optional-auth paths
-        if clean_path in OPTIONAL_AUTH_PATHS:
+        if clean_path in OPTIONAL_AUTH_PATHS or clean_path.startswith(OPTIONAL_AUTH_PREFIXES):
             request.state.user_id = None
             request.state.user_sub = "anonymous"
             request.state.auth_method = "none"
