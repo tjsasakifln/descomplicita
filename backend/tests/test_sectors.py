@@ -1345,15 +1345,15 @@ class TestTierScoring:
         assert ok is True
         assert score == 1.0
 
-    def test_score_uses_max_not_sum(self):
-        """Score should use max() not sum() — multiple tier C shouldn't exceed threshold."""
+    def test_tier_c_additive_scoring(self):
+        """Tier C scoring is additive: multiple tier C keywords accumulate (Task 4)."""
         s = SECTORS["informatica"]
-        # Multiple tier C keywords: servidor + monitor + projetor
+        # Multiple tier C keywords: servidor + monitor + projetor = 0.3 + 0.3 + 0.3 = 0.9
         ok, kw, score = match_keywords("Servidor com monitor e projetor", s.keywords, s.exclusions,
                                         keywords_a=s.keywords_a, keywords_b=s.keywords_b,
                                         keywords_c=s.keywords_c, threshold=s.threshold)
-        assert ok is False
-        assert score == 0.3  # max of three 0.3 values
+        assert ok is True
+        assert abs(score - 0.9) < 0.01  # additive: 3 x 0.3
 
     def test_no_match_returns_zero_score(self):
         """No keywords matched should return score 0.0."""

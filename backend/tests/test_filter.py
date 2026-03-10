@@ -286,7 +286,7 @@ class TestKeywordConstants:
         expected_primary = {"uniforme", "uniformes", "fardamento", "jaleco"}
         assert expected_primary.issubset(KEYWORDS_UNIFORMES)
 
-        expected_exclusions = {"uniformização de procedimento", "padrão uniforme"}
+        expected_exclusions = {"uniformização de procedimento", "padrao uniforme"}  # non-accent kept
         assert expected_exclusions.issubset(KEYWORDS_EXCLUSAO)
 
 
@@ -920,3 +920,114 @@ class TestSectorValueRanges:
 
         assert len(aprovadas) == 1
         assert stats["rejeitadas_valor"] == 2
+
+
+class TestCustomTermsWithSectorExclusions:
+    """CP6/FP6: Sector exclusions must apply even when custom_terms are used."""
+
+    def _make_bid(self, objeto: str) -> dict:
+        """Helper to create a bid dict with a future date."""
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        return {
+            "uf": "SP",
+            "valorTotalEstimado": 100_000.0,
+            "objetoCompra": objeto,
+            "dataAberturaProposta": future,
+        }
+
+    # --- CP6: Custom terms + sector exclusions ---
+
+    def test_custom_term_excluded_by_sector_exclusion(self):
+        """CP6a: 'confeccao de placa de sinalizacao' should be EXCLUDED by
+        vestuario exclusions even when 'confeccao' is a custom term."""
+        vestuario = SECTORS["vestuario"]
+        bid = self._make_bid("Confeccao de placa de sinalizacao viaria")
+
+        approved, _kw, _score = match_keywords(
+            bid["objetoCompra"],
+            keywords={"confeccao"},
+            exclusions=vestuario.exclusions,
+        )
+        assert approved is False, (
+            "Should be excluded: 'confeccao de placa' is in vestuario exclusions"
+        )
+
+    def test_custom_term_included_when_no_exclusion_match(self):
+        """CP6b: 'confeccao de uniforme escolar' should be INCLUDED because
+        it matches the custom term and does NOT match any exclusion."""
+        vestuario = SECTORS["vestuario"]
+        bid = self._make_bid("Confeccao de uniforme escolar para alunos")
+
+        approved, matched, _score = match_keywords(
+            bid["objetoCompra"],
+            keywords={"confeccao"},
+            exclusions=vestuario.exclusions,
+        )
+        assert approved is True, (
+            "Should be included: 'confeccao de uniforme' is not in exclusions"
+        )
+        assert "confeccao" in matched
+
+    def test_custom_term_filter_batch_excludes_false_positives(self):
+        """CP6c: filter_batch with custom terms + sector exclusions should
+        exclude false positives and include true positives."""
+        vestuario = SECTORS["vestuario"]
+        bids = [
+            self._make_bid("Confeccao de placa de sinalizacao"),  # FP - excluded
+            self._make_bid("Confeccao de uniforme escolar"),      # TP - included
+            self._make_bid("Confeccao de grades metalicas"),      # FP - excluded
+        ]
+
+        aprovadas, stats = filter_batch(
+            bids,
+            ufs_selecionadas={"SP"},
+            valor_min=vestuario.valor_min,
+            valor_max=vestuario.valor_max,
+            keywords={"confeccao"},
+            exclusions=vestuario.exclusions,
+            threshold=0.6,
+        )
+
+        assert len(aprovadas) == 1
+        assert "uniforme" in aprovadas[0]["objetoCompra"].lower()
+        assert stats["rejeitadas_keyword"] == 2
+
+    # --- FP6: Accent variant handling ---
+
+    def test_exclusion_with_accent_variant_no_accent(self):
+        """FP6a: 'confeccao de placa' (no accent) should be excluded."""
+        approved, _kw, _score = match_keywords(
+            "confeccao de placa de identificacao",
+            keywords={"confeccao"},
+            exclusions={"confecção de placa", "confeccao de placa"},
+        )
+        assert approved is False
+
+    def test_exclusion_with_accent_variant_with_accent(self):
+        """FP6b: 'confecção de placa' (with accent) should also be excluded,
+        because normalize_text strips accents."""
+        approved, _kw, _score = match_keywords(
+            "confecção de placa de trânsito",
+            keywords={"confeccao", "confecção"},
+            exclusions={"confecção de placa"},
+        )
+        assert approved is False
+
+    def test_exclusion_accent_normalization_symmetry(self):
+        """FP6c: Both accented and non-accented exclusion terms should
+        match both accented and non-accented input text."""
+        # Accented exclusion vs non-accented input
+        approved1, _, _ = match_keywords(
+            "confeccao de placa metalica",
+            keywords={"confeccao"},
+            exclusions={"confecção de placa"},
+        )
+        assert approved1 is False, "Accented exclusion should match non-accented input"
+
+        # Non-accented exclusion vs accented input
+        approved2, _, _ = match_keywords(
+            "confecção de placa metálica",
+            keywords={"confeccao"},
+            exclusions={"confeccao de placa"},
+        )
+        assert approved2 is False, "Non-accented exclusion should match accented input"

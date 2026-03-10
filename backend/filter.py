@@ -31,8 +31,6 @@ KEYWORDS_UNIFORMES: Set[str] = {
     "roupa profissional",
     "vestuario profissional",
     # Textile / manufacturing (ambiguous — guarded by exclusions)
-    "confecção",
-    "confecções",
     "confeccao",
     "confeccoes",
     "costura",
@@ -96,12 +94,8 @@ KEYWORDS_UNIFORMES: Set[str] = {
     # Common compositions in procurement notices
     "kit uniforme",
     "conjunto uniforme",
-    "confecção de uniforme",
-    "confecção de uniformes",
     "confeccao de uniforme",
     "confeccao de uniformes",
-    "confecção de camiseta",
-    "confecção de camisetas",
     "confeccao de camiseta",
     "confeccao de camisetas",
     "aquisição de uniforme",
@@ -127,69 +121,40 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     # --- "uniforme/uniformização" in non-clothing context ---
     "uniformização de procedimento",
     "uniformização de entendimento",
-    "uniformização de jurisprudência",
-    "uniformização de jurisprudencia",
-    "uniforme de trânsito",
+    "uniformizacao de jurisprudencia",
     "uniforme de transito",
-    "padrão uniforme",
     "padrao uniforme",
-    "padronização de uniforme escolar",  # software platforms, not clothing
     "padronizacao de uniforme escolar",
 
     # --- "confecção" in non-clothing context (manufacturing/fabrication) ---
-    "confecção de placa",
-    "confecção de placas",
     "confeccao de placa",
     "confeccao de placas",
-    "confecção de grade",
-    "confecção de grades",
     "confeccao de grade",
     "confeccao de grades",
-    "confecção de protese",
-    "confecção de prótese",
-    "confecção de proteses",
-    "confecção de próteses",
     "confeccao de protese",
     "confeccao de proteses",
-    "confecção de merenda",
     "confeccao de merenda",
-    "confecção de material grafico",
-    "confecção de material gráfico",
-    "confecção de materiais graficos",
-    "confecção de materiais gráficos",
+    "confeccao de materiais graficos",
     "confeccao de material grafico",
-    "confecção de peças",
     "confeccao de pecas",
-    "confecção de chave",
-    "confecção de chaves",
     "confeccao de chave",
     "confeccao de chaves",
     "confecção de carimbo",
     "confecção de carimbos",
-    "confecção de letras",
     "confeccao de letras",
-    "confecção de plotagem",
     "confecção de plotagens",
     "confeccao de plotagem",
-    "confecção de tampa",
     "confecção de tampas",
     "confeccao de tampa",
-    "confecção de embalagem",
     "confecção de embalagens",
     "confeccao de embalagem",
-    "confecção de mochilas",
     "confeccao de mochilas",
-    "confecção e impressão",
     "confeccao e impressao",
-    "confecção e instalação",
     "confeccao e instalacao",
     "confecção e fornecimento de placa",
     "confecção e fornecimento de placas",
-    "confecção de portão",
-    "confecção de portões",
     "confeccao de portao",
     "confeccao de portoes",
-    "confecção de peças de ferro",
     "confeccao de pecas de ferro",
 
     # --- "costura" in non-procurement context (courses/training) ---
@@ -204,23 +169,17 @@ KEYWORDS_EXCLUSAO: Set[str] = {
 
     # --- "malha" in non-textile context ---
     "malha viaria",
-    "malha viária",
     "malha rodoviaria",
-    "malha rodoviária",
     "malha tensionada",
     "malha de fibra optica",
-    "malha de fibra óptica",
 
     # --- "avental" in non-clothing context ---
     "avental plumbifero",
-    "avental plumbífero",
 
     # --- "chapéu/boné" in non-clothing context ---
-    "chapéu pensador",
     "chapeu pensador",
 
     # --- "camisa" in non-clothing context ---
-    "amor à camisa",
     "amor a camisa",
 
     # --- "bota" in non-footwear context ---
@@ -233,12 +192,10 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     # --- Software / digital ---
     "software de uniforme",
     "plataforma de uniforme",
-    "solução de software",
     "solucao de software",
     "plataforma web",
 
     # --- Decoration / events / costumes ---
-    "decoração",
     "decoracao",
     "fantasia",
     "fantasias",
@@ -246,9 +203,7 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     "trajes oficiais",
 
     # --- Non-apparel manufacturing ---
-    "tapeçaria",
     "tapecaria",
-    "forração",
     "forracao",
 
     # --- "roupa" in non-clothing context (bed/table linens) ---
@@ -263,19 +218,14 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     "colete salva vidas",
     "colete salva vida",
     "colete balistico",
-    "colete balístico",
 
     # --- "bota" in non-footwear context (expanded) ---
     "bota de borracha para construcao",
 
     # --- Construction / infrastructure that matches "bota", "colete" etc. ---
-    "material de construção",
     "material de construcao",
-    "materiais de construção",
     "materiais de construcao",
-    "sinalização",
     "sinalizacao",
-    "sinalização visual",
     "sinalizacao visual",
 }
 
@@ -393,7 +343,7 @@ def match_keywords(
             kw_norm = normalize_text(kw)
             pattern = rf"\b{re.escape(kw_norm)}\b"
             if re.search(pattern, objeto_norm):
-                score = max(score, 0.3)
+                score = min(1.0, score + 0.3)
                 matched.append(kw)
         return score >= threshold, matched, score
 

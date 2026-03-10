@@ -546,7 +546,7 @@ async def run_search_job(
                 valor_min=sector.valor_min,
                 valor_max=sector.valor_max,
                 keywords=active_keywords,
-                exclusions=sector.exclusions if not custom_terms else set(),
+                exclusions=sector.exclusions,
                 keywords_a=sector.keywords_a if not custom_terms else None,
                 keywords_b=sector.keywords_b if not custom_terms else None,
                 keywords_c=sector.keywords_c if not custom_terms else None,
