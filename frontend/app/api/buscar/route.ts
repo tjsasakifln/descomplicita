@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendHeaders } from "../../lib/backendAuth";
+import { getBackendHeaders } from "@/app/lib/backendAuth";
 
 export async function POST(request: NextRequest) {
   try {
