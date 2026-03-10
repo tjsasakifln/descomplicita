@@ -14,10 +14,11 @@ Test categories:
 """
 
 import os
+from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
-from llm import gerar_resumo, format_resumo_html
+from llm import gerar_resumo, gerar_resumo_fallback, format_resumo_html
 from schemas import ResumoLicitacoes
 
 
@@ -53,7 +54,7 @@ async def test_gerar_resumo_missing_api_key():
             "nomeOrgao": "Prefeitura SP",
             "uf": "SP",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -93,7 +94,7 @@ async def test_gerar_resumo_single_bid(mock_openai):
             "uf": "SP",
             "municipio": "São Paulo",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -139,7 +140,7 @@ async def test_gerar_resumo_50_bids_limit(mock_openai):
             "uf": "SP",
             "municipio": "São Paulo",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
         for i in range(100)
     ]
@@ -184,7 +185,7 @@ async def test_gerar_resumo_truncates_objeto_compra(mock_openai):
             "uf": "SP",
             "municipio": "São Paulo",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -268,7 +269,7 @@ async def test_gerar_resumo_custom_model(mock_openai):
             "nomeOrgao": "Prefeitura",
             "uf": "SP",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -302,7 +303,7 @@ async def test_gerar_resumo_custom_temperature_and_tokens(mock_openai):
             "nomeOrgao": "Prefeitura",
             "uf": "SP",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -333,7 +334,7 @@ async def test_gerar_resumo_api_error(mock_openai):
             "nomeOrgao": "Prefeitura",
             "uf": "SP",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -358,7 +359,7 @@ async def test_gerar_resumo_empty_api_response(mock_openai):
             "nomeOrgao": "Prefeitura",
             "uf": "SP",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -385,7 +386,7 @@ async def test_gerar_resumo_timeout(mock_openai):
             "nomeOrgao": "Prefeitura",
             "uf": "SP",
             "valorTotalEstimado": 100000.0,
-            "dataAberturaProposta": "2025-02-15T10:00:00",
+            "dataAberturaProposta": "2099-02-15T10:00:00",
         }
     ]
 
@@ -545,3 +546,138 @@ async def test_gerar_resumo_missing_optional_fields(mock_openai):
 
     assert isinstance(resumo, ResumoLicitacoes)
     mock_client.beta.chat.completions.parse.assert_awaited_once()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Past-Date Filtering Tests (urgency alert bug fix)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_fallback_no_alert_for_past_dates():
+    """Fallback should NOT generate urgency alert for dates already passed."""
+    from datetime import timedelta
+
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%dT10:00:00")
+    three_days_ago = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%dT10:00:00")
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme escolar",
+            "nomeOrgao": "Prefeitura SP",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": yesterday,
+        },
+        {
+            "objetoCompra": "Fardamento militar",
+            "nomeOrgao": "Exército",
+            "uf": "DF",
+            "valorTotalEstimado": 200000.0,
+            "dataAberturaProposta": three_days_ago,
+        },
+    ]
+
+    resumo = gerar_resumo_fallback(licitacoes)
+
+    assert resumo.alerta_urgencia is None, (
+        "Past dates should NOT trigger urgency alert"
+    )
+
+
+def test_fallback_alert_for_future_dates():
+    """Fallback SHOULD generate urgency alert for dates within 7 days in the future."""
+    from datetime import timedelta
+
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT10:00:00")
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme escolar",
+            "nomeOrgao": "Prefeitura SP",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": tomorrow,
+        },
+    ]
+
+    resumo = gerar_resumo_fallback(licitacoes)
+
+    assert resumo.alerta_urgencia is not None, (
+        "Future date within 7 days should trigger urgency alert"
+    )
+    assert "Prefeitura SP" in resumo.alerta_urgencia
+
+
+def test_fallback_no_alert_for_dates_beyond_7_days():
+    """Fallback should NOT alert for dates more than 7 days in the future."""
+    from datetime import timedelta
+
+    far_future = (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%dT10:00:00")
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme escolar",
+            "nomeOrgao": "Prefeitura SP",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": far_future,
+        },
+    ]
+
+    resumo = gerar_resumo_fallback(licitacoes)
+
+    assert resumo.alerta_urgencia is None
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
+@patch("llm.AsyncOpenAI")
+async def test_gerar_resumo_excludes_past_dates_from_llm_input(mock_openai):
+    """LLM should NOT receive bids with past opening dates in its input data."""
+    from datetime import timedelta
+
+    mock_resumo = ResumoLicitacoes(
+        resumo_executivo="Resumo OK",
+        total_oportunidades=1,
+        valor_total=50000.0,
+        destaques=[],
+        alerta_urgencia=None,
+    )
+
+    mock_client = Mock()
+    mock_openai.return_value = mock_client
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        return_value=Mock(choices=[Mock(message=Mock(parsed=mock_resumo))])
+    )
+
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%dT10:00:00")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT10:00:00")
+
+    licitacoes = [
+        {
+            "objetoCompra": "Uniforme passado",
+            "nomeOrgao": "Prefeitura Antiga",
+            "uf": "SP",
+            "valorTotalEstimado": 100000.0,
+            "dataAberturaProposta": yesterday,
+        },
+        {
+            "objetoCompra": "Uniforme futuro",
+            "nomeOrgao": "Prefeitura Nova",
+            "uf": "RJ",
+            "valorTotalEstimado": 50000.0,
+            "dataAberturaProposta": tomorrow,
+        },
+    ]
+
+    await gerar_resumo(licitacoes)
+
+    call_args = mock_client.beta.chat.completions.parse.call_args
+    user_prompt = call_args.kwargs["messages"][1]["content"]
+
+    assert "Prefeitura Antiga" not in user_prompt, (
+        "Past-date bid should be excluded from LLM input"
+    )
+    assert "Prefeitura Nova" in user_prompt, (
+        "Future-date bid should be included in LLM input"
+    )

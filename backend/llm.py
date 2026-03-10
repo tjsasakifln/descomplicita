@@ -72,8 +72,15 @@ async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uni
         )
 
     # Prepare data for LLM (limit to 50 bids to avoid token overflow)
+    # Pre-filter: exclude bids with past opening dates from LLM context
+    hoje = datetime.now()
     dados_resumidos = []
     for lic in licitacoes[:50]:
+        abertura_str = lic.get("dataAberturaProposta") or ""
+        if abertura_str:
+            abertura_dt = parse_datetime(abertura_str)
+            if abertura_dt and abertura_dt < hoje:
+                continue  # Skip past opening dates — not actionable
         dados_resumidos.append(
             {
                 "objeto": (lic.get("objetoCompra") or "")[
@@ -83,7 +90,7 @@ async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uni
                 "uf": lic.get("uf") or "",
                 "municipio": lic.get("municipio") or "",
                 "valor": lic.get("valorTotalEstimado") or 0,
-                "abertura": lic.get("dataAberturaProposta") or "",
+                "abertura": abertura_str,
             }
         )
 
@@ -97,7 +104,7 @@ Analise as licitações fornecidas e gere um resumo executivo.
 REGRAS:
 - Seja direto e objetivo
 - Destaque as maiores oportunidades por valor
-- Alerte sobre prazos próximos (< 7 dias)
+- Alerte sobre prazos FUTUROS próximos (< 7 dias da data atual). NUNCA alerte sobre datas que já passaram
 - Mencione a distribuição geográfica
 - Use linguagem profissional, não técnica demais
 - Valores sempre em reais (R$) formatados
@@ -251,7 +258,7 @@ def gerar_resumo_fallback(licitacoes: list[dict[str, Any]], sector_name: str = "
         abertura = parse_datetime(data_abertura_str)
         if abertura:
             dias_restantes = (abertura - hoje).days
-            if dias_restantes < 7:
+            if 0 <= dias_restantes < 7:
                 orgao = lic.get("nomeOrgao", "Órgão não informado")
                 alerta = f"Licitação com prazo em menos de 7 dias: {orgao}"
                 break  # First urgent bid found
