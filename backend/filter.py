@@ -3,7 +3,19 @@
 import re
 import unicodedata
 from datetime import datetime
+from functools import lru_cache
 from typing import Set, Tuple, List, Dict, Optional
+
+import nltk
+from nltk.stem import RSLPStemmer
+
+# Ensure RSLP data is available (download only once)
+try:
+    nltk.data.find("stemmers/rslp")
+except LookupError:
+    nltk.download("rslp", quiet=True)
+
+_rslp_stemmer = RSLPStemmer()
 
 
 # Primary keywords for uniform/apparel procurement (PRD Section 4.1)
@@ -33,6 +45,8 @@ KEYWORDS_UNIFORMES: Set[str] = {
     # Textile / manufacturing (ambiguous — guarded by exclusions)
     "confeccao",
     "confeccoes",
+    "confeccionado",
+    "confeccionados",
     "costura",
     # Specific clothing pieces
     "jaleco",
@@ -119,6 +133,8 @@ KEYWORDS_UNIFORMES: Set[str] = {
 # context for those ambiguous terms.
 KEYWORDS_EXCLUSAO: Set[str] = {
     # --- "uniforme/uniformização" in non-clothing context ---
+    "uniformizacao",        # standardization — never refers to clothing
+    "uniformemente",        # adverb "uniformly" — never refers to clothing
     "uniformização de procedimento",
     "uniformização de entendimento",
     "uniformizacao de jurisprudencia",
@@ -284,6 +300,42 @@ def normalize_text(text: str) -> str:
     return text.strip()
 
 
+@lru_cache(maxsize=4096)
+def stem_word(word: str) -> str:
+    """Stem a single normalized word using RSLP (PT-BR stemmer).
+
+    Args:
+        word: A single lowercase, accent-free word.
+
+    Returns:
+        The stemmed form of the word.
+    """
+    return _rslp_stemmer.stem(word)
+
+
+def stem_text(text: str) -> str:
+    """Normalize and stem text for improved keyword matching.
+
+    Applies normalize_text() first, then stems each word using RSLP.
+    This enables matching inflected forms: "uniformizado" -> "uniform",
+    "confeccionado" -> "confeccion", etc.
+
+    Args:
+        text: Input text (raw or pre-normalized).
+
+    Returns:
+        Normalized and stemmed text with words joined by spaces.
+
+    Examples:
+        >>> stem_text("uniformizado")  # same stem as "uniforme"
+        >>> stem_text("confeccionado")  # same stem as "confeccao"
+    """
+    normalized = normalize_text(text)
+    if not normalized:
+        return ""
+    return " ".join(stem_word(w) for w in normalized.split())
+
+
 def match_keywords(
     objeto: str, keywords: Set[str], exclusions: Set[str] | None = None,
     epi_only_keywords: Set[str] | None = None,
@@ -314,8 +366,12 @@ def match_keywords(
         Tuple of (approved, matched_keywords, score)
     """
     objeto_norm = normalize_text(objeto)
+    objeto_stemmed = stem_text(objeto)
 
     # Check exclusions first (fail-fast optimization)
+    # Exclusions use exact (normalized) matching only — NOT stemming.
+    # Stemming on exclusions is too risky: e.g., "uniformizacao" stems to
+    # "uniform" which would falsely block ALL uniform-related items.
     if exclusions:
         for exc in exclusions:
             exc_norm = normalize_text(exc)
@@ -324,35 +380,33 @@ def match_keywords(
                 return False, [], 0.0
 
     # Tier scoring mode: use weighted keyword matching
+    # Track matched stems to prevent double-counting singular/plural variants
+    # (e.g., "bota" and "botas" share stem "bot" — count only once per tier)
     if keywords_a:
         score = 0.0
         matched: List[str] = []
+        scored_stems: set = set()
         for kw in keywords_a:
-            kw_norm = normalize_text(kw)
-            pattern = rf"\b{re.escape(kw_norm)}\b"
-            if re.search(pattern, objeto_norm):
+            if _keyword_matches(kw, objeto_norm, objeto_stemmed):
                 score = max(score, 1.0)
                 matched.append(kw)
         for kw in (keywords_b or set()):
-            kw_norm = normalize_text(kw)
-            pattern = rf"\b{re.escape(kw_norm)}\b"
-            if re.search(pattern, objeto_norm):
+            if _keyword_matches(kw, objeto_norm, objeto_stemmed):
                 score = max(score, 0.7)
                 matched.append(kw)
         for kw in (keywords_c or set()):
-            kw_norm = normalize_text(kw)
-            pattern = rf"\b{re.escape(kw_norm)}\b"
-            if re.search(pattern, objeto_norm):
-                score = min(1.0, score + 0.3)
+            if _keyword_matches(kw, objeto_norm, objeto_stemmed):
+                kw_stem = stem_text(kw)
+                if kw_stem not in scored_stems:
+                    score = min(1.0, score + 0.3)
+                    scored_stems.add(kw_stem)
                 matched.append(kw)
         return score >= threshold, matched, score
 
     # Binary mode: any keyword match approves (backward compat)
     matched = []
     for kw in keywords:
-        kw_norm = normalize_text(kw)
-        pattern = rf"\b{re.escape(kw_norm)}\b"
-        if re.search(pattern, objeto_norm):
+        if _keyword_matches(kw, objeto_norm, objeto_stemmed):
             matched.append(kw)
 
     # EPI-only contextual check
@@ -364,6 +418,34 @@ def match_keywords(
 
     score = 1.0 if matched else 0.0
     return len(matched) > 0, matched, score
+
+
+def _keyword_matches(kw: str, objeto_norm: str, objeto_stemmed: str) -> bool:
+    """Check if a keyword matches the object text via exact or stemmed match.
+
+    Exact (normalized) match is tried first for precision. Stemmed match
+    is used as fallback to catch inflected forms (e.g., "uniformizado"
+    matching keyword "uniforme").
+
+    Args:
+        kw: Original keyword string.
+        objeto_norm: Normalized object text.
+        objeto_stemmed: Stemmed object text.
+
+    Returns:
+        True if keyword matches via either exact or stemmed match.
+    """
+    # Exact match (highest priority)
+    kw_norm = normalize_text(kw)
+    pattern = rf"\b{re.escape(kw_norm)}\b"
+    if re.search(pattern, objeto_norm):
+        return True
+    # Stemmed match (fallback for inflected forms)
+    kw_stemmed = stem_text(kw)
+    pattern_stemmed = rf"\b{re.escape(kw_stemmed)}\b"
+    if re.search(pattern_stemmed, objeto_stemmed):
+        return True
+    return False
 
 
 def filter_licitacao(

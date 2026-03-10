@@ -123,7 +123,14 @@ export function SearchForm({
               value={termoInput}
               onChange={e => {
                 const val = e.target.value;
-                if (val.endsWith(" ")) {
+                if (val.endsWith(",")) {
+                  const term = val.slice(0, -1).trim().toLowerCase();
+                  if (term && !termosArray.includes(term)) {
+                    onTermosArrayChange(prev => [...prev, term]);
+                    onFormChange();
+                  }
+                  onTermoInputChange("");
+                } else if (val.endsWith(" ")) {
                   const word = val.trim().toLowerCase();
                   if (word && !termosArray.includes(word)) {
                     onTermosArrayChange(prev => [...prev, word]);
@@ -149,13 +156,13 @@ export function SearchForm({
                   onTermoInputChange("");
                 }
               }}
-              placeholder={termosArray.length === 0 ? "Digite um termo e pressione espaço..." : "Adicionar mais..."}
+              placeholder={termosArray.length === 0 ? "Separe termos por vírgula. Ex: camisa polo, jaleco medico" : "Adicionar mais..."}
               className="flex-1 min-w-[120px] outline-none bg-transparent text-base text-ink
                          placeholder:text-ink-faint py-1"
             />
           </div>
           <p id="termos-busca-hint" className="text-sm text-ink-muted mt-1.5">
-            Digite cada termo e pressione <kbd className="px-1.5 py-0.5 bg-surface-2 rounded text-xs font-mono border">espaço</kbd> para confirmar.
+            Separe termos por <kbd className="px-1.5 py-0.5 bg-surface-2 rounded text-xs font-mono border">vírgula</kbd> para termos compostos. Ex: camisa polo, jaleco medico
             {termosArray.length > 0 && (
               <span className="text-brand-blue font-medium">
                 {" "}{termosArray.length} termo{termosArray.length > 1 ? "s" : ""} selecionado{termosArray.length > 1 ? "s" : ""}

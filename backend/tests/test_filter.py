@@ -106,14 +106,16 @@ class TestMatchKeywords:
         matched, _, _score = match_keywords("Compra de uniformes", KEYWORDS_UNIFORMES)
         assert matched is True
 
-        # "uniformemente" should NOT match (partial word)
+        # "uniformemente" should NOT match (excluded as non-clothing adverb)
         matched, _, _score = match_keywords(
-            "Distribuição uniformemente espaçada", KEYWORDS_UNIFORMES
+            "Distribuição uniformemente espaçada", KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO
         )
         assert matched is False
 
-        # "uniformização" should NOT match (partial word)
-        matched, _, _score = match_keywords("Uniformização de processos", KEYWORDS_UNIFORMES)
+        # "uniformização" should NOT match (excluded as standardization, not clothing)
+        matched, _, _score = match_keywords(
+            "Uniformização de processos", KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO
+        )
         assert matched is False
 
     def test_exclusion_keywords_prevent_match(self):

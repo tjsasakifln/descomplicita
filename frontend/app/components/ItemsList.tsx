@@ -129,6 +129,15 @@ export function ItemsList({ jobId, totalFiltered }: ItemsListProps) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
+                  {item.tipo && (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mb-1 ${
+                      item.tipo.includes("ata")
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                    }`}>
+                      {item.tipo.includes("ata") ? "Ata" : "Licitação"}
+                    </span>
+                  )}
                   <p className="text-sm font-medium text-ink line-clamp-2">
                     {item.objeto || "Sem descricao"}
                   </p>

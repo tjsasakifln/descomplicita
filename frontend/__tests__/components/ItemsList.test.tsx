@@ -174,4 +174,63 @@ describe("ItemsList", () => {
       expect(screen.getByText("Sem descricao")).toBeInTheDocument();
     });
   });
+
+  it("displays tipo badge as Licitação for licitacao type", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [{ objeto: "Uniformes", tipo: "licitacao" }],
+        total_items: 1,
+        total_pages: 1,
+        page: 1,
+        page_size: 20,
+      }),
+    });
+
+    render(<ItemsList jobId="job-tipo" totalFiltered={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Licitação")).toBeInTheDocument();
+    });
+  });
+
+  it("displays tipo badge as Ata for ata_registro_preco type", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [{ objeto: "Uniformes", tipo: "ata_registro_preco" }],
+        total_items: 1,
+        total_pages: 1,
+        page: 1,
+        page_size: 20,
+      }),
+    });
+
+    render(<ItemsList jobId="job-ata" totalFiltered={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Ata")).toBeInTheDocument();
+    });
+  });
+
+  it("does not render tipo badge when tipo is missing", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [{ objeto: "Test item" }],
+        total_items: 1,
+        total_pages: 1,
+        page: 1,
+        page_size: 20,
+      }),
+    });
+
+    render(<ItemsList jobId="job-notipo" totalFiltered={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Test item")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Licitação")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ata")).not.toBeInTheDocument();
+  });
 });

@@ -50,7 +50,7 @@ describe('SearchForm', () => {
 
   it('should render terms input in termos mode', () => {
     render(<SearchForm {...defaultProps} searchMode="termos" />);
-    expect(screen.getByPlaceholderText(/Digite um termo/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Separe termos/i)).toBeInTheDocument();
   });
 
   it('should render existing terms as tags', () => {
@@ -67,5 +67,60 @@ describe('SearchForm', () => {
   it('should display terms count', () => {
     render(<SearchForm {...defaultProps} searchMode="termos" termosArray={['uniforme', 'escolar']} />);
     expect(screen.getByText(/2 termos selecionados/)).toBeInTheDocument();
+  });
+
+  it('should add multi-word term when comma is typed', () => {
+    const onTermosArrayChange = jest.fn();
+    const onTermoInputChange = jest.fn();
+    const onFormChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        onTermosArrayChange={onTermosArrayChange}
+        onTermoInputChange={onTermoInputChange}
+        onFormChange={onFormChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Separe termos/i);
+    fireEvent.change(input, { target: { value: 'camisa polo,' } });
+    expect(onTermosArrayChange).toHaveBeenCalled();
+    expect(onTermoInputChange).toHaveBeenCalledWith('');
+    expect(onFormChange).toHaveBeenCalled();
+  });
+
+  it('should show comma hint text in termos mode', () => {
+    render(<SearchForm {...defaultProps} searchMode="termos" />);
+    expect(screen.getByText(/Separe termos por/)).toBeInTheDocument();
+    expect(screen.getByText(/vírgula/)).toBeInTheDocument();
+  });
+
+  it('should not add empty term on lone comma', () => {
+    const onTermosArrayChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        onTermosArrayChange={onTermosArrayChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Separe termos/i);
+    fireEvent.change(input, { target: { value: ',' } });
+    expect(onTermosArrayChange).not.toHaveBeenCalled();
+  });
+
+  it('should not add duplicate multi-word term via comma', () => {
+    const onTermosArrayChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        termosArray={['camisa polo']}
+        onTermosArrayChange={onTermosArrayChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Adicionar mais/i);
+    fireEvent.change(input, { target: { value: 'camisa polo,' } });
+    expect(onTermosArrayChange).not.toHaveBeenCalled();
   });
 });
