@@ -96,7 +96,16 @@ class TransparenciaSource(DataSourceClient):
         )
         self._base_url = source_cfg["base_url"].rstrip("/")
         self._rate_limit_rps = source_cfg["rate_limit_rps"]
-        self._api_key = api_key or os.environ.get("TRANSPARENCIA_API_KEY", "")
+        resolved_key = api_key or os.environ.get("TRANSPARENCIA_API_KEY", "")
+        self._api_key: str = resolved_key
+        self._api_key_configured: bool = bool(resolved_key)
+        if not self._api_key_configured:
+            logger.warning(
+                "TRANSPARENCIA_API_KEY is not configured. "
+                "Calls to TransparenciaSource will fail with a configuration error "
+                "rather than returning silent empty results.",
+                extra={"source": "transparencia"},
+            )
         self._last_request_time: float = 0.0
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -217,6 +226,18 @@ class TransparenciaSource(DataSourceClient):
             raw_data=raw,
         )
 
+    def _require_api_key(self) -> None:
+        """Raise a clear error when the API key is absent.
+
+        This prevents silent empty-result failures — callers receive an explicit
+        PermissionError (HTTP 401-equivalent) rather than a mystery empty list.
+        """
+        if not self._api_key_configured:
+            raise PermissionError(
+                "TRANSPARENCIA_API_KEY is not configured. "
+                "Set the environment variable to enable the Portal da Transparencia source."
+            )
+
     async def check_sanctions(self, cnpj: str) -> SanctionResult:
         """Check if a CNPJ appears in CEIS or CNEP sanctions lists.
 
@@ -225,7 +246,11 @@ class TransparenciaSource(DataSourceClient):
 
         Returns:
             SanctionResult with is_sanctioned flag and list of sanctions found.
+
+        Raises:
+            PermissionError: if TRANSPARENCIA_API_KEY is not configured.
         """
+        self._require_api_key()
         sanctions: List[dict] = []
 
         for list_name, endpoint in [("CEIS", "ceis"), ("CNEP", "cnep")]:
@@ -260,7 +285,11 @@ class TransparenciaSource(DataSourceClient):
         """Fetch all Portal da Transparencia records matching the query.
 
         Handles pagination via 1-indexed page parameter.
+
+        Raises:
+            PermissionError: if TRANSPARENCIA_API_KEY is not configured.
         """
+        self._require_api_key()
         url = f"{self._base_url}/api-de-dados/licitacoes"
 
         params: Dict[str, Any] = {"pagina": 1}

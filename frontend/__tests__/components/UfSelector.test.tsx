@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { UfSelector } from '@/app/components/UfSelector';
 
-jest.mock('@/components/RegionSelector', () => ({
+jest.mock('@/app/components/RegionSelector', () => ({
   RegionSelector: () => <div data-testid="region-selector" />,
   REGIONS: {},
 }));

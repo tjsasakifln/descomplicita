@@ -15,16 +15,16 @@ jest.mock('next/image', () => ({
 }));
 
 // Mock child components that aren't relevant to page-level tests
-jest.mock('@/components/ThemeToggle', () => ({
+jest.mock('@/app/components/ThemeToggle', () => ({
   ThemeToggle: () => <div data-testid="theme-toggle" />,
 }));
 
-jest.mock('@/components/RegionSelector', () => ({
+jest.mock('@/app/components/RegionSelector', () => ({
   RegionSelector: () => <div data-testid="region-selector" />,
   REGIONS: {},
 }));
 
-jest.mock('@/components/LoadingProgress', () => ({
+jest.mock('@/app/components/LoadingProgress', () => ({
   LoadingProgress: ({ onCancel, phase }: { onCancel?: () => void; phase?: string }) => (
     <div data-testid="loading-progress">
       <span>Carregando...</span>
@@ -38,13 +38,13 @@ jest.mock('@/components/LoadingProgress', () => ({
   ),
 }));
 
-jest.mock('@/components/EmptyState', () => ({
+jest.mock('@/app/components/EmptyState', () => ({
   EmptyState: ({ sectorName }: { sectorName?: string }) => (
     <div data-testid="empty-state">Nenhuma licitação de {sectorName?.toLowerCase() || 'licitações'} encontrada</div>
   ),
 }));
 
-jest.mock('@/components/SourceBadges', () => ({
+jest.mock('@/app/components/SourceBadges', () => ({
   SourceBadges: () => <div data-testid="source-badges" />,
   default: () => <div data-testid="source-badges" />,
 }));

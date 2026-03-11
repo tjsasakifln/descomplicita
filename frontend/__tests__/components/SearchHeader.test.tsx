@@ -7,11 +7,11 @@ jest.mock('next/image', () => ({
   default: (props: any) => <img {...props} />,
 }));
 
-jest.mock('@/components/ThemeToggle', () => ({
+jest.mock('@/app/components/ThemeToggle', () => ({
   ThemeToggle: () => <div data-testid="theme-toggle" />,
 }));
 
-jest.mock('@/components/SavedSearchesDropdown', () => ({
+jest.mock('@/app/components/SavedSearchesDropdown', () => ({
   SavedSearchesDropdown: () => <div data-testid="saved-searches" />,
 }));
 

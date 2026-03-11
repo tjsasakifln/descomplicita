@@ -11,6 +11,7 @@ const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-body",
   display: "swap",
+  fallback: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
 });
 
 const fahkwang = Fahkwang({
@@ -18,6 +19,7 @@ const fahkwang = Fahkwang({
   subsets: ["latin"],
   variable: "--font-display",
   display: "swap",
+  fallback: ["Georgia", "Cambria", "Times New Roman", "serif"],
 });
 
 const dmMono = DM_Mono({
@@ -25,6 +27,7 @@ const dmMono = DM_Mono({
   subsets: ["latin"],
   variable: "--font-data",
   display: "swap",
+  fallback: ["SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
 });
 
 export const metadata: Metadata = {

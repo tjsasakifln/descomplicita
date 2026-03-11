@@ -8,22 +8,22 @@ jest.mock('next/image', () => ({
   default: (props: any) => <img {...props} />,
 }));
 
-jest.mock('@/components/ThemeToggle', () => ({
+jest.mock('@/app/components/ThemeToggle', () => ({
   ThemeToggle: () => <div data-testid="theme-toggle" />,
 }));
 
-jest.mock('@/components/SavedSearchesDropdown', () => ({
+jest.mock('@/app/components/SavedSearchesDropdown', () => ({
   SavedSearchesDropdown: () => <div data-testid="saved-searches" />,
 }));
 
 // Mock for UfSelector dependency
-jest.mock('@/components/RegionSelector', () => ({
+jest.mock('@/app/components/RegionSelector', () => ({
   RegionSelector: () => <div data-testid="region-selector" />,
   REGIONS: {},
 }));
 
 // Mock for SearchSummary dependency
-jest.mock('@/components/SourceBadges', () => ({
+jest.mock('@/app/components/SourceBadges', () => ({
   SourceBadges: () => null,
   default: () => null,
 }));
@@ -106,7 +106,7 @@ describe('Story 3.0: Accessibility Tests', () => {
 
   describe('SourceBadges CSS Custom Properties (TD-044)', () => {
     // Use jest.requireActual to get the real SourceBadges (bypassing the mock)
-    const { SourceBadges } = jest.requireActual('@/components/SourceBadges');
+    const { SourceBadges } = jest.requireActual('@/app/components/SourceBadges');
 
     const defaultProps = {
       sources: ['pncp', 'comprasgov'],
@@ -155,7 +155,7 @@ describe('Story 3.0: Accessibility Tests', () => {
 
   describe('EmptyState ARIA Live Region (TD-049)', () => {
     it('should have aria-live and role="status"', () => {
-      const { EmptyState } = require('@/components/EmptyState');
+      const { EmptyState } = require('@/app/components/EmptyState');
       const { container } = render(<EmptyState />);
 
       const wrapper = container.firstChild as HTMLElement;
@@ -166,7 +166,7 @@ describe('Story 3.0: Accessibility Tests', () => {
 
   describe('SearchHeader Navigation (TD-043)', () => {
     it('should wrap navigation elements in <nav>', () => {
-      const { SearchHeader } = require('@/components/SearchHeader');
+      const { SearchHeader } = require('@/app/components/SearchHeader');
       const { container } = render(
         <SearchHeader onLoadSearch={jest.fn()} onAnalyticsEvent={jest.fn()} />
       );
@@ -179,7 +179,7 @@ describe('Story 3.0: Accessibility Tests', () => {
 
   describe('SearchForm aria-describedby (TD-046)', () => {
     it('should link terms input to help text via aria-describedby', () => {
-      const { SearchForm } = require('@/components/SearchForm');
+      const { SearchForm } = require('@/app/components/SearchForm');
       render(
         <SearchForm
           searchMode="termos"
@@ -205,7 +205,7 @@ describe('Story 3.0: Accessibility Tests', () => {
 
   describe('UfSelector Group Label (TD-051)', () => {
     it('should wrap UF grid in role="group" with aria-label', () => {
-      const { UfSelector } = require('@/components/UfSelector');
+      const { UfSelector } = require('@/app/components/UfSelector');
       render(
         <UfSelector
           ufsSelecionadas={new Set(['SC'])}
@@ -224,7 +224,7 @@ describe('Story 3.0: Accessibility Tests', () => {
 
   describe('Heading Hierarchy (TD-052)', () => {
     it('should have proper heading structure in SearchSummary', () => {
-      const { SearchSummary } = require('@/components/SearchSummary');
+      const { SearchSummary } = require('@/app/components/SearchSummary');
 
       render(
         <SearchSummary

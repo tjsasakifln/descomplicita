@@ -322,6 +322,7 @@ async def listar_setores():
 # ---------------------------------------------------------------------------
 
 @app.post("/auth/token")
+@limiter.limit("10/minute")
 async def auth_token(request: Request):
     """Exchange API key for a JWT token.
 
@@ -359,6 +360,7 @@ async def auth_token(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.post("/auth/signup")
+@limiter.limit("10/minute")
 async def auth_signup(request: Request, database=Depends(get_database)):
     """Register a new user via Supabase Auth."""
     supabase_url = os.getenv("SUPABASE_URL")
@@ -420,6 +422,7 @@ async def auth_signup(request: Request, database=Depends(get_database)):
 
 
 @app.post("/auth/login")
+@limiter.limit("10/minute")
 async def auth_login(request: Request):
     """Authenticate user via Supabase Auth (email/password)."""
     supabase_url = os.getenv("SUPABASE_URL")
@@ -475,6 +478,7 @@ async def auth_login(request: Request):
 
 
 @app.post("/auth/refresh")
+@limiter.limit("10/minute")
 async def auth_refresh(request: Request):
     """Refresh an expired Supabase Auth session."""
     supabase_url = os.getenv("SUPABASE_URL")

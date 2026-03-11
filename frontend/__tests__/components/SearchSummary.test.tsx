@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 import { SearchSummary } from '@/app/components/SearchSummary';
 import type { BuscaResult } from '@/app/types';
 
-jest.mock('@/components/SourceBadges', () => ({
+jest.mock('@/app/components/SourceBadges', () => ({
   SourceBadges: () => <div data-testid="source-badges" />,
   default: () => <div data-testid="source-badges" />,
 }));
