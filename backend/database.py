@@ -160,6 +160,22 @@ class Database:
         except Exception as e:
             logger.warning("Failed to mark search %s as failed: %s", job_id, e)
 
+    async def cancel_search(self, job_id: str) -> None:
+        """Mark a search as cancelled in history (TD-DB-017).
+
+        Distinct from fail_search: cancellation is a user-initiated action,
+        not an error condition.
+        """
+        if not self._client:
+            return
+        try:
+            self._client.table("search_history").update({
+                "status": "cancelled",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("job_id", job_id).execute()
+        except Exception as e:
+            logger.warning("Failed to mark search %s as cancelled: %s", job_id, e)
+
     async def get_recent_searches(
         self,
         limit: int = 20,

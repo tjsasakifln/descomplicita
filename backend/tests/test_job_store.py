@@ -215,6 +215,46 @@ class TestJobStoreFail:
 
 
 # ---------------------------------------------------------------------------
+# 5b. JobStore.cancel (TD-DB-017)
+# ---------------------------------------------------------------------------
+
+class TestJobStoreCancel:
+    @pytest.mark.asyncio
+    async def test_sets_cancelled_status(self, store):
+        await store.create("j1")
+        await store.cancel("j1")
+        job = await store.get("j1")
+        assert job.status == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_stores_default_reason(self, store):
+        await store.create("j1")
+        await store.cancel("j1")
+        job = await store.get("j1")
+        assert job.error == "Busca cancelada pelo usuário."
+
+    @pytest.mark.asyncio
+    async def test_stores_custom_reason(self, store):
+        await store.create("j1")
+        await store.cancel("j1", reason="Timeout pelo sistema.")
+        job = await store.get("j1")
+        assert job.error == "Timeout pelo sistema."
+
+    @pytest.mark.asyncio
+    async def test_sets_completed_at(self, store):
+        await store.create("j1")
+        before = time.time()
+        await store.cancel("j1")
+        after = time.time()
+        job = await store.get("j1")
+        assert before <= job.completed_at <= after
+
+    @pytest.mark.asyncio
+    async def test_noop_for_missing_job(self, store):
+        await store.cancel("nonexistent")
+
+
+# ---------------------------------------------------------------------------
 # 6. JobStore.get
 # ---------------------------------------------------------------------------
 

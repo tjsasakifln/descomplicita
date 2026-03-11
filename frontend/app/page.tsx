@@ -7,6 +7,7 @@ import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useSearchForm } from "./hooks/useSearchForm";
 import { useSearchJob } from "./hooks/useSearchJob";
 import { useSaveDialog } from "./hooks/useSaveDialog";
+import { APP_VERSION } from "../lib/version";
 import { SearchHeader } from "./components/SearchHeader";
 import { SearchForm } from "./components/SearchForm";
 import { UfSelector } from "./components/UfSelector";
@@ -230,7 +231,7 @@ export default function HomePage() {
           <nav aria-label="Links do rodapé" className="flex items-center gap-4">
             <a href="mailto:contato@descomplicita.com.br" className="hover:text-ink transition-colors">Contato</a>
             <a href="/termos" className="hover:text-ink transition-colors">Termos de Uso</a>
-            <span className="tabular-nums font-data">v2.0</span>
+            <span className="tabular-nums font-data">{APP_VERSION}</span>
           </nav>
         </div>
       </footer>

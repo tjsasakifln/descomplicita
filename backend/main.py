@@ -999,6 +999,7 @@ async def cancel_job(
     request: Request,
     job_store=Depends(get_job_store),
     task_runner=Depends(get_task_runner),
+    database=Depends(get_database),
 ):
     """Cancel a running search job.
 
@@ -1010,7 +1011,7 @@ async def cancel_job(
     if not job:
         raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
 
-    if job.status in ("completed", "failed"):
+    if job.status in ("completed", "failed", "cancelled"):
         raise HTTPException(
             status_code=409,
             detail=f"Job already {job.status} and cannot be cancelled.",
@@ -1020,8 +1021,12 @@ async def cancel_job(
     if task_runner:
         await task_runner.cancel_job(job_id)
 
-    # Mark job as failed with cancellation message
-    await job_store.fail(job_id, "Busca cancelada pelo usuário.")
+    # Mark job as cancelled (distinct from failed — TD-DB-017)
+    await job_store.cancel(job_id)
+
+    # Propagate cancelled status to persistent DB
+    if database:
+        await database.cancel_search(job_id)
 
     return {"status": "cancelled"}
 

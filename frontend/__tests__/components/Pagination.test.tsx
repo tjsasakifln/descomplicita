@@ -57,20 +57,20 @@ describe("Pagination", () => {
 
   it("disables previous button on first page", () => {
     render(<Pagination {...defaultProps} currentPage={1} />);
-    const prevButton = screen.getByLabelText("Pagina anterior");
+    const prevButton = screen.getByLabelText("Página anterior");
     expect(prevButton).toBeDisabled();
   });
 
   it("disables next button on last page", () => {
     render(<Pagination {...defaultProps} currentPage={5} />);
-    const nextButton = screen.getByLabelText("Proxima pagina");
+    const nextButton = screen.getByLabelText("Próxima página");
     expect(nextButton).toBeDisabled();
   });
 
   it("enables both buttons on a middle page", () => {
     render(<Pagination {...defaultProps} currentPage={3} />);
-    expect(screen.getByLabelText("Pagina anterior")).not.toBeDisabled();
-    expect(screen.getByLabelText("Proxima pagina")).not.toBeDisabled();
+    expect(screen.getByLabelText("Página anterior")).not.toBeDisabled();
+    expect(screen.getByLabelText("Próxima página")).not.toBeDisabled();
   });
 
   it("calls onPageChange when clicking next", () => {
@@ -78,7 +78,7 @@ describe("Pagination", () => {
     render(
       <Pagination {...defaultProps} currentPage={2} onPageChange={onPageChange} />
     );
-    fireEvent.click(screen.getByLabelText("Proxima pagina"));
+    fireEvent.click(screen.getByLabelText("Próxima página"));
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
 
@@ -87,7 +87,7 @@ describe("Pagination", () => {
     render(
       <Pagination {...defaultProps} currentPage={3} onPageChange={onPageChange} />
     );
-    fireEvent.click(screen.getByLabelText("Pagina anterior"));
+    fireEvent.click(screen.getByLabelText("Página anterior"));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
@@ -96,20 +96,20 @@ describe("Pagination", () => {
     render(
       <Pagination {...defaultProps} currentPage={1} onPageChange={onPageChange} />
     );
-    fireEvent.click(screen.getByLabelText("Pagina 4"));
+    fireEvent.click(screen.getByLabelText("Página 4"));
     expect(onPageChange).toHaveBeenCalledWith(4);
   });
 
   it("highlights current page with aria-current", () => {
     render(<Pagination {...defaultProps} currentPage={3} />);
-    const currentBtn = screen.getByLabelText("Pagina 3");
+    const currentBtn = screen.getByLabelText("Página 3");
     expect(currentBtn).toHaveAttribute("aria-current", "page");
   });
 
   it("shows all page numbers when totalPages <= 7", () => {
     render(<Pagination {...defaultProps} totalPages={7} totalItems={140} />);
     for (let i = 1; i <= 7; i++) {
-      expect(screen.getByLabelText(`Pagina ${i}`)).toBeInTheDocument();
+      expect(screen.getByLabelText(`Página ${i}`)).toBeInTheDocument();
     }
   });
 
@@ -130,7 +130,7 @@ describe("Pagination", () => {
   it("has navigation aria-label", () => {
     render(<Pagination {...defaultProps} />);
     expect(
-      screen.getByRole("navigation", { name: /paginas/i })
+      screen.getByRole("navigation", { name: /páginas/i })
     ).toBeInTheDocument();
   });
 });

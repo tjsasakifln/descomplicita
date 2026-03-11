@@ -115,7 +115,7 @@ export function ItemsList({ jobId, totalFiltered }: ItemsListProps) {
         <div className="py-8 text-center text-ink-muted">Carregando...</div>
       ) : error ? (
         <div className="py-8 text-center space-y-3">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="text-sm text-status-error-text">{error}</p>
           <button
             onClick={() => fetchPage(page)}
             className="px-4 py-2 text-sm font-medium text-brand-blue hover:text-brand-navy border border-brand-blue/30 rounded-button hover:bg-brand-blue-subtle transition-colors"
@@ -133,11 +133,13 @@ export function ItemsList({ jobId, totalFiltered }: ItemsListProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   {item.tipo && (
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mb-1 ${
-                      item.tipo.includes("ata")
-                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                    }`}>
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mb-1"
+                      style={item.tipo.includes("ata")
+                        ? { background: 'var(--badge-ata-bg)', color: 'var(--badge-ata-text)', borderWidth: '1px', borderColor: 'var(--badge-ata-border)' }
+                        : { background: 'var(--badge-licitacao-bg)', color: 'var(--badge-licitacao-text)', borderWidth: '1px', borderColor: 'var(--badge-licitacao-border)' }
+                      }
+                    >
                       {item.tipo.includes("ata") ? "Ata" : "Licitação"}
                     </span>
                   )}

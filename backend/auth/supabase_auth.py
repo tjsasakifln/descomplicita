@@ -15,6 +15,8 @@ import os
 import time
 from typing import Optional
 
+import jwt as pyjwt
+
 logger = logging.getLogger(__name__)
 
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
@@ -43,15 +45,17 @@ def validate_supabase_token(token: str) -> dict:
         raise SupabaseAuthError("SUPABASE_JWT_SECRET not configured")
 
     try:
-        from jose import jwt, JWTError as JoseJWTError
-
-        payload = jwt.decode(
+        payload = pyjwt.decode(
             token,
             secret,
             algorithms=["HS256"],
-            options={"verify_aud": False},
+            audience="authenticated",
         )
-    except JoseJWTError as e:
+    except pyjwt.ExpiredSignatureError:
+        raise SupabaseAuthError("Supabase token expired")
+    except pyjwt.InvalidAudienceError:
+        raise SupabaseAuthError("Invalid token audience (expected 'authenticated')")
+    except pyjwt.InvalidTokenError as e:
         raise SupabaseAuthError(f"Invalid Supabase token: {e}")
     except Exception as e:
         raise SupabaseAuthError(f"Token decode error: {e}")

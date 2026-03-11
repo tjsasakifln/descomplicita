@@ -85,7 +85,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
   return (
     <dialog
       ref={dialogRef}
-      className="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--card-bg)] text-[var(--text-primary)]"
+      className="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--surface-elevated)] text-[var(--ink)]"
     >
       <form onSubmit={handleSubmit} className="p-6">
         <div className="flex items-center justify-between mb-6">
@@ -95,7 +95,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
           <button
             type="button"
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl leading-none"
+            className="text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xl leading-none"
             aria-label="Fechar"
           >
             &times;
@@ -103,20 +103,20 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-status-error-bg text-status-error-text border border-status-error text-sm">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-3 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-status-success-bg text-status-success-text border border-status-success text-sm">
             {success}
           </div>
         )}
 
         {mode === 'signup' && (
           <div className="mb-4">
-            <label htmlFor="auth-display-name" className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+            <label htmlFor="auth-display-name" className="block text-sm font-medium mb-1 text-[var(--ink-secondary)]">
               Nome
             </label>
             <input
@@ -124,7 +124,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
               type="text"
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
               placeholder="Seu nome"
               autoComplete="name"
             />
@@ -132,7 +132,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
         )}
 
         <div className="mb-4">
-          <label htmlFor="auth-email" className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+          <label htmlFor="auth-email" className="block text-sm font-medium mb-1 text-[var(--ink-secondary)]">
             Email
           </label>
           <input
@@ -141,14 +141,14 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
             placeholder="seu@email.com"
             autoComplete="email"
           />
         </div>
 
         <div className="mb-6">
-          <label htmlFor="auth-password" className="block text-sm font-medium mb-1 text-[var(--text-secondary)]">
+          <label htmlFor="auth-password" className="block text-sm font-medium mb-1 text-[var(--ink-secondary)]">
             Senha
           </label>
           <input
@@ -158,7 +158,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
             onChange={e => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
             placeholder="Min. 6 caracteres"
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
           />
@@ -167,7 +167,7 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 rounded-lg font-medium bg-[var(--accent-color)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="w-full py-2.5 rounded-lg font-medium bg-[var(--brand-blue)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
           {loading
             ? 'Aguarde...'
@@ -176,18 +176,18 @@ export default function AuthModal({ open, onClose, initialMode = 'login' }: Auth
               : 'Criar Conta'}
         </button>
 
-        <p className="mt-4 text-center text-sm text-[var(--text-secondary)]">
+        <p className="mt-4 text-center text-sm text-[var(--ink-secondary)]">
           {mode === 'login' ? (
             <>
               Ainda nao tem conta?{' '}
-              <button type="button" onClick={toggleMode} className="text-[var(--accent-color)] hover:underline">
+              <button type="button" onClick={toggleMode} className="text-[var(--brand-blue)] hover:underline">
                 Criar conta
               </button>
             </>
           ) : (
             <>
               Ja tem conta?{' '}
-              <button type="button" onClick={toggleMode} className="text-[var(--accent-color)] hover:underline">
+              <button type="button" onClick={toggleMode} className="text-[var(--brand-blue)] hover:underline">
                 Entrar
               </button>
             </>

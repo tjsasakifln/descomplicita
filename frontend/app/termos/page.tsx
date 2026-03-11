@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { APP_VERSION } from "../../lib/version";
 
 export const metadata: Metadata = {
   title: "Termos de Uso — DescompLicita",
@@ -173,7 +174,7 @@ export default function TermosPage() {
           <nav aria-label="Links do rodapé" className="flex items-center gap-4">
             <a href="mailto:contato@descomplicita.com.br" className="hover:text-ink transition-colors">Contato</a>
             <a href="/termos" className="hover:text-ink transition-colors" aria-current="page">Termos de Uso</a>
-            <span className="tabular-nums font-data">v2.0</span>
+            <span className="tabular-nums font-data">{APP_VERSION}</span>
           </nav>
         </div>
       </footer>

@@ -11,7 +11,7 @@ class SearchJob:
     """Represents an async search job."""
 
     job_id: str
-    status: str = "queued"  # queued | running | completed | failed
+    status: str = "queued"  # queued | running | completed | failed | cancelled
     progress: Dict = field(default_factory=lambda: {
         "phase": "queued",
         "ufs_completed": 0,
@@ -110,6 +110,24 @@ class JobStore:
                 return
             job.status = "failed"
             job.error = error
+            job.completed_at = time.time()
+
+    async def cancel(self, job_id: str, reason: str = "Busca cancelada pelo usuário.") -> None:
+        """Mark a job as cancelled (user-initiated).
+
+        Unlike fail(), this records a 'cancelled' status to distinguish
+        user-initiated cancellations from actual errors (TD-DB-017).
+
+        Args:
+            job_id: The job to cancel.
+            reason: Human-readable cancellation reason.
+        """
+        async with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return
+            job.status = "cancelled"
+            job.error = reason
             job.completed_at = time.time()
 
     async def get(self, job_id: str) -> Optional[SearchJob]:

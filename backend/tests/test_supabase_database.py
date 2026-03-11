@@ -226,6 +226,24 @@ class TestSearchHistory:
         assert calls[0][1]["status"] == "failed"
 
     @pytest.mark.asyncio
+    async def test_cancel_search(self, db_connected):
+        """cancel_search should update status to cancelled (TD-DB-017)."""
+        calls = []
+
+        class TrackingQuery(MockTableQuery):
+            def update(self, data, **kwargs):
+                calls.append(("update", data))
+                return self
+
+        db_connected._client.table = lambda name: TrackingQuery()
+
+        await db_connected.cancel_search(job_id="job-cancelled")
+
+        assert len(calls) == 1
+        assert calls[0][1]["status"] == "cancelled"
+        assert "completed_at" in calls[0][1]
+
+    @pytest.mark.asyncio
     async def test_get_recent_searches_with_user_id(self):
         """get_recent_searches should filter by user_id (multi-tenant isolation)."""
         user_a_searches = [
@@ -397,6 +415,10 @@ class TestGracefulDegradation:
         await db_disconnected.fail_search("job-1")
 
     @pytest.mark.asyncio
+    async def test_cancel_search_without_client(self, db_disconnected):
+        await db_disconnected.cancel_search("job-1")
+
+    @pytest.mark.asyncio
     async def test_get_recent_searches_without_client(self, db_disconnected):
         result = await db_disconnected.get_recent_searches(user_id="user-1")
         assert result == []
@@ -456,7 +478,7 @@ class TestAuthMiddleware:
         }
 
         with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", "test-secret"):
-            with patch("jose.jwt.decode", return_value=mock_payload):
+            with patch("auth.supabase_auth.pyjwt.decode", return_value=mock_payload):
                 result = validate_supabase_token("mock.jwt.token")
                 assert result["sub"] == "user-uuid-123"
                 assert result["role"] == "authenticated"
@@ -473,7 +495,7 @@ class TestAuthMiddleware:
         }
 
         with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", "test-secret"):
-            with patch("jose.jwt.decode", return_value=mock_payload):
+            with patch("auth.supabase_auth.pyjwt.decode", return_value=mock_payload):
                 with pytest.raises(SupabaseAuthError, match="Invalid role"):
                     validate_supabase_token("mock.jwt.token")
 
@@ -488,7 +510,7 @@ class TestAuthMiddleware:
         }
 
         with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", "test-secret"):
-            with patch("jose.jwt.decode", return_value=mock_payload):
+            with patch("auth.supabase_auth.pyjwt.decode", return_value=mock_payload):
                 with pytest.raises(SupabaseAuthError, match="missing 'sub'"):
                     validate_supabase_token("mock.jwt.token")
 

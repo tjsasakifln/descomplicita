@@ -13,7 +13,7 @@ DECLARE
 BEGIN
     DELETE FROM public.search_history
     WHERE created_at < NOW() - (retention_days || ' days')::INTERVAL
-      AND status IN ('completed', 'failed');
+      AND status IN ('completed', 'failed', 'cancelled');
 
     GET DIAGNOSTICS deleted_count = ROW_COUNT;
 

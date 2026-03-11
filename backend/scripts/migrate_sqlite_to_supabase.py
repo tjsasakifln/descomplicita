@@ -13,6 +13,9 @@ Prerequisites:
     - Supabase project created with migrations applied (001_initial_schema.sql)
     - A legacy user account created in Supabase Auth
     - pip install supabase aiosqlite
+
+NOTE: aiosqlite is no longer in requirements.txt (removed in story-0.2 TD-SYS-001).
+      Install it manually if you need to re-run this one-time migration script.
 """
 
 import argparse

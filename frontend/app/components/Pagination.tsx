@@ -40,7 +40,7 @@ export function Pagination({
 
   return (
     <nav
-      aria-label="Navegacao de paginas"
+      aria-label="Navegação de páginas"
       className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4"
     >
       <p className="text-sm text-ink-muted">
@@ -51,7 +51,7 @@ export function Pagination({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
           className="px-3 py-1.5 text-sm rounded-button border border-strong text-ink-secondary hover:bg-surface-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          aria-label="Pagina anterior"
+          aria-label="Página anterior"
         >
           Anterior
         </button>
@@ -69,7 +69,7 @@ export function Pagination({
                   ? "bg-brand-navy text-white font-semibold"
                   : "border border-strong text-ink-secondary hover:bg-surface-1"
               }`}
-              aria-label={`Pagina ${p}`}
+              aria-label={`Página ${p}`}
               aria-current={p === currentPage ? "page" : undefined}
             >
               {p}
@@ -80,9 +80,9 @@ export function Pagination({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
           className="px-3 py-1.5 text-sm rounded-button border border-strong text-ink-secondary hover:bg-surface-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          aria-label="Proxima pagina"
+          aria-label="Próxima página"
         >
-          Proxima
+          Próxima
         </button>
       </div>
     </nav>
