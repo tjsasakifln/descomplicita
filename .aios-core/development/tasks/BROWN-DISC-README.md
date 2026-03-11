@@ -130,7 +130,7 @@ END ✅
 
 ## 💡 Exemplos de Uso
 
-### Para Seu Projeto BidIQ Uniformes
+### Para Seu Projeto Descomplicita
 
 ```bash
 # 1. Iniciar discovery
@@ -341,7 +341,7 @@ Se @qa não aprova:
 
 ## 🔧 Personalização
 
-Para seu projeto BidIQ:
+Para seu projeto Descomplicita:
 
 ```bash
 # O workflow vai detectar:

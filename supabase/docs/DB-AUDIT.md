@@ -1,282 +1,184 @@
-# Database Audit Report
+# Auditoria do Banco de Dados - Descomplicita
 
-> **Generated:** 2026-03-09 | **Agent:** @data-engineer (Delphi)
-> **Scope:** SQLite database (`backend/database.py`), Redis data stores, all backend data access patterns
-> **Severity Scale:** Critical > High > Medium > Low
-
----
-
-## 1. Security Audit
-
-### 1.1 RLS Coverage
-
-| Table | RLS Enabled | Policies | Risk |
-|-------|-------------|----------|------|
-| `search_history` | N/A (SQLite) | None | Medium -- no per-user isolation |
-| `user_preferences` | N/A (SQLite) | None | Medium -- global namespace, no user scoping |
-
-**Finding:** SQLite does not support Row Level Security. All data is globally accessible to any authenticated API client. The `/search-history` endpoint returns all searches from all users without any user-scoping filter. When multiple tenants or users are introduced, this becomes a data exposure risk.
-
-### 1.2 SQL Injection Analysis
-
-| Location | Pattern | Risk Level |
-|----------|---------|------------|
-| `database.py` line 98-111 | Parameterized queries (`?` placeholders) | **Safe** |
-| `database.py` line 124-137 | Parameterized queries | **Safe** |
-| `database.py` line 143-147 | Parameterized queries | **Safe** |
-| `database.py` line 153-158 | Parameterized queries for LIMIT | **Safe** |
-| `database.py` line 184-195 | Parameterized queries for upsert | **Safe** |
-| `database.py` line 202-203 | Parameterized queries | **Safe** |
-
-**Verdict:** All SQL queries use parameterized placeholders (`?`). No string interpolation or f-string SQL construction was found. **SQL injection risk is effectively zero.**
-
-### 1.3 Auth Token Handling
-
-| Mechanism | Implementation | Assessment |
-|-----------|---------------|------------|
-| API Key | Compared via `==` in middleware | **Weak** -- vulnerable to timing attacks (should use `hmac.compare_digest`) |
-| JWT | Custom HMAC-SHA256 implementation | **Adequate** -- uses `hmac.compare_digest` for signature validation |
-| JWT Secret | From `JWT_SECRET` env var | **Good** -- not hardcoded |
-| API Key Secret | From `API_KEY` env var | **Good** -- not hardcoded |
-| Token Expiration | Configurable (default 24h) | **Adequate** for POC |
-| Token Revocation | Not supported (stateless JWT) | **Acceptable** for POC, needs addressing for production |
-
-**Note:** The API key comparison in `middleware/auth.py` line 71 uses `==` (Python string comparison), which is susceptible to timing side-channel attacks. The JWT signature comparison correctly uses `hmac.compare_digest`.
-
-### 1.4 Data Exposure Risks
-
-| Risk | Severity | Description |
-|------|----------|-------------|
-| Global search history | Medium | `/search-history` returns all searches without user filtering |
-| No encryption at rest | Low | SQLite file on disk is unencrypted (acceptable for POC) |
-| Redis data unencrypted | Low | Redis keys store plaintext JSON (standard for Redis) |
-| Debug endpoints | Low | Gated by `ENABLE_DEBUG_ENDPOINTS` flag, but expose cache internals |
-| Error messages | Low | Job failure messages include internal error details in some paths |
+> **Data:** 2026-03-11 | **Agente:** @data-engineer (Forge)
+> **Escopo:** Schema PostgreSQL (Supabase), queries no backend e frontend, RLS, seguranca
+> **Nivel:** POC (Proof of Concept)
+> **Escala de severidade:** Critica > Alta > Media > Baixa
 
 ---
 
-## 2. Performance Audit
+## 1. Resumo Executivo
 
-### 2.1 Missing Indexes
+O schema e enxuto e bem estruturado para um POC: 4 tabelas, RLS habilitada em todas, FKs com CASCADE, triggers de auto-update e criacao automatica de usuario. A arquitetura multi-tenant esta implementada com isolamento por `user_id` tanto no codigo (backend) quanto via RLS (frontend).
 
-| Table | Column(s) | Current Index | Recommendation |
-|-------|-----------|--------------|----------------|
-| `search_history` | `job_id` | UNIQUE constraint (implicit index) | **Adequate** |
-| `search_history` | `created_at DESC` | `idx_search_history_created` | **Adequate** |
-| `search_history` | `setor_id` | `idx_search_history_setor` | **Adequate** |
-| `search_history` | `status` | **None** | Consider adding if querying by status |
-| `user_preferences` | `key` | UNIQUE constraint (implicit index) | **Adequate** |
-
-**Verdict:** Indexes are sufficient for current query patterns. The only SELECT on `search_history` orders by `created_at DESC` which is covered. No queries filter by `status` currently, so the missing index is not impactful.
-
-### 2.2 N+1 Query Patterns
-
-**None detected.** The database access patterns are simple:
-- Single INSERT per search job creation
-- Single UPDATE per search completion/failure
-- Single SELECT for recent history (bounded by LIMIT)
-
-There are no join queries, no nested loops with queries, and no ORM lazy-loading patterns.
-
-### 2.3 Slow Query Candidates
-
-| Query | Risk | Mitigation |
-|-------|------|------------|
-| `get_recent_searches(limit=100)` | Low | Bounded by caller (`min(limit, 100)` in endpoint) |
-| `executescript(_SCHEMA_SQL)` on startup | Low | `IF NOT EXISTS` makes it idempotent and fast |
-
-**Verdict:** No slow query risks at current scale. SQLite handles the volume (hundreds to low thousands of rows) without issues.
-
-### 2.4 Connection Pooling
-
-| Component | Pooling | Assessment |
-|-----------|---------|------------|
-| SQLite | Single connection (`aiosqlite.connect`) | **Adequate** -- SQLite is single-writer by design; pooling adds complexity without benefit |
-| Redis | Single connection via `redis.asyncio.from_url` | **Adequate** for POC -- `redis.asyncio` handles connection reuse internally |
-| Redis timeouts | `socket_connect_timeout=5, socket_timeout=5` | **Good** -- prevents hanging connections |
-
-### 2.5 Redis Performance Considerations
-
-| Pattern | Risk | Assessment |
-|---------|------|------------|
-| Full JSON serialization of items list | Medium | Large result sets (500+ items) serialized to JSON and stored in a single Redis key. Could cause latency spikes for large payloads. |
-| `scan_iter` for cache clear/count | Low | O(N) scan but only used for debug endpoints |
-| Progress updates write full job JSON to Redis | Medium | Every progress update serializes and writes the entire job state. High-frequency updates during fetching phase could create write amplification. |
+**Nota geral: 7/10** -- Solido para POC. Debitos tecnicos identificados sao gerenciaveis e devem ser resolvidos antes de escala em producao.
 
 ---
 
-## 3. Schema Quality
+## 2. Qualidade do Schema
 
-### 3.1 Normalization Issues
+### Pontos positivos
+- Tipos PostgreSQL nativos adequados: UUID, TIMESTAMPTZ, JSONB, TEXT[], DATE
+- Constraints NOT NULL nas colunas obrigatorias
+- FKs com ON DELETE CASCADE eliminam registros orfaos
+- UNIQUE constraint em `job_id` e `(user_id, key)`
+- Trigger SECURITY DEFINER para criacao automatica de perfil
+- Funcao de retencao preparada (cleanup_old_searches)
 
-| Issue | Severity | Description |
-|-------|----------|-------------|
-| `ufs` stored as JSON string | Low | Array stored as `TEXT` (JSON-encoded). Prevents efficient querying by individual UF. Acceptable for audit log. |
-| `termos_busca` stored as raw text | Low | Not normalized or parsed before storage. Acceptable for audit. |
-| `value` in `user_preferences` as JSON string | Low | Generic key-value pattern. No schema validation at DB level. |
-
-**Verdict:** Normalization level is appropriate for the use case (audit logging and simple key-value storage). The JSON-in-TEXT pattern is a pragmatic choice for SQLite.
-
-### 3.2 Missing Constraints
-
-| Table | Missing Constraint | Severity | Recommendation |
-|-------|-------------------|----------|----------------|
-| `search_history` | No CHECK on `status` values | Low | Add `CHECK(status IN ('queued','completed','failed'))` |
-| `search_history` | No CHECK on date formats | Low | Application validates via Pydantic, so risk is low |
-| `search_history` | No NOT NULL on `total_raw` | Low | Has DEFAULT 0, but explicit NOT NULL would be cleaner |
-| `user_preferences` | No length limits on `key` or `value` | Low | Application should enforce max sizes |
-
-### 3.3 Data Type Choices
-
-| Column | Current Type | Assessment |
-|--------|-------------|------------|
-| `created_at`, `completed_at` | TEXT (ISO 8601) | **Acceptable** for SQLite (no native DATETIME). Consider INTEGER (Unix timestamp) for easier comparison. |
-| `elapsed_seconds` | REAL | **Good** -- appropriate for fractional seconds |
-| `ufs` | TEXT (JSON) | **Acceptable** -- array of strings in SQLite |
-| `total_raw`, `total_filtrado` | INTEGER | **Good** |
-
-### 3.4 Naming Conventions
-
-| Convention | Assessment |
-|------------|------------|
-| Table names | snake_case -- **consistent** |
-| Column names | snake_case -- **consistent** |
-| Index names | `idx_{table}_{column}` -- **consistent** |
-| Mixed Portuguese/English | `data_inicial`, `setor_id` (PT) vs `status`, `created_at` (EN) -- **inconsistent but acceptable** given the domain |
-| Redis key patterns | `{entity}:{id}` -- **consistent** |
+### Pontos negativos
+- `status` em `search_history` e TEXT livre sem CHECK constraint
+- `setor_id` nao referencia tabela de setores (possivelmente dinamico/externo)
+- Sem validacao de formato no array `ufs`
+- `search_params` em `saved_searches` e JSONB sem schema validation
+- `saved_searches` nao tem coluna `updated_at` (inconsistente com demais tabelas)
 
 ---
 
-## 4. Technical Debt Items
+## 3. Analise de Indices
 
-### DB-001: No Multi-User / Multi-Tenant Data Isolation
+### Indices existentes (adequados)
 
-- **Severity:** High
-- **Description:** The `search_history` and `user_preferences` tables have no `user_id` column. All data is globally shared. The `/search-history` endpoint returns all searches from all users.
-- **Impact:** When multiple users or tenants are introduced, search history from one user is visible to all. Privacy violation risk.
-- **Estimated Effort:** 4 hours
-- **Recommendation:** Add `user_id TEXT NOT NULL` column to both tables. Filter queries by authenticated user. When migrating to Supabase, implement RLS policies.
+| Tabela | Indice | Colunas | Cobre query |
+|--------|--------|---------|-------------|
+| `search_history` | `idx_search_history_user_created` | `(user_id, created_at DESC)` | `get_recent_searches()` |
+| `search_history` | `idx_search_history_setor` | `(setor_id)` | Filtragem por setor |
+| `search_history` | `idx_search_history_status` | `(status)` | `cleanup_old_searches()` |
+| `search_history` | (implicito UNIQUE) | `(job_id)` | `complete_search()`, `fail_search()` |
+| `user_preferences` | `idx_user_preferences_user` | `(user_id)` | Lookup por usuario |
+| `user_preferences` | (implicito UNIQUE) | `(user_id, key)` | Upsert de preferencia |
+| `saved_searches` | `idx_saved_searches_user` | `(user_id, last_used_at DESC)` | `loadServerSearches()` |
 
-### DB-002: Ephemeral Storage on Railway/Vercel
+### Indices ausentes (recomendados)
 
-- **Severity:** High
-- **Description:** SQLite stores data on the filesystem. Railway and Vercel use ephemeral containers -- the database file is lost on every deploy or container restart. The `database.py` header acknowledges this: "ephemeral storage is acceptable for POC."
-- **Impact:** All search history is lost on deployments. No durable persistence of analytics data.
-- **Estimated Effort:** 16 hours
-- **Recommendation:** Migrate to Supabase PostgreSQL (env vars already defined). Use the Supabase Python client or SQLAlchemy with asyncpg. Implement proper migrations with Alembic or Supabase CLI.
-
-### DB-003: No Migration System
-
-- **Severity:** High
-- **Description:** Schema is created via `CREATE TABLE IF NOT EXISTS` on startup. There is no migration tool (Alembic, Supabase CLI, or custom). Schema changes require manual ALTER TABLE or database recreation.
-- **Impact:** Schema evolution is manual and error-prone. No rollback capability. Cannot track schema history.
-- **Estimated Effort:** 8 hours
-- **Recommendation:** Adopt Alembic for SQLAlchemy-based migrations, or Supabase CLI migrations if migrating to Supabase. Create initial migration from current schema.
-
-### DB-004: User Preferences Table is Unused
-
-- **Severity:** Medium
-- **Description:** The `user_preferences` table and its three methods (`set_preference`, `get_preference`, `get_all_preferences`) are defined but never called from any endpoint or background process.
-- **Impact:** Dead code increases maintenance burden and test surface. The table exists in production but serves no purpose.
-- **Estimated Effort:** 1 hour
-- **Recommendation:** Either wire up preferences to an API endpoint or remove the table and methods. If keeping, add a `GET/PUT /preferences` endpoint.
-
-### DB-005: API Key Comparison Vulnerable to Timing Attack
-
-- **Severity:** Medium
-- **Description:** In `middleware/auth.py` line 71, API key validation uses Python `==` operator (`request_key == api_key`), which is not constant-time. The JWT signature comparison at `auth/jwt.py` line 124 correctly uses `hmac.compare_digest`.
-- **Impact:** Theoretical timing side-channel attack could leak API key bytes. Low practical risk for a POC but violates security best practices.
-- **Estimated Effort:** 0.5 hours
-- **Recommendation:** Replace `request_key == api_key` with `hmac.compare_digest(request_key, api_key)` in `middleware/auth.py`.
-
-### DB-006: Redis Write Amplification on Progress Updates
-
-- **Severity:** Medium
-- **Description:** `RedisJobStore.update_progress()` serializes and writes the entire job state JSON to Redis on every progress update. During the fetching phase, progress is updated for each source completion, and potentially for each UF.
-- **Impact:** Unnecessary Redis writes. Each update writes the full job JSON (which may include the result dict after completion). Not a bottleneck at current scale but will degrade at higher concurrency.
-- **Estimated Effort:** 4 hours
-- **Recommendation:** Use Redis HSET to store job fields individually, or batch progress updates with a debounce interval (e.g., update Redis at most every 2 seconds).
-
-### DB-007: No Database Connection Health Check
-
-- **Severity:** Medium
-- **Description:** The `/health` endpoint checks Redis connectivity but does not check SQLite database health. If the database file becomes corrupted or the connection drops, it would not be detected until a write fails.
-- **Impact:** Silent database failures. Health checks report "healthy" even when persistence is broken.
-- **Estimated Effort:** 1 hour
-- **Recommendation:** Add SQLite connectivity check to `/health` endpoint (e.g., `SELECT 1`). Return database status alongside Redis status.
-
-### DB-008: No Data Retention / Cleanup Policy for SQLite
-
-- **Severity:** Medium
-- **Description:** The `search_history` table grows unbounded. There is no cleanup mechanism for old records. Redis has TTL-based expiry, but SQLite rows persist indefinitely.
-- **Impact:** On long-running instances (if not ephemeral), the SQLite file grows without bound. Performance degrades as the table grows (though slowly, given the simple queries).
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Add a periodic cleanup task that deletes rows older than N days (e.g., 90 days). Run alongside the existing Redis cleanup in the lifespan periodic task.
-
-### DB-009: Redis Items Deserialization Loads Entire Dataset
-
-- **Severity:** Medium
-- **Description:** `RedisJobStore.get_items_page()` retrieves the entire items JSON from Redis and then slices in Python. For jobs with 500+ items, this deserializes the full array even for page 1 with 20 items.
-- **Impact:** Memory waste and latency for large result sets. Each page request deserializes the full items list.
-- **Estimated Effort:** 4 hours
-- **Recommendation:** Store items as a Redis LIST (RPUSH individual items) and use LRANGE for pagination. Or use Redis Sorted Sets for ordered pagination.
-
-### DB-010: No Backup Strategy
-
-- **Severity:** Low
-- **Description:** No backup mechanism exists for the SQLite database or Redis data. The SQLite file is a single point of failure.
-- **Impact:** Data loss on disk failure (mitigated by ephemeral nature on Railway). Redis data is inherently volatile.
-- **Estimated Effort:** 4 hours
-- **Recommendation:** For production, migrate to Supabase (which handles backups). For POC, accept the risk. If staying with SQLite, add periodic WAL checkpoints and file-level backups.
-
-### DB-011: Graceful Degradation Hides Failures Silently
-
-- **Severity:** Low
-- **Description:** Both `Database` methods and `RedisJobStore` methods silently return empty results or None when the connection is unavailable (e.g., `if not self._db: return []`). While this enables graceful degradation, it also means data persistence failures go unnoticed.
-- **Impact:** Search history may silently not be recorded. Operators have no visibility into persistence failures unless they check logs.
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Add structured metrics/counters for persistence failures. Emit warnings that are surfaced in health checks (e.g., `"database": "degraded"` in `/health` response).
-
-### DB-012: Supabase Env Vars Defined but Unused
-
-- **Severity:** Low
-- **Description:** The root `.env.example` defines `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`, but no code references these variables. No Supabase client library is installed.
-- **Impact:** Confusing for developers who assume Supabase is integrated. Placeholder variables without implementation.
-- **Estimated Effort:** 0.5 hours
-- **Recommendation:** Either remove the Supabase env vars from `.env.example` (add them back when Supabase is integrated), or add a comment marking them as "planned / not yet implemented."
-
-### DB-013: No Transaction Boundaries for Multi-Step Operations
-
-- **Severity:** Low
-- **Description:** Each `Database` method commits immediately after its single SQL statement (`await self._db.commit()`). The `record_search` and `complete_search` calls in `run_search_job` are separated by the entire search pipeline execution.
-- **Impact:** No atomicity risk currently (single-statement operations). However, if more complex multi-table operations are added, the lack of explicit transaction management could cause inconsistencies.
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Acceptable for current single-statement operations. When adding multi-table operations, introduce explicit transaction context managers.
+| Tabela | Indice sugerido | Justificativa | Prioridade |
+|--------|-----------------|---------------|------------|
+| `users` | `idx_users_email` | Script de migracao e possiveis lookups futuros buscam por email | Baixa |
+| `search_history` | Indice parcial `(created_at) WHERE status IN ('completed','failed')` | Otimizaria `cleanup_old_searches()` em tabelas grandes | Baixa |
 
 ---
 
-## 5. Priority Summary
+## 4. Analise de RLS
 
-| Priority | Items | Action |
-|----------|-------|--------|
-| **Critical** | None | -- |
-| **High** | DB-001, DB-002, DB-003 | Address before production launch |
-| **Medium** | DB-004, DB-005, DB-006, DB-007, DB-008, DB-009 | Address in next sprint |
-| **Low** | DB-010, DB-011, DB-012, DB-013 | Address opportunistically |
+### Cobertura
 
-### Recommended Migration Path
+| Tabela | RLS | Policy | Tipo |
+|--------|-----|--------|------|
+| `users` | Habilitada | `users_own_data` | FOR ALL |
+| `search_history` | Habilitada | `search_history_own_data` | FOR ALL |
+| `user_preferences` | Habilitada | `user_preferences_own_data` | FOR ALL |
+| `saved_searches` | Habilitada | `saved_searches_own_data` | FOR ALL |
 
-The highest-impact improvement is **DB-002 (Supabase migration)**, which would simultaneously resolve:
-- DB-001 (multi-tenant isolation via RLS)
-- DB-002 (durable storage)
-- DB-003 (migration system via Supabase CLI)
-- DB-008 (retention policies via PostgreSQL)
-- DB-010 (managed backups)
+### Lacunas identificadas
 
-**Estimated total effort for Supabase migration:** 24-32 hours, including:
-- Schema design in PostgreSQL (4h)
-- RLS policies (4h)
-- Backend client migration from aiosqlite to supabase-py or asyncpg (8h)
-- Migration system setup (4h)
-- Testing and validation (4-8h)
-- Frontend Supabase client setup for future auth/realtime features (4h)
+| # | Lacuna | Risco | Severidade |
+|---|--------|-------|------------|
+| 1 | Policies usam `FOR ALL` sem separacao por operacao (SELECT, INSERT, UPDATE, DELETE) | Nao ha controle granular -- nao valida que `user_id = auth.uid()` em INSERTs | Media |
+| 2 | Sem policy WITH CHECK para INSERT | Via anon key, usuario autenticado poderia inserir `user_id` de outro usuario em `search_history`, `user_preferences` e `saved_searches` | Media |
+| 3 | Backend bypassa RLS via service_role key | Correto por design, mas nao documentado explicitamente no schema | Baixa |
+
+**Nota:** A lacuna #2 e parcialmente mitigada pelo fato de o frontend so acessar diretamente `saved_searches`, e o backend sempre passa `user_id` do token autenticado.
+
+---
+
+## 5. Integridade de Dados
+
+| # | Item | Tabela | Severidade |
+|---|------|--------|------------|
+| 1 | `status` sem CHECK constraint | `search_history` | Media |
+| 2 | `ufs` aceita qualquer string no array | `search_history` | Baixa |
+| 3 | `setor_id` sem FK para tabela de referencia | `search_history` | Baixa |
+| 4 | `email` sem UNIQUE em `public.users` | `users` | Baixa |
+| 5 | `name` sem limite de tamanho | `saved_searches` | Baixa |
+| 6 | Limite de 10 buscas salvas enforced apenas no codigo | `saved_searches` | Baixa |
+| 7 | `search_params` sem schema validation | `saved_searches` | Baixa |
+
+---
+
+## 6. Performance
+
+| # | Preocupacao | Impacto | Severidade |
+|---|-------------|---------|------------|
+| 1 | `cleanup_old_searches()` faz DELETE sem LIMIT | Lock prolongado em tabelas com muitos registros | Media |
+| 2 | `saveServerSearch()` faz `loadServerSearches()` inteiro para checar contagem | Query extra; `COUNT(*)` seria mais eficiente | Baixa |
+| 3 | `get_or_create_user()` faz SELECT + INSERT condicional | Race condition possivel em concorrencia alta | Baixa |
+| 4 | Sem particionamento em `search_history` | Tabela cresce indefinidamente (mitigado pela funcao de cleanup) | Baixa |
+| 5 | `loadServerSearches()` nao filtra por `user_id` explicitamente | Depende da RLS para filtrar; funcional, mas semanticamente fragil | Baixa |
+
+---
+
+## 7. Seguranca
+
+| # | Item | Descricao | Severidade |
+|---|------|-----------|------------|
+| 1 | Service role key no backend | Se vazar, acesso total ao banco sem RLS | Critica (operacional) |
+| 2 | `verify_aud: False` na validacao do Supabase JWT | Aceita tokens de qualquer projeto Supabase com o mesmo secret | Media |
+| 3 | `handle_new_user()` e SECURITY DEFINER | Executa com privilegios elevados; se comprometida, pode alterar qualquer dado | Media |
+| 4 | RLS INSERT sem WITH CHECK | Ver lacuna #2 na secao RLS | Media |
+| 5 | Duas bibliotecas JWT (`python-jose` + `PyJWT`) | Superficie de ataque duplicada e inconsistencia | Baixa |
+| 6 | Degradacao silenciosa no `Database` | Falhas de persistencia retornam `None`/`[]` sem alertas | Baixa |
+
+---
+
+## 8. Divida Tecnica
+
+| ID | Descricao | Severidade | Horas Est. | Impacto |
+|----|-----------|------------|------------|---------|
+| TD-DB-001 | **CHECK constraint em `status`** -- Adicionar `CHECK (status IN ('queued','completed','failed','cancelled'))` em `search_history.status` | Media | 0.5h | Previne dados invalidos no campo status |
+| TD-DB-002 | **RLS granular por operacao** -- Substituir `FOR ALL` por policies separadas (SELECT, INSERT, UPDATE, DELETE) com `WITH CHECK (user_id = auth.uid())` no INSERT | Media | 2h | Fecha brecha de insercao cross-usuario via client-side |
+| TD-DB-003 | **UNIQUE em `users.email`** -- Adicionar constraint UNIQUE na coluna `email` da tabela `users` | Baixa | 0.5h | Protege contra duplicatas edge-case |
+| TD-DB-004 | **Unificar bibliotecas JWT** -- Migrar `auth/supabase_auth.py` de `python-jose` para `PyJWT` (ja usado em `auth/jwt.py`) | Baixa | 1h | Reduz dependencias e superficie de ataque |
+| TD-DB-005 | **Habilitar `verify_aud` no Supabase JWT** -- Configurar audience validation em `supabase_auth.py` para aceitar apenas tokens do projeto | Media | 1h | Evita aceitar tokens de projetos Supabase alheios |
+| TD-DB-006 | **Cleanup em batches** -- Alterar `cleanup_old_searches()` para deletar em lotes de 1000 com loop, evitando locks prolongados | Media | 1h | Estabilidade em tabelas grandes |
+| TD-DB-007 | **Indice parcial para cleanup** -- `CREATE INDEX idx_sh_cleanup ON search_history(created_at) WHERE status IN ('completed','failed')` | Baixa | 0.5h | Otimiza funcao de retencao |
+| TD-DB-008 | **Limite em `saved_searches.name`** -- Adicionar `CHECK (length(name) <= 200)` | Baixa | 0.5h | Previne strings excessivas |
+| TD-DB-009 | **`updated_at` em `saved_searches`** -- Adicionar coluna e trigger, consistente com as demais tabelas | Baixa | 0.5h | Consistencia do schema |
+| TD-DB-010 | **Ativar `pg_cron` ou cron externo** -- Agendar `cleanup_old_searches(90)` diariamente | Media | 2h | Sem agendamento, dados antigos acumulam indefinidamente |
+| TD-DB-011 | **Indice em `users.email`** -- B-tree para lookups por email | Baixa | 0.5h | Performance em buscas futuras por email |
+| TD-DB-012 | **Limite de saved_searches no DB** -- Adicionar trigger ou constraint para limitar a 10 por usuario (hoje enforced so no codigo) | Baixa | 1h | Defesa em profundidade |
+| TD-DB-013 | **Metricas de falha de persistencia** -- Emitir contadores estruturados quando `Database` falha silenciosamente | Baixa | 1.5h | Observabilidade de falhas |
+
+---
+
+## 9. Priorizacao Recomendada
+
+### Antes de producao (Media/Alta)
+
+| Prioridade | ID | Descricao | Horas |
+|------------|-----|-----------|-------|
+| 1 | TD-DB-002 | RLS granular com WITH CHECK | 2h |
+| 2 | TD-DB-005 | Audience validation no JWT | 1h |
+| 3 | TD-DB-001 | CHECK constraint em status | 0.5h |
+| 4 | TD-DB-006 | Cleanup em batches | 1h |
+| 5 | TD-DB-010 | Ativar retention policy | 2h |
+
+### Melhorias de qualidade (Baixa)
+
+| Prioridade | ID | Descricao | Horas |
+|------------|-----|-----------|-------|
+| 6 | TD-DB-004 | Unificar JWT libs | 1h |
+| 7 | TD-DB-003 | UNIQUE em email | 0.5h |
+| 8 | TD-DB-007 | Indice parcial cleanup | 0.5h |
+| 9 | TD-DB-008 | Limite em name | 0.5h |
+| 10 | TD-DB-009 | updated_at em saved_searches | 0.5h |
+| 11 | TD-DB-011 | Indice em email | 0.5h |
+| 12 | TD-DB-012 | Limite de saved_searches no DB | 1h |
+| 13 | TD-DB-013 | Metricas de falha | 1.5h |
+
+---
+
+## 10. Metricas Consolidadas
+
+| Metrica | Valor |
+|---------|-------|
+| Tabelas no schema public | 4 |
+| Indices explicitos | 5 |
+| Indices implicitos (UNIQUE/PK) | 6 |
+| Policies RLS | 4 |
+| Triggers | 3 |
+| Funcoes armazenadas | 3 |
+| Itens de divida tecnica | 13 |
+| Horas estimadas (total) | ~14.5h |
+| Severidade critica (schema) | 0 |
+| Severidade critica (operacional) | 1 (service role key) |
+| Severidade media | 5 |
+| Severidade baixa | 8 |

@@ -1,714 +1,504 @@
-# DescompLicita Frontend Specification
+# Frontend Spec -- DescompLicita
 
-**Document Version:** 4.0
-**Date:** 2026-03-09
-**Author:** @ux-design-expert (Pixel)
-**Phase:** Comprehensive Frontend Audit
-**Previous Version:** 3.0 (by Vera, 2026-03-09)
+> Auditoria completa do frontend Next.js 14+ App Router.
+> Data: 2026-03-11 | Agente: @ux-design-expert (Pixel)
 
 ---
 
-## 1. Executive Summary
+## 1. Estrutura do Projeto
 
-DescompLicita is a single-page application for searching and analyzing Brazilian public procurement bids (licitacoes) from official sources (PNCP, Compras.gov, Transparencia, Diarios Oficiais, TCE-RJ). Built with **Next.js 16 (App Router) + React 18 + TypeScript**, it features a 5-theme system, Mixpanel analytics, Sentry error monitoring, and a comprehensive design token architecture.
-
-### Current State (v4.0 Audit)
-
-The codebase has matured significantly since earlier audits. Key completions since v3.0:
-
-- **LoadingProgress decomposed** into 5 sub-components (ProgressBar, StageList, UfGrid, CuriosityCarousel, SkeletonCards). The orchestrator is now 141 lines.
-- **ThemeProvider refactored** from 30+ imperative `style.setProperty` calls to CSS cascade via `data-theme` attribute selectors in `globals.css`. ThemeProvider now only sets `data-theme` attr + `.dark` class (83 lines).
-- **Carousel category colors** migrated to CSS custom properties (`--cat-{category}-bg/icon-bg/text`).
-- **Ctrl+Enter keyboard shortcut** implemented for search submission.
-- **NetworkIndicator** added for offline detection.
-- **not-found.tsx** page created.
-- **Setores loading state** added to SearchForm (spinner + "Carregando setores..." fallback).
-- **SaveSearchDialog** now uses native `<dialog>` element with `showModal()`.
-- **SavedSearchesDropdown** has full ARIA listbox pattern with keyboard navigation.
-- **Polling upgraded** to exponential backoff (1s initial, 1.5x growth, 15s max).
-- **Fallback setores** centralized in `constants/fallback-setores.ts`.
-- **ItemsList + Pagination** added for paginated result browsing.
-- **Test coverage** at ~68% statements (404+ assertions, 5 E2E specs).
-
-### What Remains
-
-- No shared Button or Spinner component abstractions
-- 2 hardcoded color violations (SearchSummary badges, SourceBadges warning)
-- Silent error swallowing in ItemsList pagination
-- `ink-muted` contrast ratio borderline WCAG AA
-- Broken `/termos` footer link
-- Single `"use client"` page (no SSR for main content)
-- No Storybook or documented design system beyond code
-
----
-
-## 2. Technology Stack
-
-### Runtime Dependencies
-
-| Dependency | Version | Purpose |
-|---|---|---|
-| next | ^16.1.4 | React framework (App Router, SSR, API routes) |
-| react / react-dom | ^18.3.1 | UI library + DOM rendering |
-| @sentry/nextjs | ^10.42.0 | Error monitoring and performance tracing |
-| mixpanel-browser | ^2.74.0 | Product analytics (lazy loaded via dynamic import) |
-| uuid | ^13.0.0 | Unique ID generation for saved searches |
-
-### Dev Dependencies
-
-| Dependency | Version | Purpose |
-|---|---|---|
-| typescript | ^5.9.3 | Type safety |
-| tailwindcss | ^3.4.19 | Utility-first CSS framework |
-| postcss | ^8.5.8 | CSS processing pipeline |
-| jest / @swc/jest | ^29.7.0 / ^0.2.29 | Unit testing with fast SWC transform |
-| @testing-library/react | ^14.1.2 | Component testing utilities |
-| @playwright/test | ^1.58.0 | End-to-end testing |
-| @axe-core/playwright | ^4.11.0 | Automated accessibility auditing |
-| msw | ^2.12.10 | API mocking for integration tests |
-
-### Fonts
-
-- **DM Sans** (body text) -- `--font-body`, `font-body` Tailwind class
-- **Fahkwang** (display/headings) -- `--font-display`, `font-display` Tailwind class
-- **DM Mono** (data/numbers) -- `--font-data`, `font-data` Tailwind class
-
-All loaded via `next/font/google` with `display: "swap"` and CSS variable injection.
-
-### Build Configuration
-
-- `reactStrictMode: true`
-- `output: 'standalone'` (Docker-optimized)
-- Sentry webpack plugin with `hideSourceMaps: true`
-- Node.js requirement: >=20.9.0
-
----
-
-## 3. Component Inventory
-
-### 3.1 Page-Level Components
-
-| File | Purpose | Props | Dependencies | Test Coverage |
-|------|---------|-------|--------------|---------------|
-| `app/page.tsx` | Main search page orchestrator (209 lines) | None (default export) | 5 hooks, 6 static components, 4 dynamic imports | `page.test.tsx` |
-| `app/layout.tsx` | Root layout (Server Component): fonts, metadata, providers | `{ children }` | DM_Sans, Fahkwang, DM_Mono, ThemeProvider, AnalyticsProvider, NetworkIndicator, theme-init.js | -- |
-| `app/error.tsx` | Error boundary with Sentry reporting | `{ error, reset }` | @sentry/nextjs | `error.test.tsx` |
-| `app/not-found.tsx` | 404 page (Server Component) | None | next/link | -- |
-
-### 3.2 UI Components
-
-| File | Purpose | Props Interface | Dependencies | Test Coverage |
-|------|---------|-----------------|--------------|---------------|
-| `SearchHeader.tsx` | Sticky header: logo, saved searches, theme toggle | `{ onLoadSearch, onAnalyticsEvent }` | next/image, SavedSearchesDropdown, ThemeToggle | `SearchHeader.test.tsx` |
-| `SearchForm.tsx` | Search mode toggle (setor/termos), sector dropdown, term chips | `SearchFormProps` (11 props) | types.Setor | `SearchForm.test.tsx`, `SearchForm.loading.test.tsx` |
-| `UfSelector.tsx` | 27-state multi-select grid with region shortcuts | `UfSelectorProps` (6 props) | RegionSelector, constants/ufs | `UfSelector.test.tsx` |
-| `RegionSelector.tsx` | 5 region quick-select buttons (Norte/Nordeste/etc.) | `{ selected, onToggleRegion }` | None | Indirect via UfSelector |
-| `DateRangeSelector.tsx` | Date range picker (start/end date inputs) | `DateRangeSelectorProps` (5 props) | types.ValidationErrors | `DateRangeSelector.test.tsx` |
-| `SearchSummary.tsx` | AI executive summary card with stats and highlights | `{ result: BuscaResult }` | SourceBadges | `SearchSummary.test.tsx` |
-| `SourceBadges.tsx` | Expandable source attribution badges with status dots | `SourceBadgesProps` (4 props) | types.SourceStats | No dedicated test |
-| `ItemsList.tsx` | Paginated procurement item list with client-side fetch | `{ jobId, totalFiltered }` | Pagination | `ItemsList.test.tsx` |
-| `Pagination.tsx` | Page navigation with ellipsis and current page indicator | `PaginationProps` (5 props) | None | `Pagination.test.tsx` |
-| `EmptyState.tsx` | Zero-results with filter breakdown and suggestions | `EmptyStateProps` (5 props) | types.FilterStats | `EmptyState.test.tsx` |
-| `SearchActions.tsx` | Download Excel + Save Search action buttons | `SearchActionsProps` (8 props) | types.BuscaResult | `SearchActions.test.tsx` |
-| `SaveSearchDialog.tsx` | Native `<dialog>` modal for naming saved searches | `SaveSearchDialogProps` (5 props) | None | `SaveSearchDialog.test.tsx` |
-| `SavedSearchesDropdown.tsx` | ARIA listbox dropdown for saved search management | `{ onLoadSearch, onAnalyticsEvent? }` | useSavedSearches | `SavedSearchesDropdown.test.tsx`, `.aria.test.tsx` |
-| `ThemeProvider.tsx` | Theme context: 5 themes via `data-theme` attribute + `.dark` class | `{ children }` | None (React Context) | `ThemeProvider.security.test.tsx` |
-| `ThemeToggle.tsx` | Theme selector dropdown with preview swatches, full keyboard nav | None (uses useTheme) | ThemeProvider | `ThemeToggle.test.tsx` |
-| `AnalyticsProvider.tsx` | Mixpanel lazy init + page_load/page_exit tracking | `{ children }` | mixpanel-browser (dynamic import) | Via `analytics.test.ts` |
-| `NetworkIndicator.tsx` | Offline/online fixed banner with dismiss | None | None | `NetworkIndicator.test.tsx` |
-
-### 3.3 Loading Progress Sub-Components
-
-| File | Purpose | Props | Test Coverage |
-|------|---------|-------|---------------|
-| `loading-progress/ProgressBar.tsx` | Animated progress bar with ETA, percentage, status | `ProgressBarProps` (7 props) | `ProgressBar.test.tsx` |
-| `loading-progress/StageList.tsx` | 5-stage indicator dots + mobile detail card | `StageListProps` (3 props) | `StageList.test.tsx` |
-| `loading-progress/UfGrid.tsx` | Per-UF completion grid with pulse on active state | `UfGridProps` (4 props) | `UfGrid.test.tsx` |
-| `loading-progress/CuriosityCarousel.tsx` | Rotating educational tips with category icons/colors | `{ curiosidade, isFading }` | `CuriosityCarousel.test.tsx` |
-| `loading-progress/SkeletonCards.tsx` | Shimmer placeholder cards | None | `SkeletonCards.test.tsx` |
-| `LoadingProgress.tsx` | Orchestrator composing all 5 sub-components (141 lines) | `LoadingProgressProps` (9 props) | `LoadingProgress.test.tsx` |
-
-### 3.4 Data/Config Modules
-
-| File | Purpose |
-|------|---------|
-| `components/carouselData.ts` | 52 curiosity items (4 categories), `shuffleBalanced()` round-robin algorithm |
-| `constants/ufs.ts` | Canonical 27 UFs, `UF` type, `UF_NAMES` map, `DEFAULT_UFS` (SC/PR/RS) |
-| `constants/fallback-setores.ts` | 7 fallback sectors for API unavailability |
-| `app/types.ts` | All TypeScript interfaces: SearchParams, BuscaResult, Resumo, FilterStats, SourceStats, SearchPhase, etc. |
-| `lib/savedSearches.ts` | localStorage CRUD for saved searches (max 10, uuid-based IDs) |
-| `lib/backendAuth.ts` | Server-side JWT token acquisition/caching for API route authentication |
-
-### 3.5 Custom Hooks
-
-| Hook | Location | Responsibility | Lines |
-|------|----------|----------------|-------|
-| `useSearchForm` | `app/hooks/useSearchForm.ts` | Form state, validation, sector fetching, UF selection, loadSearchParams | 210 |
-| `useSearchJob` | `app/hooks/useSearchJob.ts` | Search execution, exponential backoff polling, download, tab notifications | 405 |
-| `useSaveDialog` | `app/hooks/useSaveDialog.ts` | Save search dialog visibility, name input, error state | 69 |
-| `useAnalytics` | `hooks/useAnalytics.ts` | Mixpanel lazy-loaded event tracking + user identification | 56 |
-| `useSavedSearches` | `hooks/useSavedSearches.ts` | Saved search CRUD over localStorage with refresh | 148 |
-
----
-
-## 4. Page Structure
-
-### 4.1 Routes
-
-| Route | Type | Description |
-|-------|------|-------------|
-| `/` | Page (Client Component) | Main search page -- single-page app |
-| `/api/buscar` | API Route (POST) | Submits search job to backend |
-| `/api/buscar/status` | API Route (GET) | Polls job progress (exponential backoff) |
-| `/api/buscar/result` | API Route (GET) | Fetches completed search results |
-| `/api/buscar/items` | API Route (GET) | Paginated item list for a completed job |
-| `/api/download` | API Route (GET) | Proxies Excel download from backend |
-| `/api/setores` | API Route (GET) | Fetches available sectors from backend |
-
-### 4.2 Layout Hierarchy
+### Diretorio raiz (`frontend/`)
 
 ```
-RootLayout (layout.tsx) [Server Component]
-  html[lang="pt-BR"][data-theme] + Google Font CSS variables
-  head
-    theme-init.js (beforeInteractive -- FOUC prevention)
-  body
-    Skip Link -> #main-content
-    AnalyticsProvider [Client]
-      ThemeProvider [Client]
-        NetworkIndicator (fixed top banner when offline) [Client]
-        HomePage (page.tsx) [Client]
-          SearchHeader (sticky top, z-40)
-            Logo (next/image, priority)
-            SavedSearchesDropdown (ARIA listbox)
-            ThemeToggle (ARIA menu)
-          main#main-content
-            h1 "Busca de Licitacoes"
-            SearchForm (setor/termos mode)
-            UfSelector > RegionSelector
-            DateRangeSelector
-            Submit Button (with aria-busy)
-            LoadingProgress [dynamic import]
-              ProgressBar + UfGrid + StageList + CuriosityCarousel + SkeletonCards
-            Error Alert (role="alert")
-            aria-live result announcement (sr-only)
-            EmptyState [dynamic import]
-            Results Section (animate-fade-in-up)
-              SearchSummary > SourceBadges
-              ItemsList > Pagination
-              SearchActions
-          SaveSearchDialog [dynamic import, SSR disabled]
-          Footer
+frontend/
+  app/                          # App Router (Next.js 14+)
+    api/                        # Route Handlers (BFF)
+      buscar/
+        route.ts                # POST /api/buscar (inicia job)
+        status/route.ts         # GET /api/buscar/status (polling)
+        result/route.ts         # GET /api/buscar/result (resultado final)
+        items/route.ts          # GET /api/buscar/items (paginacao server-side)
+        cancel/route.ts         # DELETE /api/buscar/cancel (cancela job)
+      download/route.ts         # GET /api/download (Excel/CSV)
+      setores/route.ts          # GET /api/setores (lista setores)
+    components/                 # Componentes de UI
+    contexts/                   # React Contexts
+    hooks/                      # Hooks especificos da app
+    constants/                  # Constantes (UFs, setores fallback)
+    globals.css                 # Design tokens + temas CSS
+    layout.tsx                  # Root layout (fontes, providers)
+    page.tsx                    # Pagina principal (busca)
+    error.tsx                   # Error boundary global (Sentry)
+    not-found.tsx               # Pagina 404
+    termos/page.tsx             # Pagina de Termos de Uso
+    types.ts                    # Tipos TypeScript compartilhados
+  hooks/                        # Hooks compartilhados
+    useAnalytics.ts             # Mixpanel tracking
+    useSavedSearches.ts         # Buscas salvas (Supabase + localStorage)
+  lib/                          # Utilitarios e configs
+    backendAuth.ts              # Autenticacao com backend
+    savedSearches.ts            # CRUD localStorage buscas salvas
+    savedSearchesServer.ts      # CRUD Supabase buscas salvas
+    supabase/                   # Clients Supabase
+      client.ts                 # Browser client
+      server.ts                 # Server client (RSC)
+      middleware.ts             # Session refresh middleware
+  middleware.ts                 # Next.js middleware (session Supabase)
+  public/
+    theme-init.js               # FOUC prevention (inline antes do hydrate)
+  __tests__/                    # Testes Jest + Playwright
+  tailwind.config.ts            # Configuracao Tailwind
+  jest.config.js                # Configuracao Jest
+  playwright.config.ts          # Configuracao Playwright
+  tsconfig.json                 # TypeScript config
+  package.json                  # Dependencias
 ```
 
-### 4.3 Navigation
+### Rotas
 
-Single-page experience. No client-side routing beyond root. Navigation points:
-- Sticky header with logo (not linked)
-- Footer: mailto link, `/termos` (not yet implemented -- see FE-008)
-- External links to procurement sources in search results (`target="_blank"`)
-
----
-
-## 5. Design System Audit
-
-### 5.1 Theme Implementation
-
-**Architecture: Excellent.** The theme system uses CSS cascade via `data-theme` attribute selectors in `globals.css`. The `ThemeProvider` only performs two DOM operations: `setAttribute("data-theme", themeId)` and `classList.add/remove("dark")`. All visual changes flow through CSS custom properties.
-
-**FOUC Prevention:** `public/theme-init.js` is a 1-line IIFE loaded with `strategy="beforeInteractive"` that reads localStorage and sets `data-theme` + `.dark` class before React hydrates. This is the optimal approach.
-
-**5 Themes:**
-
-| Theme | Type | Canvas | Ink | Status |
-|-------|------|--------|-----|--------|
-| Light | Light | #ffffff | #1e2d3b | Full token coverage |
-| Paperwhite | Light | #F5F0E8 | #1e2d3b | Partial overrides (canvas, surfaces, status-bg) |
-| Sepia | Light | #EDE0CC | #2c1810 | Good overrides (canvas, ink, surfaces, semantic) |
-| Dim | Dark | #2A2A2E | via .dark | Minimal overrides (canvas, surface-0 only) |
-| Dark | Dark | #121212 | #e8eaed | Full token coverage via .dark |
-
-**Key Observation:** Dim and Dark share identical ink, border, semantic, and category tokens (all via `.dark`). Only canvas/surface-0 differs. This makes Dim feel nearly identical to Dark.
-
-### 5.2 Color Usage
-
-**Token System:** 40+ CSS custom properties organized into semantic groups:
-- Canvas/Ink hierarchy (5 levels)
-- Brand (navy, blue, blue-hover, blue-subtle)
-- Surfaces (0, 1, 2, elevated)
-- Semantic (success, error, warning + subtle)
-- Status badges (bg, text, border, dot per status)
-- Category tokens (4 categories for carousel)
-- Borders (3 levels: default, strong, accent)
-- Focus ring
-
-**Consistency Violations:**
-1. `SearchSummary.tsx` uses hardcoded Tailwind classes (`bg-blue-100`, `text-blue-800`, `bg-purple-100`, `text-purple-800`) for licitacao/ata type badges. These bypass the theme system entirely.
-2. `SourceBadges.tsx` uses `text-amber-600 dark:text-amber-400` for truncated combos warning instead of the `warning` semantic token.
-
-### 5.3 Typography
-
-**Font Stack:**
-- Body: DM Sans (`--font-body`) -- clean, readable sans-serif
-- Display: Fahkwang (`--font-display`) -- distinctive for headings/section titles
-- Data: DM Mono (`--font-data`) -- monospace for numbers, timestamps, technical data
-
-**Base Size:** `clamp(14px, 1vw + 10px, 16px)` with 1.6 line-height. Good responsive scaling.
-
-**Type Scale:** Consistent Tailwind text-size usage (xs through 4xl). Display font correctly reserved for headings. Tabular numbers via `.tabular-nums` for data alignment.
-
-### 5.4 Spacing Patterns
-
-Tailwind config declares 4px-base grid comment but does not override defaults. In practice, spacing is consistent through standard Tailwind utilities. No custom magic numbers observed. Content max-width is `max-w-4xl` (896px) with `px-4 sm:px-6` horizontal padding.
-
-### 5.5 Border Radius Tokens
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `rounded-input` | 4px | Form inputs, selects |
-| `rounded-button` | 6px | Buttons |
-| `rounded-card` | 8px | Cards, panels, alerts |
-| `rounded-modal` | 12px | Modal dialogs |
-
-Consistently applied across all components.
-
-### 5.6 Component Reuse vs Duplication
-
-**Good Reuse:**
-- LoadingProgress decomposed into 5 focused sub-components
-- RegionSelector properly extracted from UfSelector
-- SourceBadges separated from SearchSummary
-- Shared hooks (useAnalytics, useSavedSearches) in `hooks/`
-- Constants centralized in `constants/`
-
-**Duplication (Technical Debt):**
-- SVG spinner markup repeated in SearchForm, SearchActions -- no shared `Spinner` component
-- Primary/secondary/danger button styles repeated as inline Tailwind class strings across 7+ components -- no shared `Button` component
-- Form input styling (`w-full border border-strong rounded-input px-4 py-3 text-base bg-surface-0 text-ink focus:...`) repeated in 4 places
+| Rota | Arquivo | Tipo | Descricao |
+|------|---------|------|-----------|
+| `/` | `app/page.tsx` | Client Component | Pagina principal de busca |
+| `/termos` | `app/termos/page.tsx` | Server Component | Termos de Uso |
+| `/api/buscar` | `app/api/buscar/route.ts` | Route Handler | Inicia job de busca |
+| `/api/buscar/status` | `app/api/buscar/status/route.ts` | Route Handler | Polling de progresso |
+| `/api/buscar/result` | `app/api/buscar/result/route.ts` | Route Handler | Resultado final |
+| `/api/buscar/items` | `app/api/buscar/items/route.ts` | Route Handler | Paginacao de itens |
+| `/api/buscar/cancel` | `app/api/buscar/cancel/route.ts` | Route Handler | Cancelamento |
+| `/api/download` | `app/api/download/route.ts` | Route Handler | Download Excel/CSV |
+| `/api/setores` | `app/api/setores/route.ts` | Route Handler | Lista de setores |
 
 ---
 
-## 6. Accessibility Audit
+## 2. Inventario de Componentes
 
-### 6.1 ARIA Usage -- Excellent
+### 2.1. Componentes de Layout/Estrutura
 
-- `aria-pressed` on UF toggle buttons
-- `aria-expanded` + `aria-haspopup` on all dropdowns
-- `aria-live="polite"` regions for search results and loading state
-- `role="alert"` on all error messages and validation errors
-- `role="progressbar"` with `aria-valuenow/min/max` on progress bar
-- `aria-labelledby` on save search dialog
-- `role="listbox"` + `role="option"` + `aria-activedescendant` on SavedSearchesDropdown
-- `role="menu"` + `role="menuitem"` with roving tabindex on ThemeToggle
-- `aria-label` on all icon-only buttons and navigation landmarks
-- `aria-describedby` linking term input to help text
-- `aria-busy` on submit button during loading
-- `aria-current="page"` on active pagination button
-- `aria-hidden="true"` on decorative SVG icons
-- `role="group"` with `aria-label` on UF grid
-- `role="status"` on empty saved searches and result announcements
+| Componente | Arquivo | Reutilizavel | Descricao |
+|------------|---------|--------------|-----------|
+| `RootLayout` | `app/layout.tsx` | Nao | Layout raiz: fontes Google (DM Sans, Fahkwang, DM Mono), providers, skip-link |
+| `SearchHeader` | `components/SearchHeader.tsx` | Nao | Header fixo com logo, dropdown buscas salvas, theme toggle |
+| `ErrorBoundary` | `components/ErrorBoundary.tsx` | **Sim** | Class component React, fallback customizavel, callback `onError` |
 
-### 6.2 Keyboard Navigation -- Strong
+### 2.2. Componentes de Formulario
 
-- **Skip link:** "Pular para o conteudo principal" -> `#main-content`
-- **Ctrl+Enter:** Global shortcut to submit search form
-- **Escape:** Closes ThemeToggle and SavedSearchesDropdown, returns focus to trigger
-- **Arrow keys:** Full roving focus in ThemeToggle (menu) and SavedSearchesDropdown (listbox)
-- **Home/End:** Supported in both dropdown menus
-- **Enter on save dialog input:** Submits the form
-- **Backspace in empty term input:** Removes last term
-- **Focus management after search:** Results heading receives focus via `requestAnimationFrame` + `scrollIntoView`
-- **Focus trap in SaveSearchDialog:** Native `<dialog>` `showModal()` provides built-in focus trap
+| Componente | Arquivo | Reutilizavel | Descricao |
+|------------|---------|--------------|-----------|
+| `SearchForm` | `components/SearchForm.tsx` | Nao | Toggle setor/termos, select de setores, input de termos com chips |
+| `UfSelector` | `components/UfSelector.tsx` | Nao | Grid de botoes UF (27 estados), selecao por regiao |
+| `RegionSelector` | `components/RegionSelector.tsx` | Nao | Botoes por regiao (Norte, Nordeste, etc.) com estado parcial |
+| `DateRangeSelector` | `components/DateRangeSelector.tsx` | Nao | Inputs date para periodo |
+| `LargeVolumeWarning` | `components/LargeVolumeWarning.tsx` | Nao | Banner warning para >10 UFs ou >30 dias |
 
-### 6.3 Screen Reader Compatibility
+### 2.3. Componentes de Progresso/Loading
 
-- `sr-only` headings: "Formulario de Busca" and "Resultados"
-- `aria-live="polite"` region announces result count ("X resultados encontrados" / "Nenhum resultado encontrado")
-- All interactive elements have accessible names
-- Loading state communicated via aria-live region wrapping LoadingProgress
-- Status messages use `role="status"` for polite announcements
+| Componente | Arquivo | Reutilizavel | Descricao |
+|------------|---------|--------------|-----------|
+| `LoadingProgress` | `components/LoadingProgress.tsx` | Nao | Orquestrador de loading: barra, etapas, UFs, curiosidades, skeleton |
+| `ProgressBar` | `components/loading-progress/ProgressBar.tsx` | Parcial | Barra de progresso com %, ETA, tempo decorrido |
+| `UfGrid` | `components/loading-progress/UfGrid.tsx` | Nao | Grid visual de UFs completadas |
+| `StageList` | `components/loading-progress/StageList.tsx` | Nao | Lista de etapas (busca, filtragem, resumo, Excel) |
+| `CuriosityCarousel` | `components/loading-progress/CuriosityCarousel.tsx` | Nao | Carrossel de curiosidades sobre licitacoes |
+| `SkeletonCards` | `components/loading-progress/SkeletonCards.tsx` | Parcial | Cards skeleton com shimmer |
 
-### 6.4 Color Contrast
+### 2.4. Componentes de Resultados
 
-**Adequate:**
-- `ink` (#1e2d3b) vs `canvas` (#ffffff): ~12.7:1 (AAA)
-- `ink-secondary` (#3d5975) vs `canvas`: ~6.4:1 (AA)
+| Componente | Arquivo | Reutilizavel | Descricao |
+|------------|---------|--------------|-----------|
+| `SearchSummary` | `components/SearchSummary.tsx` | Nao | Resumo executivo, metricas, badges, destaques, fontes |
+| `ItemsList` | `components/ItemsList.tsx` | Nao | Lista paginada de licitacoes com fetch por pagina |
+| `Pagination` | `components/Pagination.tsx` | **Sim** | Navegacao de paginas com ellipsis, aria labels |
+| `HighlightedText` | `components/HighlightedText.tsx` | **Sim** | Highlight de keywords com NFD accent stripping |
+| `SourceBadges` | `components/SourceBadges.tsx` | Nao | Badges expandiveis de fontes (PNCP, Compras.gov, etc.) |
+| `EmptyState` | `components/EmptyState.tsx` | Nao | Estado vazio com breakdown de rejeicoes e sugestoes |
+| `SearchActions` | `components/SearchActions.tsx` | Nao | Botoes de download Excel/CSV e salvar busca |
 
-**Borderline:**
-- `ink-muted` (#5a6a7a) vs `canvas` (#ffffff): ~4.1:1 -- **below WCAG AA 4.5:1** for normal text. Used extensively for hints, timestamps, metadata.
+### 2.5. Componentes Reutilizaveis (Design System)
 
-**Dark mode needs verification:**
-- `ink-muted` (#8a99a9) vs `surface-1` (#1a1d22) should be checked
-- Category token text colors in dark mode may have insufficient contrast
+| Componente | Arquivo | Props | Descricao |
+|------------|---------|-------|-----------|
+| `Button` | `components/Button.tsx` | `variant: primary/secondary/ghost/danger`, `size: sm/md/lg`, `loading` | Botao reutilizavel com spinner integrado |
+| `Spinner` | `components/Spinner.tsx` | `size: sm/md/lg`, `className` | SVG spinner com `role="status"` e sr-only label |
+| `ErrorBoundary` | `components/ErrorBoundary.tsx` | `fallback`, `onError` | Boundary com fallback padrao e customizavel |
 
-### 6.5 Focus Management
+### 2.6. Componentes de Infraestrutura
 
-- `:focus-visible` global style: 2px solid `var(--ring)` with 2px offset
-- Ring color adapts per theme (#116dff light, #3b8bff dark)
-- Skip link visible on focus with proper styling
-- Native `<dialog>` focus trap in SaveSearchDialog
-- Focus returns to trigger on dropdown close
-- Minimum 44px touch targets enforced globally
-
-### 6.6 Reduced Motion
-
-`@media (prefers-reduced-motion: reduce)` sets all animation/transition durations to `0.01ms`. This is comprehensive and correctly covers all custom animations (fadeInUp, fadeIn, shimmer) and transitions.
-
-### 6.7 Overall A11y Grade: **A-**
-
-The application demonstrates deliberate, above-average accessibility. ARIA patterns, keyboard navigation, focus management, and screen reader support are thorough. Main deduction: `ink-muted` contrast ratio and incomplete theme contrast audit.
+| Componente | Arquivo | Descricao |
+|------------|---------|-----------|
+| `ThemeProvider` | `components/ThemeProvider.tsx` | Context de tema com `data-theme` + classe `dark` |
+| `ThemeToggle` | `components/ThemeToggle.tsx` | Dropdown de selecao de tema com menu ARIA |
+| `AnalyticsProvider` | `components/AnalyticsProvider.tsx` | Init Mixpanel lazy, track page_load/page_exit |
+| `NetworkIndicator` | `components/NetworkIndicator.tsx` | Banner offline/online com dismiss |
+| `AuthModal` | `components/AuthModal.tsx` | Modal login/signup com `<dialog>` nativo |
+| `SaveSearchDialog` | `components/SaveSearchDialog.tsx` | Dialog salvar busca com `<dialog>` nativo |
+| `SavedSearchesDropdown` | `components/SavedSearchesDropdown.tsx` | Dropdown ARIA listbox com keyboard nav |
 
 ---
 
-## 7. Performance Assessment
+## 3. Design System
 
-### 7.1 Bundle Size Strategy
+### 3.1. Sistema de Temas (5 temas)
 
-**Dynamic Imports (next/dynamic):**
-- `SaveSearchDialog` -- SSR disabled, loaded on demand
-- `LoadingProgress` -- with inline skeleton fallback
-- `EmptyState` -- lazy loaded
-- `ItemsList` -- lazy loaded
+O sistema de temas opera via CSS custom properties definidas em `globals.css`, selecionadas pelo atributo `data-theme` no `<html>`.
 
-**Lazy-loaded SDK:**
-- Mixpanel loaded via `import('mixpanel-browser')` -- ~40KB savings from initial bundle
+| Tema | `data-theme` | Classe | Canvas | Ink | Tipo |
+|------|-------------|--------|--------|-----|------|
+| Light | `light` (default) | -- | `#ffffff` | `#1e2d3b` | Claro |
+| Paperwhite | `paperwhite` | -- | `#F5F0E8` | `#1e2d3b` | Claro (quente) |
+| Sepia | `sepia` | -- | `#EDE0CC` | `#2c1810` | Claro (pergaminho) |
+| Dim | `dim` | `dark` | `#2A2A2E` | `#e0e0e0` | Escuro (suave) |
+| Dark | `dark` | `dark` | `#121212` | `#e0e0e0` | Escuro (profundo) |
 
-**Production dependencies:** next, react, react-dom, @sentry/nextjs, mixpanel-browser (lazy), uuid
+**Implementacao:**
+- `theme-init.js` (inline `beforeInteractive`): previne FOUC lendo localStorage
+- `ThemeProvider`: context React com `setTheme()` que aplica `data-theme` + classe `dark`
+- `globals.css`: tokens CSS via seletores `html[data-theme="..."]` e classe `.dark`
+- `tailwind.config.ts`: `darkMode: "class"` para suporte ao Tailwind dark mode
 
-### 7.2 Lazy Loading Usage
+### 3.2. Tokens de Cor
 
-4 components use `next/dynamic`. `LoadingProgress` has a proper skeleton fallback. `EmptyState` and `ItemsList` have no fallback (minor gap -- see FE-009).
+**Canvas & Ink (base)**
+- `--canvas`: fundo principal
+- `--ink`: texto principal
+- `--ink-secondary`: texto secundario
+- `--ink-muted`: texto desenfatizado (>= 4.5:1 WCAG AA em todos os temas)
+- `--ink-faint`: texto muito sutil / placeholders
 
-### 7.3 Image Optimization
+**Brand**
+- `--brand-navy`: `#0a1e3f` (primaria)
+- `--brand-blue`: `#116dff` (accent)
+- `--brand-blue-hover`: `#0d5ad4`
+- `--brand-blue-subtle`: fundo sutil azul
 
-- Logo: `next/image` with explicit `width={140} height={67}`, `priority` flag, `className="h-10 w-auto"` -- correctly optimized for LCP
-- App icon: SVG in `app/icon.svg` -- optimal format
-- No other images in the application
+**Superficies**
+- `--surface-0`: superficie base (= canvas)
+- `--surface-1`: superficie elevada 1
+- `--surface-2`: superficie elevada 2
+- `--surface-elevated`: cards/modais
 
-### 7.4 Client vs Server Components
+**Semanticos**
+- `--success`, `--error`, `--warning` + variantes `*-subtle`
+- `--status-{success|warning|error}-{bg|text|border|dot}`: badges e indicadores
+- `--badge-licitacao-*`, `--badge-ata-*`: badges de tipo no SearchSummary
+- `--ink-warning`: texto de aviso tematico
+- `--cat-{legislacao|estrategia|insight|dica}-*`: categorias do carrossel
 
-**Server Components:** `layout.tsx` (font loading, metadata), `not-found.tsx` (static content)
-**Client Components:** Everything else (`"use client"` on all interactive components)
+**Bordas**
+- `--border`: borda sutil (`rgba(0,0,0,0.08)` light / `rgba(255,255,255,0.08)` dark)
+- `--border-strong`: borda enfatizada
+- `--border-accent`: borda azul accent
 
-Given the SPA-like interactive nature, this split is reasonable. The main page could theoretically SSR the form shell for better initial paint, but the complexity tradeoff is not justified for this use case.
+**Focus**
+- `--ring`: cor do focus ring (`#116dff` light / `#3b8bff` dark)
 
-### 7.5 Polling Strategy
+### 3.3. Tipografia
 
-Exponential backoff: 1s initial, 1.5x growth factor, 15s max interval, 10-minute timeout. Pattern: 1s -> 1.5s -> 2.25s -> 3.375s -> 5s -> 7.6s -> 11.4s -> 15s (max). Reduces poll requests by 60-80% vs fixed interval. Well-documented in code with future SSE migration noted.
+| Variavel | Fonte | Uso |
+|----------|-------|-----|
+| `--font-body` | DM Sans | Corpo de texto, UI geral |
+| `--font-display` | Fahkwang | Titulos, headings |
+| `--font-data` | DM Mono | Numeros, dados tabulares, versao |
 
-### 7.6 Build Output
+**Tamanho base:** `clamp(14px, 1vw + 10px, 16px)` com `line-height: 1.6`
 
-`output: 'standalone'` produces a self-contained server for Docker deployment. Combined with Sentry's `hideSourceMaps: true`, this is production-ready.
+Classes Tailwind: `font-body`, `font-display`, `font-data`
+
+### 3.4. Spacing
+
+Base 4px (Tailwind default). Escala: 1=4px, 2=8px, 3=12px, 4=16px, 6=24px, 8=32px, 16=64px.
+
+### 3.5. Border Radius
+
+| Token | Valor | Uso |
+|-------|-------|-----|
+| `rounded-input` | 4px | Inputs, selects |
+| `rounded-button` | 6px | Botoes |
+| `rounded-card` | 8px | Cards, containers |
+| `rounded-modal` | 12px | Modais (definido mas nao usado -- dialogs usam `rounded-xl`/`rounded-card`) |
+
+### 3.6. Animacoes
+
+| Classe | Descricao | Duracao |
+|--------|-----------|---------|
+| `animate-fade-in-up` | Entrada com slide up | 0.4s ease-out |
+| `animate-fade-in` | Fade simples | 0.3s ease-out |
+| `animate-shimmer` | Shimmer gradient para skeletons | 1.5s infinite |
+| `stagger-1` a `stagger-5` | Delays escalonados (50ms cada) | -- |
+
+`@media (prefers-reduced-motion: reduce)` reduz todas as animacoes a 0.01ms.
 
 ---
 
-## 8. State Management
+## 4. Gerenciamento de Estado
 
-### 8.1 Architecture
+### 4.1. Contexts
 
-Pure React hooks with no external state library. All state originates in `page.tsx` and flows down via props.
+| Context | Provider | Arquivo | Descricao |
+|---------|----------|---------|-----------|
+| `AuthContext` | `AuthProvider` | `app/contexts/AuthContext.tsx` | User, session, loading, signUp, signIn, signOut via Supabase |
+| `ThemeContext` | `ThemeProvider` | `app/components/ThemeProvider.tsx` | Tema atual, setTheme, config |
+
+### 4.2. Hooks
+
+| Hook | Arquivo | Escopo | Descricao |
+|------|---------|--------|-----------|
+| `useSearchForm` | `app/hooks/useSearchForm.ts` | App | Estado do formulario: setores, UFs, datas, modo busca, validacao |
+| `useSearchJob` | `app/hooks/useSearchJob.ts` | App | Lifecycle do job: submit, polling, progresso, resultado, download |
+| `useSaveDialog` | `app/hooks/useSaveDialog.ts` | App | Estado do dialog de salvar busca |
+| `useSavedSearches` | `hooks/useSavedSearches.ts` | Shared | CRUD buscas salvas (Supabase server-mode + localStorage fallback) |
+| `useAnalytics` | `hooks/useAnalytics.ts` | Shared | Mixpanel trackEvent, identifyUser, trackPageView |
+| `useAuth` | `app/contexts/AuthContext.tsx` | App | Acesso ao AuthContext |
+| `useTheme` | `app/components/ThemeProvider.tsx` | App | Acesso ao ThemeContext |
+
+### 4.3. Fluxo de Dados
 
 ```
-page.tsx (orchestrator)
+HomePage (page.tsx)
+  |-- useSearchForm() ........ estado do formulario
+  |-- useSearchJob() ......... job lifecycle + polling
+  |-- useSaveDialog() ........ dialog de salvar
+  |-- useSavedSearches() ..... buscas salvas
+  |-- useAnalytics() ......... tracking
   |
-  +-- useSearchForm(clearResult)
-  |     State: setores, setorId, searchMode, termosArray, termoInput,
-  |            ufsSelecionadas (Set), dataInicial, dataFinal, validationErrors
-  |     Side effects: fetch /api/setores on mount
+  |-> SearchHeader (onLoadSearch, onAnalyticsEvent)
+  |     |-> SavedSearchesDropdown
+  |     |-> ThemeToggle
   |
-  +-- useSearchJob(trackEvent)
-  |     State: loading, error, result, rawCount, searchPhase,
-  |            ufsCompleted, ufsTotal, itemsFetched, itemsFiltered,
-  |            elapsedSeconds, downloadLoading, downloadError
-  |     Side effects: POST /api/buscar, poll status, fetch result, download
+  |-> SearchForm (modo, setores, termos)
+  |-> UfSelector (UFs selecionadas)
+  |-> DateRangeSelector (periodo)
+  |-> LargeVolumeWarning (contagem UFs/dias)
+  |-> Botao Buscar
   |
-  +-- useSaveDialog({ form, saveNewSearch, trackEvent, hasResult })
-  |     State: showSaveDialog, saveSearchName, saveError
-  |
-  +-- useSavedSearches()
-  |     State: searches, loading, isMaxCapacity
-  |     Storage: localStorage
-  |
-  +-- useAnalytics()
-        State: mixpanelInstance (module-level singleton)
-        Side effects: lazy load mixpanel-browser
+  |-> LoadingProgress (fase, progresso, UFs, cancel)
+  |-> Error alert (retry)
+  |-> SearchSummary (resultado)
+  |-> ItemsList (paginacao server-side via /api/buscar/items)
+  |-> SearchActions (download, salvar)
+  |-> SaveSearchDialog (modal)
 ```
 
-### 8.2 Context Providers
+**Padrao de polling:** Exponential backoff (1s -> 1.5x -> max 15s) com timeout dinamico baseado em UFs selecionadas.
 
-| Provider | Scope | Purpose | Consumers |
-|----------|-------|---------|-----------|
-| `ThemeContext` | `ThemeProvider` | Theme ID, setter, config | ThemeToggle (via `useTheme()`) |
-| `AnalyticsProvider` | Root | Mixpanel init, page tracking | Children (passive -- no context exposed) |
-
-### 8.3 Patterns
-
-- **Lifting state up:** All form/search state in page.tsx, passed as props (max 2 levels deep)
-- **useCallback memoization:** All handlers wrapped for referential stability
-- **Set for multi-select:** `ufsSelecionadas` uses `Set<string>` for O(1) toggle/has
-- **Refs for non-UI state:** pollingRef, jobIdRef, searchStartTimeRef avoid unnecessary re-renders
-- **Reactive validation:** `validateForm()` via `useCallback` + `useEffect` recomputes on dependency change
+**Padrao auth:** Supabase JWT via cookies (SSR) + `@supabase/ssr`. Middleware Next.js refresh session em cada request.
 
 ---
 
-## 9. UX Patterns
+## 5. Estilizacao
 
-### 9.1 Loading States
+### 5.1. Tailwind Config
 
-| Context | Implementation |
-|---------|----------------|
-| Sectors dropdown | Spinner + "Carregando setores..." with `aria-busy`, fallback to hardcoded list |
-| Search in progress | Full LoadingProgress: progress bar, 5-stage indicator, UF grid, carousel, skeletons, cancel button |
-| Pagination | "Carregando..." centered text |
-| Download | Spinner in button + "Preparando download..." label |
-| Dynamic import | Inline skeleton for LoadingProgress; no fallback for EmptyState/ItemsList |
+- **`darkMode: "class"`** -- ativado pela classe `.dark` no `<html>`
+- **Cores** mapeadas para CSS custom properties (ex: `canvas: "var(--canvas)"`)
+- **Fontes** via CSS variables (`--font-body`, `--font-display`, `--font-data`)
+- **Border radius** semanticos: `input`, `button`, `card`, `modal`
+- **Plugins:** nenhum
 
-### 9.2 Error Handling
+### 5.2. CSS Custom Properties
 
-| Scenario | Implementation |
-|----------|----------------|
-| Network offline | NetworkIndicator: fixed top banner with dismiss button |
-| Search failure | Alert card (`role="alert"`) with error message + "Tentar novamente" button |
-| Download failure | Inline alert card below action buttons |
-| Save search error | Inline error in dialog |
-| Pagination failure | Silent -- **no user feedback** (see FE-005) |
-| Global unhandled error | error.tsx: Sentry report + "Ops! Algo deu errado" with retry |
-| Polling timeout | "A consulta excedeu o tempo limite" message after 10 minutes |
-| Backend unavailable | 503 with "Backend indisponivel em [URL]: [error]" |
+Definidas em `globals.css` com cascata por `data-theme`. Totalizando ~70+ tokens cobrindo:
+- Canvas/Ink (5), Brand (4), Surfaces (4), Semantic (6)
+- Status badges (12), Source badges (6), Warning ink (1)
+- Borders (3), Focus (1), Category carousel (16)
 
-### 9.3 Empty States
+### 5.3. Abordagem Responsiva
 
-| Context | Implementation |
-|---------|----------------|
-| No saved searches | Icon + "Nenhuma busca salva" + hint text in dropdown |
-| Zero search results | Rich EmptyState with filter breakdown, suggestions, stats, "Ajustar criterios" button |
-| Zero filtered items | Contextual messaging based on rawCount vs filtered count |
-
-### 9.4 Form Validation
-
-| Field | Validation | Display |
-|-------|------------|---------|
-| UF selection | At least 1 state required | `role="alert"` below grid |
-| Date range | End date >= start date | `role="alert"` below dates |
-| Terms mode | At least 1 term required | Submit button disabled |
-| Save search name | Required, max 50 chars | Live character counter, disabled submit |
-| Submit guard | `canSearch` boolean | Button disabled + aria-busy when loading |
-| Ctrl+Enter | Respects `canSearch` and `!loading` | No visual indicator (keyboard shortcut) |
-
-### 9.5 Responsive Design
-
-| Breakpoint | Changes |
-|------------|---------|
-| Base (mobile) | Single column, 5-col UF grid, hidden labels, mobile stage detail card |
-| `sm:` (640px) | Two-column dates, 7-col UF grid, visible labels, hidden mobile card |
-| `md:` (768px) | 9-col UF grid |
-
-**Touch targets:** Global 44px minimum via CSS. **Content width:** `max-w-4xl` (896px). **Fluid typography:** `clamp(14px, 1vw + 10px, 16px)`.
-
-### 9.6 Notifications
-
-- **Tab title:** Updates to show result count when search completes while tab is backgrounded
-- **Browser notifications:** Requested on completion; sent when tab is hidden (permission-gated)
-- **Analytics:** Comprehensive Mixpanel event tracking: search_started, search_completed, search_failed, search_cancelled, loading_stage_reached, loading_abandoned, download_started/completed/failed, saved_search_created/loaded/deleted
+- **Mobile-first** com breakpoints Tailwind: `sm:` (640px), `md:` (768px)
+- Layout max-width: `max-w-4xl` (896px) centrado com `mx-auto`
+- Grid UFs: `grid-cols-5 sm:grid-cols-7 md:grid-cols-9`
+- Tamanhos de texto adaptativos: `text-sm sm:text-base`, `text-2xl sm:text-3xl`
+- Touch targets: `min-height: 44px` em botoes e inputs (global CSS)
+- Padding responsivo: `px-4 sm:px-6`, `py-6 sm:py-8`
 
 ---
 
-## 10. Test Coverage
+## 6. Acessibilidade
 
-### 10.1 Jest Unit Tests
+### 6.1. Conformidade WCAG
 
-**Coverage thresholds (jest.config.js):**
-- Statements: 65% (current: ~67.93%)
-- Lines: 65% (current: ~66.30%)
-- Functions: 57% (current: ~59.89%)
-- Branches: 50% (current: ~52.74%)
+| Criterio | Status | Implementacao |
+|----------|--------|---------------|
+| Skip link | OK | "Pular para o conteudo principal" no layout |
+| `lang="pt-BR"` | OK | Definido no `<html>` |
+| Focus visible | OK | `--ring` com `outline: 2px solid` e `outline-offset: 2px` |
+| Touch targets | OK | `min-height: 44px` global para botoes e inputs |
+| Contraste `--ink-muted` | OK | >= 4.5:1 em todos os 5 temas |
+| Reduced motion | OK | `@media (prefers-reduced-motion)` zera animacoes |
+| `aria-live` regions | OK | Anuncio de resultados, progresso, warnings |
+| `role="alert"` | OK | Erros de validacao, download, timeout |
+| `aria-pressed` | OK | Botoes UF toggle |
+| `aria-expanded` | OK | Dropdowns (ThemeToggle, SavedSearches, SourceBadges) |
+| `aria-label` | OK | Botoes de icone, nav, regioes |
+| `aria-current="page"` | OK | Paginacao, link ativo |
+| `aria-busy` | OK | Botao de busca durante loading |
+| `aria-labelledby` | OK | SaveSearchDialog via `id="save-search-dialog-title"` |
+| `aria-describedby` | OK | Input termos via hint text |
+| Keyboard navigation | OK | ThemeToggle (Arrow, Home, End, Escape), SavedSearches (listbox pattern) |
+| Screen reader headings | OK | `<h2 class="sr-only">` para secoes invisiveis |
 
-**~585 test assertions** across 30+ test files:
+### 6.2. Testes de Acessibilidade
 
-| Category | Files | Scope |
-|----------|-------|-------|
-| Component tests | 18 files | All major components + accessibility + loading states |
-| Hook tests | 3 files | useSearchForm, useSearchJob, useSearchJob.polling |
-| API route tests | 4 files | buscar, buscar-result, buscar-status, download |
-| Integration | 1 file | Full search flow with MSW handlers |
-| Page-level | 2 files | page.tsx, error.tsx |
-| Library tests | 2 files | analytics, savedSearches |
-| Security | 1 file | Security headers |
+- `accessibility.test.tsx`: testes de estrutura ARIA
+- `contrast-validation.test.ts`: validacao de contraste por tema
+- `SavedSearchesDropdown.aria.test.tsx`: keyboard navigation
+- `05-accessibility.spec.ts`: Playwright E2E com axe-core
 
-### 10.2 E2E Tests (Playwright)
+### 6.3. Lacunas Identificadas
 
-5 specs with axe-core:
-1. `01-happy-path.spec.ts` -- full search -> results -> download flow
-2. `02-llm-fallback.spec.ts` -- LLM/AI summary failure handling
-3. `03-validation-errors.spec.ts` -- form validation error states
-4. `04-error-handling.spec.ts` -- backend error scenarios
-5. `05-accessibility.spec.ts` -- automated accessibility audits
-
-### 10.3 Test Gaps
-
-| Component | Risk Level |
-|-----------|------------|
-| RegionSelector (no direct test) | Low -- tested indirectly via UfSelector |
-| SourceBadges (no dedicated test) | Medium -- complex conditional rendering |
-| not-found.tsx (no test) | Low -- static content |
+- `AuthModal.tsx` usa `var(--card-bg)`, `var(--text-primary)`, `var(--border-color)`, `var(--input-bg)`, `var(--accent-color)` -- tokens que **nao existem** no design system. O modal provavelmente renderiza com fallbacks do browser.
+- Pagination: labels sem acentos (`"Navegacao de paginas"`, `"Pagina anterior"`, `"Proxima pagina"`) -- nao e um bug funcional mas e inconsistente com o restante em portugues.
+- `HighlightedText`: `<mark>` nao tem `aria-label` ou contexto adicional para screen readers.
 
 ---
 
-## 11. Technical Debt Items
+## 7. Performance
 
-### FE-001: Hardcoded Colors in SearchSummary Badges
+### 7.1. Bundle Optimization
 
-- **Description:** `SearchSummary.tsx` uses `bg-blue-100 text-blue-800 border-blue-200` and `bg-purple-100 text-purple-800 border-purple-200` for licitacao/ata type badges. These bypass the theme system and use `dark:` prefix variants that do not cover paperwhite, sepia, or dim themes.
-- **Severity:** High
-- **Impact on UX:** Visual inconsistency across non-light themes; badges may be illegible in sepia/paperwhite.
-- **Estimated Effort:** 1 hour
-- **Recommendation:** Define `--badge-licitacao-{bg,text,border}` and `--badge-ata-{bg,text,border}` CSS custom properties per theme in globals.css, similar to the category token pattern.
+| Tecnica | Implementacao |
+|---------|---------------|
+| Dynamic imports | `LoadingProgress`, `EmptyState`, `ItemsList`, `SaveSearchDialog` via `next/dynamic` |
+| Mixpanel lazy load | `import('mixpanel-browser')` dinamico (~40KB savings) |
+| Font display swap | `display: "swap"` em todas as 3 fontes Google |
+| FOUC prevention | `theme-init.js` inline via `strategy="beforeInteractive"` |
+| Image optimization | Logo via `next/image` com `priority` |
 
-### FE-002: Hardcoded Color in SourceBadges Warning
+### 7.2. Polling Optimization
 
-- **Description:** `SourceBadges.tsx` uses `text-amber-600 dark:text-amber-400` for truncated combos warning instead of the `warning` semantic token.
-- **Severity:** Low
-- **Impact on UX:** Minor inconsistency in paperwhite, sepia, dim themes.
-- **Estimated Effort:** 0.5 hours
-- **Recommendation:** Replace with `text-warning`.
+- Exponential backoff: 1s -> 1.5s -> 2.25s -> ... -> max 15s
+- Reduz requests em ~60-80% vs polling fixo de 2s
+- AbortController em ItemsList para cancelar requests duplicados
+- Timeout dinamico baseado em UFs selecionadas
 
-### FE-003: UUID Dependency for ID Generation
+### 7.3. Caching
 
-- **Description:** `uuid` v13 is a production dependency used only in `lib/savedSearches.ts`. `crypto.randomUUID()` is available in all target browsers and Node 19+.
-- **Severity:** Low
-- **Impact on UX:** None directly; ~3KB gzipped bundle overhead.
-- **Estimated Effort:** 0.5 hours
-- **Recommendation:** Replace with `crypto.randomUUID()` and remove the dependency.
+- Buscas salvas: Supabase primary + localStorage write-through cache
+- Setores: fetch on mount com fallback para constantes locais
+- Sem estrategia de cache HTTP explicita para API routes
 
-### FE-004: Missing Spinner Component
+### 7.4. Dependencias (runtime)
 
-- **Description:** SVG spinner markup (circle + arc path with opacity animation) is duplicated in SearchForm (setores loading) and SearchActions (download button). No shared component exists.
-- **Severity:** Medium
-- **Impact on UX:** Inconsistency risk if spinner styles diverge.
-- **Estimated Effort:** 1 hour
-- **Recommendation:** Extract `<Spinner size="sm" | "md" />` component.
-
-### FE-005: Silent Error Swallowing in ItemsList
-
-- **Description:** `ItemsList.tsx` has an empty `catch {}` block when fetching paginated items. Errors are silently discarded with no user feedback, retry mechanism, or error logging.
-- **Severity:** High
-- **Impact on UX:** Users see perpetual "Carregando..." or stale data with no indication of failure. No way to recover without page reload.
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Add error state with inline message and retry button. Log to Sentry.
-
-### FE-006: Missing Button Component Abstraction
-
-- **Description:** Primary/secondary/danger/ghost button styles are duplicated as inline Tailwind class strings across 7+ components. Strings like `bg-brand-navy text-white py-3 rounded-button font-semibold hover:bg-brand-blue-hover...` repeat verbatim.
-- **Severity:** Medium
-- **Impact on UX:** Risk of style drift; difficulty enforcing consistent hover/focus/disabled states.
-- **Estimated Effort:** 3 hours
-- **Recommendation:** Create `<Button variant="primary" | "secondary" | "danger" | "ghost" size="sm" | "md" | "lg" />`.
-
-### FE-007: ink-muted Contrast Below WCAG AA
-
-- **Description:** `--ink-muted` (#5a6a7a) against white (#ffffff) yields ~4.1:1 contrast ratio, below WCAG AA (4.5:1) for normal text. This color is used extensively for metadata, timestamps, and hints.
-- **Severity:** Medium
-- **Impact on UX:** Accessibility barrier for low-vision users.
-- **Estimated Effort:** 1 hour
-- **Recommendation:** Darken to ~#4d5d6d (achieving ~5:1 ratio).
-
-### FE-008: Broken /termos Footer Link
-
-- **Description:** Footer links to `/termos` but no route exists. Clicking shows 404 page.
-- **Severity:** Medium
-- **Impact on UX:** Broken link on every page view.
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Create `app/termos/page.tsx` or remove the link until content is ready.
-
-### FE-009: Missing Error Fallback for Dynamic Imports
-
-- **Description:** `EmptyState` and `ItemsList` dynamic imports have no `loading` or error fallback. Chunk load failures (network issues) result in blank sections.
-- **Severity:** Low
-- **Impact on UX:** Rare scenario but silent failure.
-- **Estimated Effort:** 1 hour
-- **Recommendation:** Add loading skeletons and error boundaries.
-
-### FE-010: Missing Test for RegionSelector
-
-- **Description:** No direct test file. Partial/full selection visual states not explicitly verified.
-- **Severity:** Low
-- **Impact on UX:** None directly; testing gap.
-- **Estimated Effort:** 1.5 hours
-- **Recommendation:** Add `RegionSelector.test.tsx`.
-
-### FE-011: Missing Test for SourceBadges
-
-- **Description:** Complex conditional rendering (status colors, expandable detail, dedup stats, truncation) with no dedicated test.
-- **Severity:** Medium
-- **Impact on UX:** None directly; regression risk.
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Add `SourceBadges.test.tsx`.
-
-### FE-012: Dim Theme Incomplete Token Coverage
-
-- **Description:** `html[data-theme="dim"]` only overrides `--canvas` and `--surface-0`. All other tokens (surfaces 1/2/elevated, borders) inherit from `.dark`, making dim visually near-identical to dark.
-- **Severity:** Low
-- **Impact on UX:** Dim theme may feel indistinguishable from dark.
-- **Estimated Effort:** 2 hours
-- **Recommendation:** Add `surface-1: #32323a`, `surface-2: #3a3a42`, `surface-elevated: #2e2e34` to dim theme.
-
-### FE-013: SavedSearchesDropdown Returns null During Loading
-
-- **Description:** When `useSavedSearches` is loading, the entire dropdown renders null, causing a brief layout shift in the header.
-- **Severity:** Low
-- **Impact on UX:** Brief layout shift on initial page load.
-- **Estimated Effort:** 0.5 hours
-- **Recommendation:** Return a disabled skeleton button instead of null.
-
-### FE-014: page.tsx Is a Monolithic Client Component
-
-- **Description:** The entire main page (209 lines) is a single `"use client"` component managing all state. Any state change re-renders the entire page.
-- **Severity:** Low
-- **Impact on UX:** No visible impact currently due to React's efficient diffing. Will become relevant as features grow.
-- **Estimated Effort:** 4 hours
-- **Recommendation:** Consider splitting into `SearchFormSection` and `ResultsSection` with `React.memo` boundaries when scope expands.
+| Pacote | Tamanho aprox. | Uso |
+|--------|----------------|-----|
+| `next` | ~150KB (core) | Framework |
+| `react` + `react-dom` | ~130KB | UI |
+| `@supabase/ssr` + `@supabase/supabase-js` | ~50KB | Auth + DB |
+| `mixpanel-browser` | ~40KB | Analytics (lazy) |
+| `@sentry/nextjs` | ~60KB | Error tracking |
+| `uuid` | ~5KB | IDs |
 
 ---
 
-## 12. Summary
+## 8. Padroes UX
 
-### Strengths
+### 8.1. Fluxo de Busca
 
-1. **Well-architected theme system** with CSS cascade, FOUC prevention, 5 coherent themes, and comprehensive design tokens (40+ properties)
-2. **Strong accessibility** (A- grade): skip link, ARIA patterns, keyboard navigation, focus management, reduced motion, screen reader announcements
-3. **Excellent loading UX**: multi-stage progress, per-UF grid, educational carousel with sector-aware content, ETA estimation, skeleton placeholders
-4. **Efficient polling**: exponential backoff reducing requests 60-80%
-5. **Good component decomposition**: LoadingProgress into 5 sub-components, RegionSelector extracted, hooks properly separated
-6. **Comprehensive analytics**: full search lifecycle tracking, loading abandonment, download metrics
-7. **Dynamic imports** for heavy components reduce initial bundle
-8. **Solid test coverage**: ~68% statements, 585+ assertions, 5 E2E specs with axe-core
-9. **Consistent typography**: 3-font system (body/display/data) with fluid scaling
-10. **Native `<dialog>`** for modal with built-in focus trap
+1. Usuario seleciona modo (setor ou termos)
+2. Configura UFs (grid + regioes) e periodo
+3. LargeVolumeWarning aparece se >10 UFs ou >30 dias
+4. Clique "Buscar" (ou Ctrl+Enter)
+5. POST `/api/buscar` retorna `job_id`
+6. Polling com backoff exponencial mostra progresso em tempo real
+7. LoadingProgress: barra, etapas, grid UFs, curiosidades, skeleton
+8. Cancelamento disponivel durante polling
+9. Resultado: resumo executivo, metricas, lista paginada
+10. Acoes: download Excel/CSV, salvar busca
 
-### Priority Remediation
+### 8.2. Buscas Salvas
 
-| Priority | Items | Total Effort |
-|----------|-------|--------------|
-| High | FE-001 (hardcoded colors), FE-005 (silent pagination error) | 3 hours |
-| Medium | FE-004, FE-006, FE-007, FE-008, FE-011 | 9 hours |
-| Low | FE-002, FE-003, FE-009, FE-010, FE-012, FE-013, FE-014 | 10 hours |
+- Maximo 10 buscas
+- Dual-mode: Supabase (autenticado) + localStorage (anonimo)
+- Migracao automatica no primeiro login
+- Dropdown com listbox ARIA, keyboard navigation
+- Delete com confirmacao dupla
 
-**Total estimated remediation effort: ~22 hours**
+### 8.3. Auth Modal
 
-### Changes Since v3.0 Spec
+- `<dialog>` nativo com `showModal()` (focus trap built-in)
+- Toggle login/signup
+- Supabase email/password auth
+- Feedback visual para erro e sucesso
 
-| v3.0 Issue | v4.0 Status |
-|------------|-------------|
-| UXD-001: Multi-word terms impossible | Still open (space triggers token) |
-| UXD-002: No setores loading state | **RESOLVED** -- spinner + text + aria-busy |
-| UXD-003: No 404 page | **RESOLVED** -- not-found.tsx created |
-| UXD-004: No keyboard shortcut | **RESOLVED** -- Ctrl+Enter implemented |
-| UXD-005: SavedSearchesDropdown not ARIA listbox | **RESOLVED** -- full listbox pattern |
-| UXD-006: SaveSearchDialog not native dialog | **RESOLVED** -- uses `<dialog>` showModal() |
-| UXD-008: Mixpanel unconditionally imported | **RESOLVED** -- lazy loaded via dynamic import |
-| UXD-010: ThemeProvider 30+ imperative style.setProperty | **RESOLVED** -- CSS cascade via data-theme |
-| UXD-011: FOUC script may drift from ThemeProvider | **RESOLVED** -- both use same mechanism (data-theme + .dark) |
-| UXD-012: No offline/network indicator | **RESOLVED** -- NetworkIndicator component |
-| UXD-016: LoadingProgress 450+ lines | **RESOLVED** -- decomposed to 141-line orchestrator + 5 sub-components |
-| UXD-017: Hardcoded fallback sectors | **RESOLVED** -- centralized in constants/fallback-setores.ts |
-| UXD-019: carouselData hardcoded colors | **RESOLVED** -- migrated to CSS custom properties (--cat-* tokens) |
+### 8.4. Error Handling
+
+| Nivel | Componente | Estrategia |
+|-------|------------|------------|
+| Global | `app/error.tsx` | Sentry + botao retry |
+| Secao | `ErrorBoundary` | Fallback local + retry |
+| Network | `NetworkIndicator` | Banner offline dismissivel |
+| Busca | `useSearchJob` | Timeout com contexto (UFs/dias), retry |
+| Download | `SearchActions` | Mensagem de erro + retry |
+| Paginacao | `ItemsList` | Retry por pagina, abort em flight |
+| Analytics | Todo lugar | `try/catch` silencioso -- analytics nunca quebra o app |
+
+### 8.5. Notificacoes
+
+- Notification API: pede permissao, notifica quando busca completa em background
+- `document.title` muda para "X licitacoes encontradas" quando tab inativa
+- Restaura titulo ao voltar para a tab
+
+---
+
+## 9. Inventario de Debitos Tecnicos
+
+### Frontend / UX
+
+| ID | Descricao | Severidade | Esforco (h) | Impacto UX |
+|----|-----------|------------|-------------|------------|
+| TD-UX-001 | **AuthModal usa tokens CSS inexistentes** (`--card-bg`, `--text-primary`, `--border-color`, `--input-bg`, `--accent-color`). Esses tokens nao existem em `globals.css` nem no Tailwind config. O modal provavelmente renderiza com cores do browser default, quebrando a consistencia visual em todos os temas. | **Critico** | 2 | Modal de auth com aparencia incorreta em todos os temas nao-default. Experiencia de cadastro/login degradada. |
+| TD-UX-002 | **AuthModal nao usa design tokens do sistema** -- usa classes hardcoded como `bg-red-100 dark:bg-red-900/30`, `bg-green-100 dark:bg-green-900/30` ao inves de `bg-error-subtle`, `bg-success-subtle`. Inconsistente com padrao do restante da app. | **Alto** | 1 | Cores de feedback (erro/sucesso) nao acompanham temas paperwhite/sepia/dim. |
+| TD-UX-003 | **ItemsList usa cores Tailwind hardcoded** -- `text-red-600 dark:text-red-400` e badges `bg-amber-100/text-amber-800`, `bg-blue-100/text-blue-800` ao inves de tokens semanticos. | **Alto** | 2 | Cores de erro e badges de tipo nao seguem temas personalizados. Inconsistencia visual com SearchSummary que usa `--badge-licitacao-*` e `--badge-ata-*`. |
+| TD-UX-004 | **Componente `Button` reutilizavel existe mas nao e usado** -- A pagina principal usa botoes inline com classes repetidas. `Button.tsx` define variantes (primary/secondary/ghost/danger) mas o botao "Buscar", botao de retry, e botoes de download nao o utilizam. | **Medio** | 3 | Duplicacao de estilos, risco de inconsistencia entre botoes. Manutencao mais dificil. |
+| TD-UX-005 | **Pagina unica (SPA-like)** -- Toda a aplicacao vive em `page.tsx` como client component. O formulario, progresso, e resultados sao secoes do mesmo componente. Nao ha rota separada para resultados. | **Medio** | 8 | Nao e possivel compartilhar link de resultado. Historico do browser nao funciona. Scroll position perdida ao navegar. |
+| TD-UX-006 | **Footer duplicado** -- O footer identico aparece em `page.tsx` e `termos/page.tsx` como JSX inline. Deveria ser um componente reutilizavel no layout. | **Baixo** | 1 | Manutencao duplicada. Risco de divergencia. |
+| TD-UX-007 | **Versao hardcoded "v2.0"** no footer. Deveria vir de `package.json` ou env var. | **Baixo** | 0.5 | Informacao desatualizada para usuarios. |
+| TD-UX-008 | **`rounded-modal: "12px"` definido mas nao usado** -- SaveSearchDialog usa `rounded-card`, AuthModal usa `rounded-xl`. O token de design para modais existe mas nenhum modal o utiliza. | **Baixo** | 0.5 | Inconsistencia de border-radius entre modais. |
+| TD-UX-009 | **Sem loading state para pagina inicial** -- O fetch de setores (`/api/setores`) acontece no mount mas nao ha skeleton/placeholder para o formulario inteiro durante o carregamento. O spinner aparece apenas no select. | **Baixo** | 2 | Flash de conteudo parcial no primeiro render. |
+| TD-UX-010 | **Paginacao sem acentos nos aria-labels** -- `"Navegacao de paginas"`, `"Pagina anterior"`, `"Proxima pagina"` faltam acentos. Inconsistente com o restante do app que usa acentos corretamente. | **Baixo** | 0.5 | Screen readers pronunciam incorretamente. |
+| TD-UX-011 | **`SearchSummary` usa inline `style={{}}` para badge tokens** ao inves de classes Tailwind. Mistura de abordagens de estilizacao. | **Baixo** | 1 | Manutencao inconsistente. Inline styles nao beneficiam de purge/tree-shaking. |
+| TD-UX-012 | **Sem i18n framework** -- Todos os textos estao hardcoded em portugues nos componentes. Nao ha separacao de strings. | **Baixo** | 16 | Caso futuro de internacionalizacao sera custoso. Para POC e aceitavel. |
+| TD-UX-013 | **`dateDiffInDays` duplicada** -- Funcao identica existe em `page.tsx` e `useSearchJob.ts`. Deveria estar em um util compartilhado. | **Baixo** | 0.5 | Risco de divergencia se alterada em apenas um local. |
+| TD-UX-014 | **Coverage abaixo do ideal** -- branches em 52.74%, funcoes em 59.89%. Threshold global e 50/57/65/65. Ha margem apertada. | **Medio** | 8 | Regressoes podem passar despercebidas. |
+| TD-UX-015 | **Sem tratamento de erro no `/api/setores`** -- Se o fetch falha, cai em FALLBACK_SETORES silenciosamente. Nao ha indicacao visual de que os setores sao fallback. | **Baixo** | 1 | Usuario pode ver lista incompleta de setores sem saber. |
+| TD-UX-016 | **SSE nao implementado** -- Comentario no codigo menciona substituir polling por Server-Sent Events. Polling com backoff funciona mas consome mais recursos. | **Medio** | 12 | Latencia de atualizacao de progresso entre 1-15s. Custo de requests desnecessarios. |
+| TD-UX-017 | **`carouselData.ts` nao auditado neste spec** -- Dados de curiosidades podem conter informacoes desatualizadas sobre legislacao de licitacoes. | **Baixo** | 2 | Conteudo educacional potencialmente incorreto. |
+| TD-UX-018 | **Sem PWA / Service Worker** -- App nao funciona offline. NetworkIndicator avisa mas nao ha cache de conteudo. | **Baixo** | 8 | Nenhuma funcionalidade offline. Busca impossivel sem internet. |
+| TD-UX-019 | **`SourceBadges` usa `style={{}}` para `--ink-warning`** ao inves de classe Tailwind. Necessidade de prop `style` para acessar token CSS nao mapeado no Tailwind. | **Baixo** | 0.5 | Padroes mistos de estilizacao. |
+| TD-UX-020 | **Nenhum componente de input reutilizavel** -- Inputs de texto, date, e select repetem classes CSS longas. Nao ha `<Input>` ou `<Select>` padronizado como existe `<Button>`. | **Medio** | 4 | ~10 inputs com classes duplicadas. Mudanca de estilo requer alteracao em multiplos locais. |
+
+### Resumo de Severidade
+
+| Severidade | Quantidade | Esforco total estimado |
+|------------|-----------|----------------------|
+| Critico | 1 | 2h |
+| Alto | 2 | 3h |
+| Medio | 5 | 35h |
+| Baixo | 12 | 33.5h |
+| **Total** | **20** | **~73.5h** |
+
+### Prioridade sugerida (quick wins)
+
+1. **TD-UX-001** (Critico, 2h) -- Corrigir tokens do AuthModal
+2. **TD-UX-002** (Alto, 1h) -- Migrar AuthModal para tokens semanticos
+3. **TD-UX-003** (Alto, 2h) -- Migrar ItemsList para tokens semanticos
+4. **TD-UX-010** (Baixo, 0.5h) -- Adicionar acentos nos aria-labels
+5. **TD-UX-013** (Baixo, 0.5h) -- Extrair `dateDiffInDays` para util
+6. **TD-UX-006** (Baixo, 1h) -- Extrair Footer reutilizavel
+
+---
+
+## Apendice: Stack Tecnica
+
+| Tecnologia | Versao | Uso |
+|------------|--------|-----|
+| Next.js | ^16.1.6 | Framework App Router |
+| React | ^18.3.1 | UI Library |
+| TypeScript | ^5.9.3 | Type safety |
+| Tailwind CSS | ^3.4.19 | Utility-first CSS |
+| Supabase (`@supabase/ssr` + `supabase-js`) | ^0.9.0 / ^2.99.0 | Auth + DB |
+| Mixpanel | ^2.75.0 | Product analytics |
+| Sentry | ^10.42.0 | Error monitoring |
+| Jest + Testing Library | ^29.7.0 / ^14.1.2 | Unit/integration tests |
+| Playwright + axe-core | ^1.58.2 / ^4.11.1 | E2E + accessibility |
+| MSW | ^2.12.10 | API mocking |
+| SWC | ^0.2.29 | Fast transpilation |

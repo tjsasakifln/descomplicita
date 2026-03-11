@@ -1,201 +1,264 @@
-# Database Schema Documentation
+# Schema do Banco de Dados - Descomplicita
 
-> **Generated:** 2026-03-09 | **Agent:** @data-engineer (Delphi)
-> **Database Engine:** SQLite 3 (via aiosqlite 0.20.0)
-> **ORM/Driver:** Raw SQL with aiosqlite (no ORM)
-> **File Location:** `backend/descomplicita.db` (or `$DATA_DIR/descomplicita.db`)
-
----
-
-## 1. Schema Overview
-
-The Descomplicita backend uses a **minimal SQLite persistence layer** designed for POC-level storage. There is no Supabase or PostgreSQL in use despite environment placeholders existing in `.env.example`. The database serves two purposes:
-
-1. **Search History** -- records every search job (parameters, results, timing)
-2. **User Preferences** -- key-value store for user settings
-
-Additionally, **Redis** (not SQLite) serves as the primary data store for:
-- Job state and progress (`job:{id}` keys)
-- Excel file bytes (`excel:{id}` keys)
-- Filtered items for pagination (`job:{id}:items` keys)
-- PNCP API response cache (`pncp_cache:*` keys)
-- Durable task parameters (`job_params:{id}` keys)
-
-### Storage Architecture Summary
-
-| Store | Engine | Purpose | Persistence |
-|-------|--------|---------|-------------|
-| `search_history` | SQLite | Search audit trail | Durable (file-based) |
-| `user_preferences` | SQLite | User settings (key-value) | Durable (file-based) |
-| Job state | Redis (or in-memory fallback) | Active job tracking | TTL-based (24h) |
-| Excel bytes | Redis (or in-memory fallback) | Download files | TTL-based (2h) |
-| PNCP cache | Redis (or in-memory fallback) | API response caching | TTL-based (4h) |
+> **Atualizado em:** 2026-03-11 | **Agente:** @data-engineer (Forge)
+> **Banco:** Supabase (PostgreSQL)
+> **Driver:** supabase-py >= 2.13.0 (backend), @supabase/ssr (frontend)
+> **Migracoes:** `backend/supabase/migrations/001_initial_schema.sql`, `002_retention_policy.sql`
 
 ---
 
-## 2. Table Definitions
+## 1. Extensoes Habilitadas
 
-### 2.1 `search_history`
-
-Records every search job submitted through the `/buscar` endpoint.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-incrementing row ID |
-| `job_id` | TEXT | NOT NULL, UNIQUE | UUID v4 job identifier |
-| `ufs` | TEXT | NOT NULL | JSON array of Brazilian state codes (e.g., `["SP","RJ"]`) |
-| `data_inicial` | TEXT | NOT NULL | Search start date (YYYY-MM-DD) |
-| `data_final` | TEXT | NOT NULL | Search end date (YYYY-MM-DD) |
-| `setor_id` | TEXT | NOT NULL | Sector identifier (e.g., `vestuario`, `alimentos`) |
-| `termos_busca` | TEXT | (nullable) | Custom search terms provided by user |
-| `total_raw` | INTEGER | DEFAULT 0 | Total records fetched before filtering |
-| `total_filtrado` | INTEGER | DEFAULT 0 | Total records after filtering |
-| `status` | TEXT | DEFAULT 'queued' | Job status: `queued`, `completed`, `failed` |
-| `created_at` | TEXT | NOT NULL | ISO 8601 UTC timestamp of job creation |
-| `completed_at` | TEXT | (nullable) | ISO 8601 UTC timestamp of job completion |
-| `elapsed_seconds` | REAL | (nullable) | Total job execution time in seconds |
-
-**Indexes:**
-
-| Index Name | Column(s) | Purpose |
-|------------|-----------|---------|
-| `idx_search_history_created` | `created_at DESC` | Fast retrieval of recent searches |
-| `idx_search_history_setor` | `setor_id` | Filter searches by sector |
-
-### 2.2 `user_preferences`
-
-Generic key-value store for user preferences.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | Auto-incrementing row ID |
-| `key` | TEXT | NOT NULL, UNIQUE | Preference identifier |
-| `value` | TEXT | NOT NULL | JSON-serialized value |
-| `updated_at` | TEXT | NOT NULL | ISO 8601 UTC timestamp of last update |
-
-**Indexes:**
-
-| Index Name | Column(s) | Purpose |
-|------------|-----------|---------|
-| (implicit UNIQUE) | `key` | Enforced by UNIQUE constraint |
+| Extensao | Objetivo |
+|----------|----------|
+| `uuid-ossp` | Geracao de UUIDs v4 via `uuid_generate_v4()` |
 
 ---
 
-## 3. Relationships
+## 2. Tabelas
 
-There are **no foreign key relationships** between tables. The schema is flat:
+### 2.1 `public.users`
 
-- `search_history` is a standalone audit log
-- `user_preferences` is a standalone key-value store
-- `job_id` in `search_history` corresponds to Redis job keys (`job:{id}`) but this relationship is **not enforced** at the database level -- it is maintained by application logic in `main.py`
+Perfil de usuario vinculado ao `auth.users` do Supabase Auth. Criado automaticamente via trigger ao cadastrar usuario.
 
----
+| Coluna | Tipo | Nullable | Default | Constraints |
+|--------|------|----------|---------|-------------|
+| `id` | UUID | NOT NULL | -- | PK, FK -> `auth.users(id)` ON DELETE CASCADE |
+| `email` | TEXT | NOT NULL | -- | -- |
+| `display_name` | TEXT | sim | -- | -- |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `NOW()` | -- |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `NOW()` | Auto-atualizado via trigger |
 
-## 4. Row Level Security (RLS)
+**Indices:** Apenas o PK implicito.
 
-**Not applicable.** SQLite does not support RLS. There is no Supabase/PostgreSQL in use.
-
-Access control is handled at the application layer:
-- **API Key middleware** (`middleware/auth.py`) -- validates `X-API-Key` header
-- **JWT authentication** (`auth/jwt.py`) -- HMAC-SHA256 signed tokens
-- All database operations flow through the FastAPI dependency injection system
-- The `/search-history` endpoint exposes data without user-scoping (see audit)
+**RLS:** Habilitada. Policy `users_own_data` -- `FOR ALL USING (auth.uid() = id)`.
 
 ---
 
-## 5. Functions / Triggers
+### 2.2 `public.search_history`
 
-**None.** The database uses no triggers, stored procedures, or views. All logic is in the Python application layer (`database.py`).
+Historico de buscas realizadas. Cada registro representa um job de busca com seus parametros e resultados.
 
-### Database Operations (Application Layer)
+| Coluna | Tipo | Nullable | Default | Constraints |
+|--------|------|----------|---------|-------------|
+| `id` | BIGSERIAL | NOT NULL | auto-increment | PK |
+| `user_id` | UUID | NOT NULL | -- | FK -> `public.users(id)` ON DELETE CASCADE |
+| `job_id` | TEXT | NOT NULL | -- | UNIQUE |
+| `ufs` | TEXT[] | NOT NULL | -- | Array de siglas UF (ex: `{SP,RJ,MG}`) |
+| `data_inicial` | DATE | NOT NULL | -- | -- |
+| `data_final` | DATE | NOT NULL | -- | -- |
+| `setor_id` | TEXT | NOT NULL | -- | Identificador do setor (ex: `vestuario`) |
+| `termos_busca` | TEXT | sim | -- | Termos de busca customizados |
+| `total_raw` | INTEGER | sim | `0` | Total de registros antes da filtragem |
+| `total_filtrado` | INTEGER | sim | `0` | Total de registros apos filtragem |
+| `status` | TEXT | NOT NULL | `'queued'` | Valores esperados: queued, completed, failed |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `NOW()` | -- |
+| `completed_at` | TIMESTAMPTZ | sim | -- | -- |
+| `elapsed_seconds` | REAL | sim | -- | Tempo de execucao em segundos |
 
-| Method | SQL Operation | Called From |
-|--------|--------------|-------------|
-| `Database.record_search()` | `INSERT OR IGNORE INTO search_history` | `POST /buscar` (job creation) |
-| `Database.complete_search()` | `UPDATE search_history SET status='completed'` | `run_search_job()` (on success) |
-| `Database.fail_search()` | `UPDATE search_history SET status='failed'` | `run_search_job()` (on error) |
-| `Database.get_recent_searches()` | `SELECT ... FROM search_history ORDER BY created_at DESC LIMIT ?` | `GET /search-history` |
-| `Database.set_preference()` | `INSERT ... ON CONFLICT(key) DO UPDATE` (upsert) | Not currently called by any endpoint |
-| `Database.get_preference()` | `SELECT value FROM user_preferences WHERE key=?` | Not currently called by any endpoint |
-| `Database.get_all_preferences()` | `SELECT key, value FROM user_preferences` | Not currently called by any endpoint |
+**Indices:**
+
+| Nome | Colunas | Tipo |
+|------|---------|------|
+| `idx_search_history_user_created` | `(user_id, created_at DESC)` | B-tree |
+| `idx_search_history_setor` | `(setor_id)` | B-tree |
+| `idx_search_history_status` | `(status)` | B-tree |
+| (implicito via UNIQUE) | `(job_id)` | B-tree |
+
+**RLS:** Habilitada. Policy `search_history_own_data` -- `FOR ALL USING (auth.uid() = user_id)`.
 
 ---
 
-## 6. Migrations
+### 2.3 `public.user_preferences`
 
-**There is no migration system.** Schema creation uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` statements executed on every application startup via `Database.connect()`.
+Preferencias do usuario no formato key-value com valores JSONB.
 
-The schema SQL is defined inline in `backend/database.py` as the `_SCHEMA_SQL` constant (lines 30-59).
+| Coluna | Tipo | Nullable | Default | Constraints |
+|--------|------|----------|---------|-------------|
+| `id` | BIGSERIAL | NOT NULL | auto-increment | PK |
+| `user_id` | UUID | NOT NULL | -- | FK -> `public.users(id)` ON DELETE CASCADE |
+| `key` | TEXT | NOT NULL | -- | UNIQUE(user_id, key) |
+| `value` | JSONB | NOT NULL | -- | -- |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `NOW()` | Auto-atualizado via trigger |
 
-### Migration History
+**Indices:**
 
-| Version | Date | Description |
-|---------|------|-------------|
-| v1 (initial) | ~2026-02 | `search_history` + `user_preferences` tables created (TD-H04) |
+| Nome | Colunas | Tipo |
+|------|---------|------|
+| `idx_user_preferences_user` | `(user_id)` | B-tree |
+| (implicito via UNIQUE) | `(user_id, key)` | B-tree |
 
-There are no subsequent migrations. Schema changes would require manual `ALTER TABLE` or recreating the database.
+**RLS:** Habilitada. Policy `user_preferences_own_data` -- `FOR ALL USING (auth.uid() = user_id)`.
 
 ---
 
-## 7. Data Flow
+### 2.4 `public.saved_searches`
 
-### 7.1 Search Job Lifecycle
+Buscas salvas pelo usuario para reutilizacao rapida. Limite de 10 por usuario (enforced no codigo, nao no DB).
+
+| Coluna | Tipo | Nullable | Default | Constraints |
+|--------|------|----------|---------|-------------|
+| `id` | UUID | NOT NULL | `uuid_generate_v4()` | PK |
+| `user_id` | UUID | NOT NULL | -- | FK -> `public.users(id)` ON DELETE CASCADE |
+| `name` | TEXT | NOT NULL | -- | Nome dado pelo usuario |
+| `search_params` | JSONB | NOT NULL | -- | Parametros da busca (ufs, datas, setor, etc) |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `NOW()` | -- |
+| `last_used_at` | TIMESTAMPTZ | NOT NULL | `NOW()` | Atualizado ao reutilizar a busca |
+
+**Indices:**
+
+| Nome | Colunas | Tipo |
+|------|---------|------|
+| `idx_saved_searches_user` | `(user_id, last_used_at DESC)` | B-tree |
+
+**RLS:** Habilitada. Policy `saved_searches_own_data` -- `FOR ALL USING (auth.uid() = user_id)`.
+
+---
+
+## 3. Relacionamentos (Foreign Keys)
 
 ```
-User POST /buscar
-  |
-  +--> [FastAPI] Create UUID job_id
-  |
-  +--> [SQLite] record_search(job_id, params)     -- Insert "queued" row
-  |
-  +--> [Redis]  job:{id} = {status: "queued"}      -- Create job state
-  |
-  +--> [TaskRunner] enqueue background coroutine
-         |
-         +--> [PNCP API] Fetch procurement records
-         |
-         +--> [Redis] Update job progress
-         |
-         +--> [Filter] Apply keyword/value/UF filters
-         |
-         +--> [Redis] Store filtered items (job:{id}:items)
-         |
-         +--> [LLM] Generate executive summary
-         |
-         +--> [Redis] Store Excel bytes (excel:{id})
-         |
-         +--> [Redis] Complete job (job:{id} = completed)
-         |
-         +--> [SQLite] complete_search(job_id, totals, elapsed)
+auth.users (Supabase Auth - tabela interna)
+    |
+    | 1:1 (id -> id, ON DELETE CASCADE)
+    v
+public.users
+    |
+    |-- 1:N --> public.search_history   (id -> user_id, ON DELETE CASCADE)
+    |-- 1:N --> public.user_preferences (id -> user_id, ON DELETE CASCADE)
+    |-- 1:N --> public.saved_searches   (id -> user_id, ON DELETE CASCADE)
 ```
 
-### 7.2 Data Retrieval
-
-```
-GET /buscar/{id}/status  --> Redis (job state)
-GET /buscar/{id}/result  --> Redis (job result JSON)
-GET /buscar/{id}/items   --> Redis (paginated items, fallback from in-memory)
-GET /buscar/{id}/download --> Redis (excel bytes)
-GET /search-history      --> SQLite (recent search rows)
-```
-
-### 7.3 Redis Key Schema
-
-| Key Pattern | Value Type | TTL | Purpose |
-|-------------|-----------|-----|---------|
-| `job:{uuid}` | JSON string | 24h | Job state, progress, result |
-| `excel:{uuid}` | Raw bytes | 2h | Excel report file |
-| `job:{uuid}:items` | JSON string (array) | 24h | Filtered items for pagination |
-| `job_params:{uuid}` | JSON string | 24h | Durable task parameters (crash recovery) |
-| `pncp_cache:{uf}:{modalidade}:{date}:{date}` | JSON string (array) | 4h | Cached PNCP API responses |
+Todas as FKs usam `ON DELETE CASCADE` -- excluir o usuario remove automaticamente todos os dados associados.
 
 ---
 
-## 8. Supabase Status
+## 4. Diagrama ER
 
-The root `.env.example` contains `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` placeholders, but **Supabase is not integrated into the codebase**. No Supabase client library is installed, no frontend code references Supabase, and no migrations exist in the `supabase/` directory.
+```
++------------------+       +---------------------+
+|   auth.users     |       |   public.users      |
+|  (Supabase Auth) |<------| id (PK, FK)         |
+|  id (PK, UUID)   |  1:1  | email               |
+|  email           |       | display_name        |
+|  raw_user_meta   |       | created_at          |
++------------------+       | updated_at          |
+                           +---------------------+
+                                |    |    |
+                    +-----------+    |    +----------+
+                    |                |               |
+                    v                v               v
+          +------------------+ +----------------+ +------------------+
+          | search_history   | | user_prefs     | | saved_searches   |
+          | id (PK, BIGSER.) | | id (PK, BIGSER)| | id (PK, UUID)    |
+          | user_id (FK)     | | user_id (FK)   | | user_id (FK)     |
+          | job_id (UNIQUE)  | | key            | | name             |
+          | ufs (TEXT[])     | | value (JSONB)  | | search_params    |
+          | data_inicial     | | updated_at     | |   (JSONB)        |
+          | data_final       | | UNIQUE(uid,key)| | created_at       |
+          | setor_id         | +----------------+ | last_used_at     |
+          | termos_busca     |                     +------------------+
+          | total_raw        |
+          | total_filtrado   |
+          | status           |
+          | created_at       |
+          | completed_at     |
+          | elapsed_seconds  |
+          +------------------+
+```
 
-The `database.py` module header explicitly states:
-> "Future migration path: Supabase PostgreSQL for production persistence"
+---
 
-The current database is SQLite, intended as a zero-cost POC solution with ephemeral-safe characteristics for Railway/Vercel deployments.
+## 5. Triggers
+
+| Trigger | Tabela | Evento | Funcao |
+|---------|--------|--------|--------|
+| `tr_users_updated_at` | `public.users` | BEFORE UPDATE | `update_updated_at()` |
+| `tr_user_preferences_updated_at` | `public.user_preferences` | BEFORE UPDATE | `update_updated_at()` |
+| `on_auth_user_created` | `auth.users` | AFTER INSERT | `handle_new_user()` |
+
+---
+
+## 6. Funcoes Armazenadas
+
+### `public.update_updated_at()`
+- **Tipo:** Trigger function
+- **Linguagem:** PL/pgSQL
+- **Descricao:** Define `NEW.updated_at = NOW()` antes de cada UPDATE
+
+### `public.handle_new_user()`
+- **Tipo:** Trigger function
+- **Linguagem:** PL/pgSQL
+- **Seguranca:** SECURITY DEFINER
+- **Descricao:** Ao criar usuario em `auth.users`, insere perfil em `public.users` com `display_name` extraido de `raw_user_meta_data->>'display_name'` ou da parte local do email
+
+### `public.cleanup_old_searches(retention_days INTEGER DEFAULT 90)`
+- **Tipo:** Funcao regular (nao trigger)
+- **Linguagem:** PL/pgSQL
+- **Descricao:** Remove registros de `search_history` com status `completed` ou `failed` mais antigos que `retention_days` dias
+- **Retorno:** INTEGER (quantidade de registros deletados)
+- **Agendamento:** Preparado para `pg_cron` (comentado na migracao -- requer Supabase Pro)
+
+---
+
+## 7. Politicas RLS (Row Level Security)
+
+Todas as tabelas do schema `public` tem RLS habilitada.
+
+| Tabela | Policy | Operacao | Regra USING |
+|--------|--------|----------|-------------|
+| `users` | `users_own_data` | ALL | `auth.uid() = id` |
+| `search_history` | `search_history_own_data` | ALL | `auth.uid() = user_id` |
+| `user_preferences` | `user_preferences_own_data` | ALL | `auth.uid() = user_id` |
+| `saved_searches` | `saved_searches_own_data` | ALL | `auth.uid() = user_id` |
+
+**Nota:** O backend usa `SUPABASE_SERVICE_ROLE_KEY` que bypassa RLS. A RLS atua como defesa em profundidade, protegendo acessos via client-side (anon key).
+
+---
+
+## 8. Camadas de Acesso
+
+### Backend (Python/FastAPI)
+- **Driver:** `supabase-py` >= 2.13.0
+- **Chave:** `SUPABASE_SERVICE_ROLE_KEY` (bypassa RLS)
+- **Modulo:** `backend/database.py` (classe `Database`)
+- **Operacoes:** CRUD em `users`, `search_history`, `user_preferences`
+- **Isolamento:** `user_id` passado explicitamente em todas as queries
+
+### Frontend (Next.js)
+- **Driver:** `@supabase/ssr`
+- **Chave:** `NEXT_PUBLIC_SUPABASE_ANON_KEY` (sujeita a RLS)
+- **Modulos:**
+  - `frontend/lib/supabase/client.ts` -- cliente browser (singleton)
+  - `frontend/lib/supabase/server.ts` -- cliente server-side (cookie-based)
+  - `frontend/lib/supabase/middleware.ts` -- refresh de sessao
+  - `frontend/lib/savedSearchesServer.ts` -- CRUD de `saved_searches`
+- **Operacoes:** CRUD apenas em `saved_searches` (via RLS do usuario autenticado)
+
+### Autenticacao (3 camadas, em ordem de prioridade)
+1. **Supabase JWT** (preferencial) -- validado via `python-jose` em `auth/supabase_auth.py`, extrai `user_id` do claim `sub`
+2. **Custom JWT** (legado) -- validado via `PyJWT` em `auth/jwt.py`, sem `user_id` (claims: iss, aud, sub)
+3. **API Key** (fallback legado) -- header `X-API-Key`, sem `user_id`, comparacao via `hmac.compare_digest`
+
+---
+
+## 9. Armazenamento Complementar (Redis)
+
+O Redis nao faz parte do schema PostgreSQL, mas complementa como armazenamento volatil:
+
+| Key Pattern | Tipo | TTL | Finalidade |
+|-------------|------|-----|------------|
+| `job:{uuid}` | JSON string | 24h | Estado e progresso do job |
+| `excel:{uuid}` | Bytes brutos | 2h | Arquivo Excel para download |
+| `job:{uuid}:items` | Redis LIST | 24h | Itens filtrados para paginacao |
+| `job_params:{uuid}` | JSON string | 24h | Parametros para crash recovery |
+| `pncp_cache:{uf}:{mod}:{d1}:{d2}` | JSON string | 4h | Cache de respostas da API PNCP |
+
+---
+
+## 10. Historico de Migracoes
+
+| Arquivo | Versao | Descricao |
+|---------|--------|-----------|
+| `001_initial_schema.sql` | v3-story-2.0 | Schema completo: tabelas, RLS, triggers, funcao handle_new_user |
+| `002_retention_policy.sql` | v3-story-2.0 | Funcao cleanup_old_searches (pg_cron comentado) |
