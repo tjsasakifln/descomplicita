@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { Button } from "./Button";
 
 interface SaveSearchDialogProps {
   saveSearchName: string;
@@ -95,24 +96,12 @@ export function SaveSearchDialog({
         )}
 
         <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            type="button"
-            className="px-4 py-2 text-sm font-medium text-ink-secondary hover:text-ink
-                       hover:bg-surface-1 rounded-button transition-colors"
-          >
+          <Button onClick={onCancel} type="button" variant="ghost" size="sm">
             Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={!saveSearchName.trim()}
-            type="button"
-            className="px-4 py-2 text-sm font-medium text-white bg-brand-navy
-                       hover:bg-brand-blue-hover rounded-button transition-colors
-                       disabled:bg-ink-faint disabled:cursor-not-allowed"
-          >
+          </Button>
+          <Button onClick={onConfirm} disabled={!saveSearchName.trim()} type="button" size="sm">
             Salvar
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

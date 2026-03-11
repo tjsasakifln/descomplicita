@@ -38,6 +38,11 @@ const config: Config = {
         "status-error-bg": "var(--status-error-bg)",
         "status-error-text": "var(--status-error-text)",
         "status-error-dot": "var(--status-error-dot)",
+        "ink-warning": "var(--ink-warning)",
+        "badge-licitacao-bg": "var(--badge-licitacao-bg)",
+        "badge-licitacao-text": "var(--badge-licitacao-text)",
+        "badge-ata-bg": "var(--badge-ata-bg)",
+        "badge-ata-text": "var(--badge-ata-text)",
       },
       borderColor: {
         DEFAULT: "var(--border)",
@@ -46,6 +51,8 @@ const config: Config = {
         "status-success": "var(--status-success-border)",
         "status-warning": "var(--status-warning-border)",
         "status-error": "var(--status-error-border)",
+        "badge-licitacao": "var(--badge-licitacao-border)",
+        "badge-ata": "var(--badge-ata-border)",
       },
       fontFamily: {
         body: ["var(--font-body)", "sans-serif"],
@@ -59,7 +66,6 @@ const config: Config = {
         input: "4px",
         button: "6px",
         card: "8px",
-        modal: "12px",
       },
       spacing: {
         // Enforce 4px base: 1=4px, 2=8px, 3=12px, 4=16px, 6=24px, 8=32px, 16=64px

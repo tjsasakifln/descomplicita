@@ -5,6 +5,7 @@ import { useAnalytics } from "../../hooks/useAnalytics";
 import type { SearchPhase } from "../types";
 import { CURIOSIDADES, shuffleBalanced } from "./carouselData";
 import { ProgressBar, UfGrid, StageList, STAGES, CuriosityCarousel, SkeletonCards } from "./loading-progress";
+import { Button } from "./Button";
 
 interface LoadingProgressProps {
   phase: SearchPhase;
@@ -141,10 +142,10 @@ export function LoadingProgress({
       <CuriosityCarousel curiosidade={shuffledItems[curiosidadeIndex]} isFading={isFading} />
       <SkeletonCards />
       <div className="mt-4 flex justify-center">
-        <button type="button" onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-ink-muted hover:text-error hover:bg-error-subtle border border-transparent hover:border-error/20 rounded-button transition-all duration-200">
+        <Button type="button" onClick={onCancel} variant="ghost" size="sm"
+          className="text-ink-muted hover:text-error hover:bg-error-subtle">
           Cancelar busca
-        </button>
+        </Button>
       </div>
     </div>
   );

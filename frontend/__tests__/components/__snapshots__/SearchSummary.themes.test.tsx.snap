@@ -1,0 +1,396 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SearchSummary — theme snapshots (TD-UX-011) renders correctly in dark theme 1`] = `
+<div
+  class="p-4 sm:p-6 bg-brand-blue-subtle border border-accent rounded-card"
+>
+  <p
+    class="text-base sm:text-lg leading-relaxed text-ink"
+  >
+    Encontradas 15 licitações de uniformes
+  </p>
+  <div
+    class="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-8 mt-4 sm:mt-6"
+  >
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        15
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        oportunidades
+      </span>
+      <div
+        class="flex flex-wrap gap-2 mt-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-licitacao-bg text-badge-licitacao-text border border-badge-licitacao"
+        >
+          10
+           Licitações
+        </span>
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-ata-bg text-badge-ata-text border border-badge-ata"
+        >
+          5
+           Atas RP
+        </span>
+      </div>
+    </div>
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        R$ 
+        450.000
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        valor total
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 sm:mt-6"
+  >
+    <h3
+      class="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3"
+    >
+      Destaques:
+    </h3>
+    <ul
+      class="list-disc list-inside text-sm sm:text-base space-y-2 text-ink-secondary"
+    >
+      <li
+        class="animate-fade-in-up"
+        style="animation-delay: 0ms;"
+      >
+        Destaque 1
+      </li>
+    </ul>
+  </div>
+  <div
+    data-testid="source-badges"
+  />
+</div>
+`;
+
+exports[`SearchSummary — theme snapshots (TD-UX-011) renders correctly in dim theme 1`] = `
+<div
+  class="p-4 sm:p-6 bg-brand-blue-subtle border border-accent rounded-card"
+>
+  <p
+    class="text-base sm:text-lg leading-relaxed text-ink"
+  >
+    Encontradas 15 licitações de uniformes
+  </p>
+  <div
+    class="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-8 mt-4 sm:mt-6"
+  >
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        15
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        oportunidades
+      </span>
+      <div
+        class="flex flex-wrap gap-2 mt-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-licitacao-bg text-badge-licitacao-text border border-badge-licitacao"
+        >
+          10
+           Licitações
+        </span>
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-ata-bg text-badge-ata-text border border-badge-ata"
+        >
+          5
+           Atas RP
+        </span>
+      </div>
+    </div>
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        R$ 
+        450.000
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        valor total
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 sm:mt-6"
+  >
+    <h3
+      class="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3"
+    >
+      Destaques:
+    </h3>
+    <ul
+      class="list-disc list-inside text-sm sm:text-base space-y-2 text-ink-secondary"
+    >
+      <li
+        class="animate-fade-in-up"
+        style="animation-delay: 0ms;"
+      >
+        Destaque 1
+      </li>
+    </ul>
+  </div>
+  <div
+    data-testid="source-badges"
+  />
+</div>
+`;
+
+exports[`SearchSummary — theme snapshots (TD-UX-011) renders correctly in light theme 1`] = `
+<div
+  class="p-4 sm:p-6 bg-brand-blue-subtle border border-accent rounded-card"
+>
+  <p
+    class="text-base sm:text-lg leading-relaxed text-ink"
+  >
+    Encontradas 15 licitações de uniformes
+  </p>
+  <div
+    class="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-8 mt-4 sm:mt-6"
+  >
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        15
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        oportunidades
+      </span>
+      <div
+        class="flex flex-wrap gap-2 mt-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-licitacao-bg text-badge-licitacao-text border border-badge-licitacao"
+        >
+          10
+           Licitações
+        </span>
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-ata-bg text-badge-ata-text border border-badge-ata"
+        >
+          5
+           Atas RP
+        </span>
+      </div>
+    </div>
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        R$ 
+        450.000
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        valor total
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 sm:mt-6"
+  >
+    <h3
+      class="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3"
+    >
+      Destaques:
+    </h3>
+    <ul
+      class="list-disc list-inside text-sm sm:text-base space-y-2 text-ink-secondary"
+    >
+      <li
+        class="animate-fade-in-up"
+        style="animation-delay: 0ms;"
+      >
+        Destaque 1
+      </li>
+    </ul>
+  </div>
+  <div
+    data-testid="source-badges"
+  />
+</div>
+`;
+
+exports[`SearchSummary — theme snapshots (TD-UX-011) renders correctly in paperwhite theme 1`] = `
+<div
+  class="p-4 sm:p-6 bg-brand-blue-subtle border border-accent rounded-card"
+>
+  <p
+    class="text-base sm:text-lg leading-relaxed text-ink"
+  >
+    Encontradas 15 licitações de uniformes
+  </p>
+  <div
+    class="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-8 mt-4 sm:mt-6"
+  >
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        15
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        oportunidades
+      </span>
+      <div
+        class="flex flex-wrap gap-2 mt-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-licitacao-bg text-badge-licitacao-text border border-badge-licitacao"
+        >
+          10
+           Licitações
+        </span>
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-ata-bg text-badge-ata-text border border-badge-ata"
+        >
+          5
+           Atas RP
+        </span>
+      </div>
+    </div>
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        R$ 
+        450.000
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        valor total
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 sm:mt-6"
+  >
+    <h3
+      class="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3"
+    >
+      Destaques:
+    </h3>
+    <ul
+      class="list-disc list-inside text-sm sm:text-base space-y-2 text-ink-secondary"
+    >
+      <li
+        class="animate-fade-in-up"
+        style="animation-delay: 0ms;"
+      >
+        Destaque 1
+      </li>
+    </ul>
+  </div>
+  <div
+    data-testid="source-badges"
+  />
+</div>
+`;
+
+exports[`SearchSummary — theme snapshots (TD-UX-011) renders correctly in sepia theme 1`] = `
+<div
+  class="p-4 sm:p-6 bg-brand-blue-subtle border border-accent rounded-card"
+>
+  <p
+    class="text-base sm:text-lg leading-relaxed text-ink"
+  >
+    Encontradas 15 licitações de uniformes
+  </p>
+  <div
+    class="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-8 mt-4 sm:mt-6"
+  >
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        15
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        oportunidades
+      </span>
+      <div
+        class="flex flex-wrap gap-2 mt-2"
+      >
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-licitacao-bg text-badge-licitacao-text border border-badge-licitacao"
+        >
+          10
+           Licitações
+        </span>
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-badge-ata-bg text-badge-ata-text border border-badge-ata"
+        >
+          5
+           Atas RP
+        </span>
+      </div>
+    </div>
+    <div>
+      <span
+        class="text-3xl sm:text-4xl font-bold font-data tabular-nums text-brand-navy dark:text-brand-blue"
+      >
+        R$ 
+        450.000
+      </span>
+      <span
+        class="text-sm sm:text-base text-ink-secondary block mt-1"
+      >
+        valor total
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 sm:mt-6"
+  >
+    <h3
+      class="text-base sm:text-lg font-semibold font-display text-ink mb-2 sm:mb-3"
+    >
+      Destaques:
+    </h3>
+    <ul
+      class="list-disc list-inside text-sm sm:text-base space-y-2 text-ink-secondary"
+    >
+      <li
+        class="animate-fade-in-up"
+        style="animation-delay: 0ms;"
+      >
+        Destaque 1
+      </li>
+    </ul>
+  </div>
+  <div
+    data-testid="source-badges"
+  />
+</div>
+`;

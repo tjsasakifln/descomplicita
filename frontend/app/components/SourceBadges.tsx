@@ -108,7 +108,7 @@ export function SourceBadges({ sources, stats, dedupRemoved, truncatedCombos = 0
             </p>
           )}
           {truncatedCombos > 0 && (
-            <p className="mt-2 pt-2 border-t text-xs" style={{ color: 'var(--ink-warning)' }}>
+            <p className="mt-2 pt-2 border-t text-xs text-ink-warning">
               Resultados parciais: {truncatedCombos} combinac{truncatedCombos !== 1 ? "oes" : "ao"} UF/modalidade foram limitadas para evitar timeout. Para resultados completos, reduza o numero de estados.
             </p>
           )}

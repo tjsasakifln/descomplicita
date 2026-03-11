@@ -7,7 +7,6 @@ import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useSearchForm } from "./hooks/useSearchForm";
 import { useSearchJob } from "./hooks/useSearchJob";
 import { useSaveDialog } from "./hooks/useSaveDialog";
-import { APP_VERSION } from "../lib/version";
 import { SearchHeader } from "./components/SearchHeader";
 import { SearchForm } from "./components/SearchForm";
 import { UfSelector } from "./components/UfSelector";
@@ -16,13 +15,10 @@ import { LargeVolumeWarning } from "./components/LargeVolumeWarning";
 import { SearchSummary } from "./components/SearchSummary";
 import { SearchActions } from "./components/SearchActions";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Button } from "./components/Button";
+import { Footer } from "./components/Footer";
 import type { SavedSearch } from "../lib/savedSearches";
-
-function dateDiffInDays(date1: string, date2: string): number {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  return Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-}
+import { dateDiffInDays } from "../lib/utils";
 
 // Task 15 (TD-042): Dynamic imports for heavy components
 const SaveSearchDialog = dynamic(
@@ -163,10 +159,10 @@ export default function HomePage() {
         />
         </ErrorBoundary>
 
-        <button onClick={handleBuscar} disabled={job.loading || !form.canSearch} type="button" aria-busy={job.loading}
-          className="w-full bg-brand-navy text-white py-3 sm:py-4 rounded-button text-base sm:text-lg font-semibold hover:bg-brand-blue-hover active:bg-brand-blue disabled:bg-ink-faint disabled:text-ink-muted disabled:cursor-not-allowed transition-all duration-200">
+        <Button onClick={handleBuscar} disabled={!form.canSearch} loading={job.loading} type="button"
+          size="lg" className="w-full sm:py-4 text-base sm:text-lg font-semibold" aria-busy={job.loading}>
           {job.loading ? "Buscando..." : `Buscar ${form.searchLabel}`}
-        </button>
+        </Button>
 
         {job.loading && (
           <div aria-live="polite">
@@ -180,10 +176,9 @@ export default function HomePage() {
         {job.error && (
           <div className="mt-6 sm:mt-8 p-4 sm:p-5 bg-error-subtle border border-error/20 rounded-card animate-fade-in-up" role="alert">
             <p className="text-sm sm:text-base font-medium text-error mb-3">{job.error}</p>
-            <button onClick={handleBuscar} disabled={job.loading}
-              className="px-4 py-2 bg-error text-white rounded-button text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+            <Button onClick={handleBuscar} disabled={job.loading} variant="danger" size="sm">
               Tentar novamente
-            </button>
+            </Button>
           </div>
         )}
 
@@ -225,16 +220,7 @@ export default function HomePage() {
           onConfirm={save.confirmSaveSearch} onCancel={save.cancelSaveDialog} saveError={save.saveError} />
       )}
 
-      <footer className="border-t mt-12 py-6 text-xs text-ink-muted">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>DescompLicita &mdash; Licitações e Contratos de Forma Descomplicada</span>
-          <nav aria-label="Links do rodapé" className="flex items-center gap-4">
-            <a href="mailto:contato@descomplicita.com.br" className="hover:text-ink transition-colors">Contato</a>
-            <a href="/termos" className="hover:text-ink transition-colors">Termos de Uso</a>
-            <span className="tabular-nums font-data">{APP_VERSION}</span>
-          </nav>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

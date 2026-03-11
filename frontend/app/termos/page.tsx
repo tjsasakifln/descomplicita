@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { APP_VERSION } from "../../lib/version";
+import { Footer } from "../components/Footer";
 
 export const metadata: Metadata = {
   title: "Termos de Uso — DescompLicita",
@@ -168,16 +168,7 @@ export default function TermosPage() {
         </div>
       </main>
 
-      <footer className="border-t mt-12 py-6 text-xs text-ink-muted">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>DescompLicita &mdash; Licitações e Contratos de Forma Descomplicada</span>
-          <nav aria-label="Links do rodapé" className="flex items-center gap-4">
-            <a href="mailto:contato@descomplicita.com.br" className="hover:text-ink transition-colors">Contato</a>
-            <a href="/termos" className="hover:text-ink transition-colors" aria-current="page">Termos de Uso</a>
-            <span className="tabular-nums font-data">{APP_VERSION}</span>
-          </nav>
-        </div>
-      </footer>
+      <Footer currentPage="termos" />
     </div>
   );
 }

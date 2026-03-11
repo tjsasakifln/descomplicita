@@ -236,10 +236,10 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Keyword highlight mark — theme-aware via CSS custom property */
+/* Keyword highlight mark — theme-aware via design tokens (TD-UX-021) */
 mark {
-  background-color: var(--color-highlight-bg, #fef08a);
-  color: inherit;
+  background-color: var(--brand-blue-subtle);
+  color: var(--ink);
   padding: 0.05em 0.15em;
   border-radius: 2px;
 }

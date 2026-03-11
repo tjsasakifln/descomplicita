@@ -1,7 +1,7 @@
 "use client";
 
 import type { BuscaResult } from "../types";
-import { Spinner } from "./Spinner";
+import { Button } from "./Button";
 
 interface SearchActionsProps {
   result: BuscaResult;
@@ -29,21 +29,15 @@ export function SearchActions({
   return (
     <>
       {/* Download Button */}
-      <button
+      <Button
         onClick={onDownload}
-        disabled={downloadLoading}
+        loading={downloadLoading}
+        size="lg"
+        className="w-full sm:py-4 text-base sm:text-lg font-semibold"
         aria-label={`Baixar Excel com ${result.resumo.total_oportunidades} licitações`}
-        className="w-full bg-brand-navy text-white py-3 sm:py-4 rounded-button text-base sm:text-lg font-semibold
-                   hover:bg-brand-blue-hover active:bg-brand-blue
-                   disabled:bg-ink-faint disabled:text-ink-muted disabled:cursor-not-allowed
-                   transition-all duration-200
-                   flex items-center justify-center gap-3"
       >
         {downloadLoading ? (
-          <>
-            <Spinner size="md" />
-            Preparando download...
-          </>
+          "Preparando download..."
         ) : (
           <>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -55,7 +49,7 @@ export function SearchActions({
             } licitações)
           </>
         )}
-      </button>
+      </Button>
 
       {/* Export limit message + CSV download (v3-story-2.2) */}
       {result.export_limited && onDownloadCsv && (
@@ -75,14 +69,12 @@ export function SearchActions({
       )}
 
       {/* Save Search Button */}
-      <button
+      <Button
         onClick={onSaveSearch}
         disabled={isMaxCapacity}
         type="button"
-        className="w-full bg-surface-0 text-brand-navy py-2.5 sm:py-3 rounded-button text-sm sm:text-base font-medium
-                   border border-brand-navy hover:bg-brand-blue-subtle
-                   disabled:bg-surface-0 disabled:text-ink-muted disabled:border-ink-faint disabled:cursor-not-allowed
-                   transition-all duration-200 flex items-center justify-center gap-2"
+        variant="secondary"
+        className="w-full"
         title={isMaxCapacity ? "Máximo de 10 buscas salvas atingido" : "Salvar esta busca"}
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -90,7 +82,7 @@ export function SearchActions({
                 d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
         </svg>
         {isMaxCapacity ? "Limite de buscas atingido" : "Salvar Busca"}
-      </button>
+      </Button>
 
       {/* Download Error */}
       {downloadError && (

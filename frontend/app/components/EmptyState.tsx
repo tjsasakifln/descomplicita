@@ -1,6 +1,7 @@
 "use client";
 
 import type { FilterStats } from "../types";
+import { Button } from "./Button";
 
 interface EmptyStateProps {
   onAdjustSearch?: () => void;
@@ -126,13 +127,9 @@ export function EmptyState({
       )}
 
       {/* Action Button */}
-      <button
-        onClick={handleAdjust}
-        className="px-6 py-3 bg-brand-navy text-white rounded-button font-semibold
-                   hover:bg-brand-blue-hover active:bg-brand-blue transition-colors"
-      >
+      <Button onClick={handleAdjust} size="lg">
         Ajustar critérios de busca
-      </button>
+      </Button>
     </div>
   );
 }
