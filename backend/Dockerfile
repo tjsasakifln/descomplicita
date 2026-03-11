@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # --- Stage 2: Production ---
 FROM python:3.11-slim
 
-LABEL build.timestamp="2026-03-07T22:30:00"
+LABEL build.timestamp="2026-03-11T14:30:00"
 
 WORKDIR /app
 
@@ -33,6 +33,10 @@ ENV PYTHONPATH="/app:/app/deps" \
 
 # Copy application code
 COPY . .
+
+# Pre-download NLTK data (RSLP stemmer) to avoid runtime download
+RUN PYTHONPATH="/app/deps" python -c "import nltk; nltk.download('rslp', download_dir='/app/nltk_data')"
+ENV NLTK_DATA="/app/nltk_data"
 
 # Remove dev files from production image
 RUN rm -f requirements-dev.txt && \

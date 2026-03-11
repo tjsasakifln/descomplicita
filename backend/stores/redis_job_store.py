@@ -144,6 +144,14 @@ class RedisJobStore(JobStore):
         if job:
             await self._redis_set(job)
 
+    async def cancel(self, job_id: str, reason: str = "Busca cancelada pelo usuário.") -> None:
+        """Mark job cancelled in both in-memory cache and Redis."""
+        await super().cancel(job_id, reason)
+        async with self._lock:
+            job = self._jobs.get(job_id)
+        if job:
+            await self._redis_set(job)
+
     async def get(self, job_id: str) -> Optional[SearchJob]:
         """Get job from in-memory cache first, fallback to Redis."""
         job = await super().get(job_id)

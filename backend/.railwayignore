@@ -1,1 +1,16 @@
-# Deploy trigger 1769610324
+# Deploy trigger 1741706400
+# Development tools
+.claude/
+.aios/
+.aios-core/
+.playwright-mcp/
+
+# Testing
+tests/
+coverage/
+.pytest_cache/
+requirements-dev.txt
+
+# Scripts
+scripts/
+

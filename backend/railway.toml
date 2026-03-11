@@ -24,9 +24,15 @@ restartPolicyMaxRetries = 3
 # REQUIRED:
 #   - OPENAI_API_KEY (Get from https://platform.openai.com/api-keys)
 #   - PORT (Auto-injected by Railway)
+#   - At least ONE auth secret (SYS-007 safeguard):
+#     SUPABASE_JWT_SECRET, JWT_SECRET, or API_KEY
+#   - SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (for database persistence)
 #
 # OPTIONAL (with defaults):
+#   - ENVIRONMENT=production (triggers SYS-007 safeguard if no auth secrets)
 #   - LOG_LEVEL=INFO
 #   - PNCP_TIMEOUT=30
 #   - PNCP_MAX_RETRIES=5
+#   - REDIS_URL (auto-injected if Redis addon is attached)
+#   - SENTRY_DSN (error monitoring)
 # =============================================================================

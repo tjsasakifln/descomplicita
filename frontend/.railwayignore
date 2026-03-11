@@ -1,0 +1,22 @@
+# Development tools
+.claude/
+.aios/
+.aios-core/
+.playwright-mcp/
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
