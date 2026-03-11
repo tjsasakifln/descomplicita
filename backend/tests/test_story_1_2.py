@@ -57,7 +57,9 @@ class TestAuthRateLimiting:
         self._reset_limiter()
         statuses = []
         for _ in range(15):
-            resp = client.post("/auth/signup", json={"email": "a@b.com", "password": "x", "display_name": "Test"})
+            resp = client.post(
+                "/auth/signup", json={"email": "a@b.com", "password": "secret123", "display_name": "Test"}
+            )
             statuses.append(resp.status_code)
 
         assert 429 in statuses, "Expected 429 on /auth/signup after burst"

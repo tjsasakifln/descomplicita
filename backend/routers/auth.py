@@ -1,13 +1,19 @@
-"""Authentication endpoints (v3-story-2.0: Supabase Auth)."""
+"""Authentication endpoints (v3-story-2.0: Supabase Auth, story-2.2: Pydantic + DI).
+
+TD-SYS-005: Supabase client via DI singleton (no per-request creation).
+TD-SYS-006: Pydantic request models on all /auth/* endpoints — 422 on invalid payloads.
+"""
 
 import hmac
 import logging
 import os
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, EmailStr, Field
 
 from auth.jwt import generate_token
-from dependencies import get_database
+from dependencies import get_database, get_supabase_auth_client
 from error_codes import ErrorCode, error_response
 from rate_limit import limiter
 
@@ -17,11 +23,82 @@ router = APIRouter(tags=["auth"])
 
 
 # ---------------------------------------------------------------------------
+# Pydantic request/response models (TD-SYS-006 / story-2.2)
+# ---------------------------------------------------------------------------
+
+
+class AuthSignupRequest(BaseModel):
+    """Request body for POST /auth/signup."""
+
+    email: EmailStr
+    password: str = Field(..., min_length=6, description="Password (min 6 chars)")
+    display_name: str = Field("", description="Display name (optional)")
+
+
+class AuthLoginRequest(BaseModel):
+    """Request body for POST /auth/login."""
+
+    email: EmailStr
+    password: str = Field(..., min_length=1, description="Password")
+
+
+class AuthRefreshRequest(BaseModel):
+    """Request body for POST /auth/refresh."""
+
+    refresh_token: str = Field(..., min_length=1, description="Refresh token from login/signup")
+
+
+class AuthUserResponse(BaseModel):
+    """User data returned in auth responses."""
+
+    id: str
+    email: str
+
+
+class AuthSessionResponse(BaseModel):
+    """Session data returned in auth responses."""
+
+    access_token: str
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None
+    token_type: str = "bearer"
+
+
+class AuthSignupResponse(BaseModel):
+    """Response body for POST /auth/signup."""
+
+    user: AuthUserResponse
+    session: Optional[AuthSessionResponse] = None
+    message: str
+
+
+class AuthLoginResponse(BaseModel):
+    """Response body for POST /auth/login."""
+
+    user: AuthUserResponse
+    session: AuthSessionResponse
+
+
+class AuthRefreshResponse(BaseModel):
+    """Response body for POST /auth/refresh."""
+
+    session: AuthSessionResponse
+
+
+class AuthTokenResponse(BaseModel):
+    """Response body for POST /auth/token."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+# ---------------------------------------------------------------------------
 # JWT token endpoint (TD-C02/XD-SEC-02)
 # ---------------------------------------------------------------------------
 
 
-@router.post("/auth/token")
+@router.post("/auth/token", response_model=AuthTokenResponse)
 @limiter.limit("10/minute")
 async def auth_token(request: Request):
     """Exchange API key for a JWT token.
@@ -56,42 +133,29 @@ async def auth_token(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Supabase Auth endpoints (v3-story-2.0 / Task 6)
+# Supabase Auth endpoints (v3-story-2.0 / Task 6, story-2.2: Pydantic + DI)
 # ---------------------------------------------------------------------------
 
 
-@router.post("/auth/signup")
+@router.post("/auth/signup", response_model=AuthSignupResponse)
 @limiter.limit("10/minute")
-async def auth_signup(request: Request, database=Depends(get_database)):
+async def auth_signup(
+    request: Request,
+    body: AuthSignupRequest,
+    database=Depends(get_database),
+    supabase=Depends(get_supabase_auth_client),
+):
     """Register a new user via Supabase Auth."""
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
-
-    if not supabase_url or not supabase_key:
+    if not supabase:
         raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
 
-    body = await request.json()
-    email = body.get("email", "")
-    password = body.get("password", "")
-    display_name = body.get("display_name", "")
-
-    if not email or not password:
-        raise error_response(
-            ErrorCode.VALIDATION_ERROR,
-            status_code=400,
-            message="Email and password are required",
-        )
-
     try:
-        from supabase import create_client
-
-        client = create_client(supabase_url, supabase_key)
-        result = client.auth.sign_up(
+        result = supabase.auth.sign_up(
             {
-                "email": email,
-                "password": password,
+                "email": body.email,
+                "password": body.password,
                 "options": {
-                    "data": {"display_name": display_name or email.split("@")[0]},
+                    "data": {"display_name": body.display_name or body.email.split("@")[0]},
                 },
             }
         )
@@ -128,35 +192,22 @@ async def auth_signup(request: Request, database=Depends(get_database)):
         )
 
 
-@router.post("/auth/login")
+@router.post("/auth/login", response_model=AuthLoginResponse)
 @limiter.limit("10/minute")
-async def auth_login(request: Request):
+async def auth_login(
+    request: Request,
+    body: AuthLoginRequest,
+    supabase=Depends(get_supabase_auth_client),
+):
     """Authenticate user via Supabase Auth (email/password)."""
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
-
-    if not supabase_url or not supabase_key:
+    if not supabase:
         raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
 
-    body = await request.json()
-    email = body.get("email", "")
-    password = body.get("password", "")
-
-    if not email or not password:
-        raise error_response(
-            ErrorCode.VALIDATION_ERROR,
-            status_code=400,
-            message="Email and password are required",
-        )
-
     try:
-        from supabase import create_client
-
-        client = create_client(supabase_url, supabase_key)
-        result = client.auth.sign_in_with_password(
+        result = supabase.auth.sign_in_with_password(
             {
-                "email": email,
-                "password": password,
+                "email": body.email,
+                "password": body.password,
             }
         )
 
@@ -190,31 +241,19 @@ async def auth_login(request: Request):
         )
 
 
-@router.post("/auth/refresh")
+@router.post("/auth/refresh", response_model=AuthRefreshResponse)
 @limiter.limit("10/minute")
-async def auth_refresh(request: Request):
+async def auth_refresh(
+    request: Request,
+    body: AuthRefreshRequest,
+    supabase=Depends(get_supabase_auth_client),
+):
     """Refresh an expired Supabase Auth session."""
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
-
-    if not supabase_url or not supabase_key:
+    if not supabase:
         raise error_response(ErrorCode.JWT_NOT_CONFIGURED, status_code=503)
 
-    body = await request.json()
-    refresh_token = body.get("refresh_token", "")
-
-    if not refresh_token:
-        raise error_response(
-            ErrorCode.VALIDATION_ERROR,
-            status_code=400,
-            message="refresh_token is required",
-        )
-
     try:
-        from supabase import create_client
-
-        client = create_client(supabase_url, supabase_key)
-        result = client.auth.refresh_session(refresh_token)
+        result = supabase.auth.refresh_session(body.refresh_token)
 
         if result.session:
             return {

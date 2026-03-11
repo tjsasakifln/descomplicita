@@ -61,11 +61,38 @@ jobs:
             fi
           fi
 
-  deploy-backend:
-    name: Deploy Backend (Railway)
+  run-migrations:
+    name: Apply Database Migrations (story-2.2 / TD-SYS-013)
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply pending migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "Applying pending migrations via supabase db push..."
+          supabase db push --db-url "$SUPABASE_DB_URL"
+          echo "Migrations applied successfully"
+
+  deploy-backend:
+    name: Deploy Backend (Railway)
+    runs-on: ubuntu-latest
+    needs: [detect-changes, run-migrations]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.backend == 'true' &&
+      (needs.run-migrations.result == 'success' || needs.run-migrations.result == 'skipped')
     environment: production
 
     steps:

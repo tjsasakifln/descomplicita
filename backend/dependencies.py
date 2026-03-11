@@ -182,3 +182,44 @@ def get_task_runner():
 def get_database():
     """Dependency: get the database (may be None)."""
     return _app_state.database
+
+
+# ---------------------------------------------------------------------------
+# Supabase Auth client — reusable singleton (TD-SYS-005 / story-2.2)
+# ---------------------------------------------------------------------------
+
+_supabase_auth_client = None
+
+
+def get_supabase_auth_client():
+    """Return a reusable Supabase client for auth operations.
+
+    Creates a singleton on first call. Thread-safe because supabase-py
+    uses HTTP (stateless) under the hood — no connection pool to worry about.
+    Returns None if SUPABASE_URL or SUPABASE_KEY are not configured.
+    """
+    global _supabase_auth_client
+    if _supabase_auth_client is not None:
+        return _supabase_auth_client
+
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+
+    if not supabase_url or not supabase_key:
+        return None
+
+    try:
+        from supabase import create_client
+
+        _supabase_auth_client = create_client(supabase_url, supabase_key)
+        logger.info("Supabase auth client created (singleton)")
+        return _supabase_auth_client
+    except Exception as e:
+        logger.warning("Failed to create Supabase auth client: %s", e)
+        return None
+
+
+def reset_supabase_auth_client():
+    """Reset the singleton (for tests)."""
+    global _supabase_auth_client
+    _supabase_auth_client = None

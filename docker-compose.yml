@@ -1,21 +1,23 @@
 # =============================================================================
 # Descomplicita - Docker Compose Development Environment
 # =============================================================================
-# This file orchestrates backend (FastAPI) and frontend (Next.js placeholder)
-# services for local development with hot-reload capabilities.
+# Orchestrates backend (FastAPI) + frontend (Next.js) + Redis for local dev.
+# Updated story-2.2 / TD-SYS-010: Reflects Supabase + Redis stack.
 #
 # USAGE:
-#   docker-compose up           # Start all services
-#   docker-compose up -d        # Start in background (detached)
-#   docker-compose logs -f      # Follow logs
-#   docker-compose down         # Stop and remove containers
-#   docker-compose build        # Rebuild images after dependency changes
+#   docker compose up           # Start all services
+#   docker compose up -d        # Start in background (detached)
+#   docker compose logs -f      # Follow logs
+#   docker compose down         # Stop and remove containers
+#   docker compose build        # Rebuild images after dependency changes
 #
 # REQUIREMENTS:
 #   - Docker Engine 20.10+
 #   - Docker Compose 2.0+
 #   - .env file (copy from .env.example)
 #
+# NOTE: Supabase runs as a hosted service (supabase.com). This compose file
+# connects to it via environment variables — there is no local Supabase container.
 # =============================================================================
 
 services:
@@ -57,14 +59,26 @@ services:
       - /app/.pytest_cache
       - /app/__pycache__
     environment:
-      # OpenAI Configuration
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-
       # Backend Configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=development
 
       # Redis
       - REDIS_URL=redis://redis:6379/0
+
+      # Supabase (hosted service — story-2.2)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+
+      # Auth
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET_PREVIOUS=${JWT_SECRET_PREVIOUS:-}
+      - API_KEY=${API_KEY:-}
+
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
 
       # PNCP Client Configuration
       - PNCP_BASE_URL=${PNCP_BASE_URL:-https://pncp.gov.br/api/consulta/v1}
@@ -74,6 +88,7 @@ services:
       - PNCP_BACKOFF_MAX=${PNCP_BACKOFF_MAX:-60}
 
       # LLM Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-gpt-4.1-nano}
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.3}
       - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-500}
@@ -84,16 +99,15 @@ services:
       - descomplicita-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
 
   # ---------------------------------------------------------------------------
-  # Frontend Service (Next.js Placeholder - nginx)
+  # Frontend Service (Next.js)
   # ---------------------------------------------------------------------------
-  # NOTE: This is a placeholder until issue #21 implements actual Next.js app
   frontend:
     build:
       context: ./frontend
@@ -101,6 +115,11 @@ services:
     container_name: descomplicita-frontend
     ports:
       - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_KEY}
+      - BACKEND_URL=http://backend:8000
+      - BACKEND_API_KEY=${API_KEY:-}
     networks:
       - descomplicita-network
     restart: unless-stopped
@@ -123,7 +142,7 @@ networks:
     name: descomplicita-network
 
 # =============================================================================
-# Volumes (for future use with databases, etc.)
+# Volumes
 # =============================================================================
 volumes:
   redis_data:
