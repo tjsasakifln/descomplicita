@@ -1,0 +1,431 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AuthModal theme snapshots renders correctly in dark theme 1`] = `
+<div>
+  <dialog
+    class="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--surface-elevated)] text-[var(--ink)]"
+  >
+    <form
+      class="p-6"
+    >
+      <div
+        class="flex items-center justify-between mb-6"
+      >
+        <h2
+          class="text-lg font-semibold"
+        >
+          Entrar
+        </h2>
+        <button
+          aria-label="Fechar"
+          class="text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xl leading-none"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <div
+        class="mb-4"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-email"
+        >
+          Email
+        </label>
+        <input
+          autocomplete="email"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-email"
+          placeholder="seu@email.com"
+          required=""
+          type="email"
+          value=""
+        />
+      </div>
+      <div
+        class="mb-6"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-password"
+        >
+          Senha
+        </label>
+        <input
+          autocomplete="current-password"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-password"
+          minlength="6"
+          placeholder="Min. 6 caracteres"
+          required=""
+          type="password"
+          value=""
+        />
+      </div>
+      <button
+        class="w-full py-2.5 rounded-lg font-medium bg-[var(--brand-blue)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+        type="submit"
+      >
+        Entrar
+      </button>
+      <p
+        class="mt-4 text-center text-sm text-[var(--ink-secondary)]"
+      >
+        Ainda nao tem conta?
+         
+        <button
+          class="text-[var(--brand-blue)] hover:underline"
+          type="button"
+        >
+          Criar conta
+        </button>
+      </p>
+    </form>
+  </dialog>
+</div>
+`;
+
+exports[`AuthModal theme snapshots renders correctly in dim theme 1`] = `
+<div>
+  <dialog
+    class="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--surface-elevated)] text-[var(--ink)]"
+  >
+    <form
+      class="p-6"
+    >
+      <div
+        class="flex items-center justify-between mb-6"
+      >
+        <h2
+          class="text-lg font-semibold"
+        >
+          Entrar
+        </h2>
+        <button
+          aria-label="Fechar"
+          class="text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xl leading-none"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <div
+        class="mb-4"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-email"
+        >
+          Email
+        </label>
+        <input
+          autocomplete="email"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-email"
+          placeholder="seu@email.com"
+          required=""
+          type="email"
+          value=""
+        />
+      </div>
+      <div
+        class="mb-6"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-password"
+        >
+          Senha
+        </label>
+        <input
+          autocomplete="current-password"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-password"
+          minlength="6"
+          placeholder="Min. 6 caracteres"
+          required=""
+          type="password"
+          value=""
+        />
+      </div>
+      <button
+        class="w-full py-2.5 rounded-lg font-medium bg-[var(--brand-blue)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+        type="submit"
+      >
+        Entrar
+      </button>
+      <p
+        class="mt-4 text-center text-sm text-[var(--ink-secondary)]"
+      >
+        Ainda nao tem conta?
+         
+        <button
+          class="text-[var(--brand-blue)] hover:underline"
+          type="button"
+        >
+          Criar conta
+        </button>
+      </p>
+    </form>
+  </dialog>
+</div>
+`;
+
+exports[`AuthModal theme snapshots renders correctly in light theme 1`] = `
+<div>
+  <dialog
+    class="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--surface-elevated)] text-[var(--ink)]"
+  >
+    <form
+      class="p-6"
+    >
+      <div
+        class="flex items-center justify-between mb-6"
+      >
+        <h2
+          class="text-lg font-semibold"
+        >
+          Entrar
+        </h2>
+        <button
+          aria-label="Fechar"
+          class="text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xl leading-none"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <div
+        class="mb-4"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-email"
+        >
+          Email
+        </label>
+        <input
+          autocomplete="email"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-email"
+          placeholder="seu@email.com"
+          required=""
+          type="email"
+          value=""
+        />
+      </div>
+      <div
+        class="mb-6"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-password"
+        >
+          Senha
+        </label>
+        <input
+          autocomplete="current-password"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-password"
+          minlength="6"
+          placeholder="Min. 6 caracteres"
+          required=""
+          type="password"
+          value=""
+        />
+      </div>
+      <button
+        class="w-full py-2.5 rounded-lg font-medium bg-[var(--brand-blue)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+        type="submit"
+      >
+        Entrar
+      </button>
+      <p
+        class="mt-4 text-center text-sm text-[var(--ink-secondary)]"
+      >
+        Ainda nao tem conta?
+         
+        <button
+          class="text-[var(--brand-blue)] hover:underline"
+          type="button"
+        >
+          Criar conta
+        </button>
+      </p>
+    </form>
+  </dialog>
+</div>
+`;
+
+exports[`AuthModal theme snapshots renders correctly in paperwhite theme 1`] = `
+<div>
+  <dialog
+    class="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--surface-elevated)] text-[var(--ink)]"
+  >
+    <form
+      class="p-6"
+    >
+      <div
+        class="flex items-center justify-between mb-6"
+      >
+        <h2
+          class="text-lg font-semibold"
+        >
+          Entrar
+        </h2>
+        <button
+          aria-label="Fechar"
+          class="text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xl leading-none"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <div
+        class="mb-4"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-email"
+        >
+          Email
+        </label>
+        <input
+          autocomplete="email"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-email"
+          placeholder="seu@email.com"
+          required=""
+          type="email"
+          value=""
+        />
+      </div>
+      <div
+        class="mb-6"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-password"
+        >
+          Senha
+        </label>
+        <input
+          autocomplete="current-password"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-password"
+          minlength="6"
+          placeholder="Min. 6 caracteres"
+          required=""
+          type="password"
+          value=""
+        />
+      </div>
+      <button
+        class="w-full py-2.5 rounded-lg font-medium bg-[var(--brand-blue)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+        type="submit"
+      >
+        Entrar
+      </button>
+      <p
+        class="mt-4 text-center text-sm text-[var(--ink-secondary)]"
+      >
+        Ainda nao tem conta?
+         
+        <button
+          class="text-[var(--brand-blue)] hover:underline"
+          type="button"
+        >
+          Criar conta
+        </button>
+      </p>
+    </form>
+  </dialog>
+</div>
+`;
+
+exports[`AuthModal theme snapshots renders correctly in sepia theme 1`] = `
+<div>
+  <dialog
+    class="rounded-xl p-0 backdrop:bg-black/50 w-full max-w-md bg-[var(--surface-elevated)] text-[var(--ink)]"
+  >
+    <form
+      class="p-6"
+    >
+      <div
+        class="flex items-center justify-between mb-6"
+      >
+        <h2
+          class="text-lg font-semibold"
+        >
+          Entrar
+        </h2>
+        <button
+          aria-label="Fechar"
+          class="text-[var(--ink-secondary)] hover:text-[var(--ink)] text-xl leading-none"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <div
+        class="mb-4"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-email"
+        >
+          Email
+        </label>
+        <input
+          autocomplete="email"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-email"
+          placeholder="seu@email.com"
+          required=""
+          type="email"
+          value=""
+        />
+      </div>
+      <div
+        class="mb-6"
+      >
+        <label
+          class="block text-sm font-medium mb-1 text-[var(--ink-secondary)]"
+          for="auth-password"
+        >
+          Senha
+        </label>
+        <input
+          autocomplete="current-password"
+          class="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          id="auth-password"
+          minlength="6"
+          placeholder="Min. 6 caracteres"
+          required=""
+          type="password"
+          value=""
+        />
+      </div>
+      <button
+        class="w-full py-2.5 rounded-lg font-medium bg-[var(--brand-blue)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+        type="submit"
+      >
+        Entrar
+      </button>
+      <p
+        class="mt-4 text-center text-sm text-[var(--ink-secondary)]"
+      >
+        Ainda nao tem conta?
+         
+        <button
+          class="text-[var(--brand-blue)] hover:underline"
+          type="button"
+        >
+          Criar conta
+        </button>
+      </p>
+    </form>
+  </dialog>
+</div>
+`;

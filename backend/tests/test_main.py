@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from io import BytesIO
 from fastapi.testclient import TestClient
 from main import app, run_search_job
-from dependencies import get_job_store, get_orchestrator, get_pncp_source
+from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_task_runner, get_database
 from tests.conftest import get_test_job_store
 from tests.mock_helpers import make_mock_orchestrator
 
@@ -757,3 +757,80 @@ class TestJobLifecycle:
         }
         client.post("/buscar", json=request)
         assert "old-job" not in job_store._jobs
+
+
+class TestCancelJobEndpoint:
+    """Test DELETE /buscar/{job_id} cancel endpoint (story-0.2)."""
+
+    @pytest.fixture(autouse=True)
+    def reset_job_store(self, job_store):
+        job_store._jobs.clear()
+        yield
+        job_store._jobs.clear()
+
+    @pytest.fixture(autouse=True)
+    def override_task_runner_and_database(self):
+        """Provide a no-op task runner and database so cancel_job doesn't crash."""
+        mock_task_runner = Mock()
+        mock_task_runner.cancel_job = AsyncMock()
+
+        mock_database = Mock()
+        mock_database.cancel_search = AsyncMock()
+
+        app.dependency_overrides[get_task_runner] = lambda: mock_task_runner
+        app.dependency_overrides[get_database] = lambda: mock_database
+        yield mock_task_runner, mock_database
+        app.dependency_overrides.pop(get_task_runner, None)
+        app.dependency_overrides.pop(get_database, None)
+
+    def test_cancel_running_job_returns_cancelled(self, client, job_store):
+        """DELETE /buscar/{job_id} on a running job returns 200 with status=cancelled."""
+        from job_store import SearchJob
+
+        job = SearchJob(job_id="running-cancel-test", status="running")
+        job_store._jobs["running-cancel-test"] = job
+
+        resp = client.delete("/buscar/running-cancel-test")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "cancelled"}
+
+    def test_cancel_sets_job_status_to_cancelled(self, client, job_store):
+        """After cancel, the job status in the store should be 'cancelled'."""
+        from job_store import SearchJob
+
+        job = SearchJob(job_id="cancel-status-check", status="running")
+        job_store._jobs["cancel-status-check"] = job
+
+        client.delete("/buscar/cancel-status-check")
+
+        updated_job = job_store._jobs.get("cancel-status-check")
+        assert updated_job is not None
+        assert updated_job.status == "cancelled"
+
+    def test_cancel_unknown_job_returns_404(self, client):
+        """DELETE /buscar/{job_id} on a nonexistent job returns 404."""
+        resp = client.delete("/buscar/nonexistent-job-id")
+        assert resp.status_code == 404
+
+    def test_cancel_already_completed_job_returns_409(self, client, job_store):
+        """DELETE on an already-completed job must return 409 Conflict."""
+        from job_store import SearchJob
+
+        job = SearchJob(job_id="completed-cancel-test", status="completed")
+        job_store._jobs["completed-cancel-test"] = job
+
+        resp = client.delete("/buscar/completed-cancel-test")
+
+        assert resp.status_code == 409
+
+    def test_cancel_already_cancelled_job_returns_409(self, client, job_store):
+        """DELETE on an already-cancelled job must return 409 Conflict."""
+        from job_store import SearchJob
+
+        job = SearchJob(job_id="already-cancelled-test", status="cancelled")
+        job_store._jobs["already-cancelled-test"] = job
+
+        resp = client.delete("/buscar/already-cancelled-test")
+
+        assert resp.status_code == 409

@@ -14,29 +14,29 @@ Corrigir todas as inconsistencias visuais que causariam constrangimento em uma d
 
 ## Tasks
 
-- [ ] **Task 1** (TD-UX-001) -- Corrigir 6 tokens CSS inexistentes no AuthModal: `--card-bg` -> `--surface-elevated`, `--text-primary` -> `--ink`, `--text-secondary` -> `--ink-secondary`, `--border-color` -> `--border`, `--input-bg` -> `--surface-1`, `--accent-color` -> `--brand-blue` -- 2h
-- [ ] **Task 2** (TD-UX-002) -- Migrar feedback de erro/sucesso do AuthModal de classes Tailwind hardcoded (`bg-red-100`, `bg-green-100`) para tokens semanticos (`bg-error-subtle`/`text-error`, `bg-success-subtle`/`text-success`) -- 1h
-- [ ] **Task 3** (TD-UX-003) -- Migrar badges do ItemsList de cores Tailwind hardcoded (`bg-amber-100`, `bg-blue-100`) para tokens `--badge-licitacao-*`/`--badge-ata-*` ja definidos; migrar texto de erro de `text-red-600` para `text-error` -- 2h
-- [ ] **Task 4** (TD-UX-010) -- Adicionar acentos nos aria-labels da paginacao: "Navegacao de paginas", "Pagina anterior", "Proxima pagina" -- 0.5h
+- [x] **Task 1** (TD-UX-001) -- Corrigir 6 tokens CSS inexistentes no AuthModal: `--card-bg` -> `--surface-elevated`, `--text-primary` -> `--ink`, `--text-secondary` -> `--ink-secondary`, `--border-color` -> `--border`, `--input-bg` -> `--surface-1`, `--accent-color` -> `--brand-blue` -- 2h
+- [x] **Task 2** (TD-UX-002) -- Migrar feedback de erro/sucesso do AuthModal de classes Tailwind hardcoded (`bg-red-100`, `bg-green-100`) para tokens semanticos (`bg-error-subtle`/`text-error`, `bg-success-subtle`/`text-success`) -- 1h
+- [x] **Task 3** (TD-UX-003) -- Migrar badges do ItemsList de cores Tailwind hardcoded (`bg-amber-100`, `bg-blue-100`) para tokens `--badge-licitacao-*`/`--badge-ata-*` ja definidos; migrar texto de erro de `text-red-600` para `text-error` -- 2h
+- [x] **Task 4** (TD-UX-010) -- Adicionar acentos nos aria-labels da paginacao: "Navegacao de paginas", "Pagina anterior", "Proxima pagina" -- 0.5h
 
 ## Criterios de Aceite
 
-- [ ] AuthModal renderiza corretamente em todos os 5 temas (light, paperwhite, sepia, dim, dark)
-- [ ] Texto, inputs, botoes e mensagens de erro/sucesso do AuthModal sao visiveis e legiveis em todos os temas
-- [ ] Nenhum token CSS inexistente (`var(--*)` sem definicao em globals.css) referenciado no AuthModal
-- [ ] Badges de tipo de licitacao no ItemsList sao consistentes com badges do SearchSummary na mesma pagina
-- [ ] Texto de erro no ItemsList usa tokens semanticos, nao cores Tailwind hardcoded
-- [ ] Aria-labels da paginacao contem acentos corretos em portugues
+- [x] AuthModal renderiza corretamente em todos os 5 temas (light, paperwhite, sepia, dim, dark)
+- [x] Texto, inputs, botoes e mensagens de erro/sucesso do AuthModal sao visiveis e legiveis em todos os temas
+- [x] Nenhum token CSS inexistente (`var(--*)` sem definicao em globals.css) referenciado no AuthModal
+- [x] Badges de tipo de licitacao no ItemsList sao consistentes com badges do SearchSummary na mesma pagina
+- [x] Texto de erro no ItemsList usa tokens semanticos, nao cores Tailwind hardcoded
+- [x] Aria-labels da paginacao contem acentos corretos em portugues
 - [ ] Zero violacoes WCAG AA de contraste nos componentes corrigidos (validar via axe-core)
 
 ## Testes Requeridos
 
-- [ ] Snapshot tests do AuthModal nos 5 temas (unit)
-- [ ] Verificar que nenhum `var(--card-bg)`, `var(--text-primary)`, `var(--text-secondary)`, `var(--border-color)`, `var(--input-bg)`, `var(--accent-color)` permanece no codigo (CI grep)
-- [ ] Snapshot tests do ItemsList nos 5 temas (unit)
+- [x] Snapshot tests do AuthModal nos 5 temas (unit)
+- [x] Verificar que nenhum `var(--card-bg)`, `var(--text-primary)`, `var(--text-secondary)`, `var(--border-color)`, `var(--input-bg)`, `var(--accent-color)` permanece no codigo (CI grep)
+- [x] Snapshot tests do ItemsList nos 5 temas (unit)
 - [ ] Teste de acessibilidade axe-core incluindo AuthModal aberto (e2e)
-- [ ] Testes existentes do AuthModal continuam passando (unit)
-- [ ] Testes existentes do ItemsList continuam passando (unit)
+- [x] Testes existentes do AuthModal continuam passando (unit)
+- [x] Testes existentes do ItemsList continuam passando (unit)
 
 ## Estimativa
 
@@ -50,9 +50,9 @@ Corrigir todas as inconsistencias visuais que causariam constrangimento em uma d
 
 ## Definition of Done
 
-- [ ] Codigo implementado e revisado
-- [ ] Todos os testes passando (existentes + novos snapshots)
-- [ ] Nenhuma regressao nos 576+ testes frontend
+- [x] Codigo implementado e revisado
+- [x] Todos os testes passando (existentes + novos snapshots)
+- [x] Nenhuma regressao nos 576+ testes frontend (576 passed)
 - [ ] Review aprovado
 - [ ] Verificacao visual em pelo menos 3 temas (light, dim, dark)
 

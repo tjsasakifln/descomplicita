@@ -1,0 +1,96 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ItemsList theme snapshots renders correctly in dark theme 1`] = `
+<div>
+  <div
+    class="mt-4"
+  >
+    <h3
+      class="text-lg font-semibold font-display text-ink mb-3"
+    >
+      Licitações Encontradas
+    </h3>
+    <div
+      class="py-8 text-center text-ink-muted"
+    >
+      Carregando...
+    </div>
+  </div>
+</div>
+`;
+
+exports[`ItemsList theme snapshots renders correctly in dim theme 1`] = `
+<div>
+  <div
+    class="mt-4"
+  >
+    <h3
+      class="text-lg font-semibold font-display text-ink mb-3"
+    >
+      Licitações Encontradas
+    </h3>
+    <div
+      class="py-8 text-center text-ink-muted"
+    >
+      Carregando...
+    </div>
+  </div>
+</div>
+`;
+
+exports[`ItemsList theme snapshots renders correctly in light theme 1`] = `
+<div>
+  <div
+    class="mt-4"
+  >
+    <h3
+      class="text-lg font-semibold font-display text-ink mb-3"
+    >
+      Licitações Encontradas
+    </h3>
+    <div
+      class="py-8 text-center text-ink-muted"
+    >
+      Carregando...
+    </div>
+  </div>
+</div>
+`;
+
+exports[`ItemsList theme snapshots renders correctly in paperwhite theme 1`] = `
+<div>
+  <div
+    class="mt-4"
+  >
+    <h3
+      class="text-lg font-semibold font-display text-ink mb-3"
+    >
+      Licitações Encontradas
+    </h3>
+    <div
+      class="py-8 text-center text-ink-muted"
+    >
+      Carregando...
+    </div>
+  </div>
+</div>
+`;
+
+exports[`ItemsList theme snapshots renders correctly in sepia theme 1`] = `
+<div>
+  <div
+    class="mt-4"
+  >
+    <h3
+      class="text-lg font-semibold font-display text-ink mb-3"
+    >
+      Licitações Encontradas
+    </h3>
+    <div
+      class="py-8 text-center text-ink-muted"
+    >
+      Carregando...
+    </div>
+  </div>
+</div>
+`;

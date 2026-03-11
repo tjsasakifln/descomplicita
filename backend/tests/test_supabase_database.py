@@ -8,10 +8,13 @@ Test coverage:
 - User preferences (per-user key-value store)
 - RLS validation: user A cannot see user B data
 - Graceful degradation when Supabase is unavailable
+- JWT audience validation (story-0.2)
 """
 
+import time
 import json
 import pytest
+import jwt as pyjwt
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
 
 from database import Database
@@ -522,6 +525,46 @@ class TestAuthMiddleware:
         with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", ""):
             with pytest.raises(SupabaseAuthError, match="not configured"):
                 validate_supabase_token("any.token.here")
+
+    def test_jwt_accepted_with_authenticated_audience(self):
+        """A real JWT signed with aud='authenticated' must be accepted (story-0.2)."""
+        from auth.supabase_auth import validate_supabase_token
+
+        secret = "test-secret-for-audience-check"
+        payload = {
+            "sub": "user-aud-ok",
+            "email": "aud@example.com",
+            "role": "authenticated",
+            "aud": "authenticated",
+            "exp": int(time.time()) + 3600,
+            "iat": int(time.time()),
+        }
+        token = pyjwt.encode(payload, secret, algorithm="HS256")
+
+        with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", secret):
+            result = validate_supabase_token(token)
+
+        assert result["sub"] == "user-aud-ok"
+        assert result["aud"] == "authenticated"
+
+    def test_jwt_rejected_with_wrong_audience(self):
+        """A real JWT signed with aud='wrong-audience' must be rejected (story-0.2)."""
+        from auth.supabase_auth import validate_supabase_token, SupabaseAuthError
+
+        secret = "test-secret-for-audience-check"
+        payload = {
+            "sub": "user-bad-aud",
+            "email": "bad@example.com",
+            "role": "authenticated",
+            "aud": "wrong-audience",
+            "exp": int(time.time()) + 3600,
+            "iat": int(time.time()),
+        }
+        token = pyjwt.encode(payload, secret, algorithm="HS256")
+
+        with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", secret):
+            with pytest.raises(SupabaseAuthError, match="Invalid token audience"):
+                validate_supabase_token(token)
 
 
 # ============================================================================
