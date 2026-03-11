@@ -108,7 +108,7 @@ export function ItemsList({ jobId, totalFiltered }: ItemsListProps) {
   return (
     <div className="mt-4">
       <h3 className="text-lg font-semibold font-display text-ink mb-3">
-        Licitacoes Encontradas
+        Licitações Encontradas
       </h3>
 
       {loading ? (

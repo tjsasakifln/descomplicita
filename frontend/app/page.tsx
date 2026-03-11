@@ -14,6 +14,7 @@ import { DateRangeSelector } from "./components/DateRangeSelector";
 import { LargeVolumeWarning } from "./components/LargeVolumeWarning";
 import { SearchSummary } from "./components/SearchSummary";
 import { SearchActions } from "./components/SearchActions";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { SavedSearch } from "../lib/savedSearches";
 
 function dateDiffInDays(date1: string, date2: string): number {
@@ -42,10 +43,12 @@ const LoadingProgress = dynamic(
 
 const EmptyState = dynamic(
   () => import("./components/EmptyState").then(mod => ({ default: mod.EmptyState })),
+  { loading: () => <div className="mt-6 p-6 bg-surface-1 rounded-card border animate-fade-in text-center text-ink-muted text-sm">Carregando...</div> }
 );
 
 const ItemsList = dynamic(
   () => import("./components/ItemsList").then(mod => ({ default: mod.ItemsList })),
+  { loading: () => <div className="mt-4 p-6 bg-surface-1 rounded-card border animate-fade-in text-center text-ink-muted text-sm">Carregando lista...</div> }
 );
 
 export default function HomePage() {
@@ -139,6 +142,7 @@ export default function HomePage() {
         </div>
 
         <h2 className="sr-only">Formulário de Busca</h2>
+        <ErrorBoundary>
         <SearchForm searchMode={form.searchMode} onSearchModeChange={form.setSearchMode} setores={form.setores}
           setoresLoading={form.setoresLoading} setorId={form.setorId} onSetorIdChange={form.setSetorId} termosArray={form.termosArray}
           onTermosArrayChange={form.setTermosArray} termoInput={form.termoInput}
@@ -156,6 +160,7 @@ export default function HomePage() {
           ufCount={form.ufsSelecionadas.size}
           dateRangeDays={dateDiffInDays(form.dataInicial, form.dataFinal)}
         />
+        </ErrorBoundary>
 
         <button onClick={handleBuscar} disabled={job.loading || !form.canSearch} type="button" aria-busy={job.loading}
           className="w-full bg-brand-navy text-white py-3 sm:py-4 rounded-button text-base sm:text-lg font-semibold hover:bg-brand-blue-hover active:bg-brand-blue disabled:bg-ink-faint disabled:text-ink-muted disabled:cursor-not-allowed transition-all duration-200">
@@ -194,6 +199,7 @@ export default function HomePage() {
           Resultados
         </h2>
 
+        <ErrorBoundary>
         {isEmpty && (
           <EmptyState onAdjustSearch={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             rawCount={job.rawCount} stateCount={form.ufsSelecionadas.size}
@@ -210,6 +216,7 @@ export default function HomePage() {
               onSaveSearch={save.handleSaveSearch} />
           </div>
         )}
+        </ErrorBoundary>
       </main>
 
       {save.showSaveDialog && (

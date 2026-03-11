@@ -32,7 +32,7 @@ describe("ItemsList", () => {
 
     render(<ItemsList jobId="test-job" totalFiltered={5} />);
     expect(
-      screen.getByText("Licitacoes Encontradas")
+      screen.getByText("Licitações Encontradas")
     ).toBeInTheDocument();
   });
 
@@ -146,7 +146,7 @@ describe("ItemsList", () => {
 
     // Should not crash, heading should still be there
     expect(
-      screen.getByText("Licitacoes Encontradas")
+      screen.getByText("Licitações Encontradas")
     ).toBeInTheDocument();
 
     // Should show error message with retry

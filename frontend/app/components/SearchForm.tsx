@@ -1,6 +1,7 @@
 "use client";
 
 import type { Setor } from "../types";
+import { Spinner } from "./Spinner";
 
 interface SearchFormProps {
   searchMode: "setor" | "termos";
@@ -64,10 +65,7 @@ export function SearchForm({
           {setoresLoading ? (
             <div className="w-full border border-strong rounded-input px-4 py-3 bg-surface-0 flex items-center gap-2"
                  aria-busy="true" aria-label="Carregando setores">
-              <svg className="w-4 h-4 animate-spin text-brand-blue" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <Spinner size="sm" className="text-brand-blue" />
               <span className="text-sm text-ink-muted">Carregando setores...</span>
             </div>
           ) : (
@@ -162,7 +160,8 @@ export function SearchForm({
             />
           </div>
           <p id="termos-busca-hint" className="text-sm text-ink-muted mt-1.5">
-            Separe termos por <kbd className="px-1.5 py-0.5 bg-surface-2 rounded text-xs font-mono border">vírgula</kbd> para termos compostos. Ex: camisa polo, jaleco medico
+            Separe termos por <kbd className="px-1.5 py-0.5 bg-surface-2 rounded text-xs font-mono border">vírgula</kbd> para termos compostos. Ex: camisa polo, jaleco medico.
+            {" "}Acentos são opcionais — &quot;licitação&quot; e &quot;licitacao&quot; retornam os mesmos resultados.
             {termosArray.length > 0 && (
               <span className="text-brand-blue font-medium">
                 {" "}{termosArray.length} termo{termosArray.length > 1 ? "s" : ""} selecionado{termosArray.length > 1 ? "s" : ""}

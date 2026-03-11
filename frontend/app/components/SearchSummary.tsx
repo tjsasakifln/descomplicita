@@ -33,12 +33,12 @@ export function SearchSummary({ result, completedAt }: SearchSummaryProps) {
           {(result.total_atas > 0 || result.total_licitacoes > 0) && (
             <div className="flex flex-wrap gap-2 mt-2">
               {result.total_licitacoes > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full" style={{ background: 'var(--badge-licitacao-bg)', color: 'var(--badge-licitacao-text)', borderWidth: '1px', borderColor: 'var(--badge-licitacao-border)' }}>
                   {result.total_licitacoes} Licitações
                 </span>
               )}
               {result.total_atas > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full" style={{ background: 'var(--badge-ata-bg)', color: 'var(--badge-ata-text)', borderWidth: '1px', borderColor: 'var(--badge-ata-border)' }}>
                   {result.total_atas} Atas RP
                 </span>
               )}
