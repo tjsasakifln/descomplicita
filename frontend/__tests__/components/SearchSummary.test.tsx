@@ -93,4 +93,22 @@ describe('SearchSummary', () => {
     const card = screen.getByText('Encontradas 15 licitações de uniformes').closest('div');
     expect(card).toHaveClass('bg-brand-blue-subtle', 'border-accent');
   });
+
+  it('should display freshness timestamp when completedAt is provided', () => {
+    const completedAt = new Date('2026-03-10T14:30:00');
+    render(<SearchSummary result={mockResult} completedAt={completedAt} />);
+    const expected = completedAt.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    expect(screen.getByText(new RegExp(`Dados consultados em ${expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
+  });
+
+  it('should not display freshness timestamp when completedAt is not provided', () => {
+    render(<SearchSummary result={mockResult} />);
+    expect(screen.queryByText(/Dados consultados em/)).not.toBeInTheDocument();
+  });
 });

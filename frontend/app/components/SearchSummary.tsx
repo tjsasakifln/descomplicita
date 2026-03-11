@@ -5,11 +5,21 @@ import { SourceBadges } from "./SourceBadges";
 
 interface SearchSummaryProps {
   result: BuscaResult;
+  completedAt?: Date;
 }
 
-export function SearchSummary({ result }: SearchSummaryProps) {
+export function SearchSummary({ result, completedAt }: SearchSummaryProps) {
+  const timestamp = completedAt
+    ? completedAt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : null;
+
   return (
     <div className="p-4 sm:p-6 bg-brand-blue-subtle border border-accent rounded-card">
+      {timestamp && (
+        <p className="text-xs text-ink-muted mb-3">
+          Dados consultados em {timestamp}
+        </p>
+      )}
       <p className="text-base sm:text-lg leading-relaxed text-ink">
         {result.resumo.resumo_executivo}
       </p>

@@ -289,6 +289,146 @@ describe('useSearchJob — Exponential Backoff Polling', () => {
     });
   });
 
+  describe('Timeout message context', () => {
+    it('should include uf count and days in timeout error message', async () => {
+      const multiUfParams = {
+        ...mockSearchParams,
+        ufs: ['SC', 'RS', 'SP', 'RJ', 'MG', 'BA', 'PR', 'GO', 'PE', 'CE', 'AM', 'PA'],
+        dataInicial: '2024-01-01',
+        dataFinal: '2024-02-15',
+      };
+
+      const { result } = renderHook(() => useSearchJob(mockTrackEvent));
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(mockJobCreation());
+      await act(async () => {
+        result.current.buscar(multiUfParams);
+      });
+
+      const originalDateNow = Date.now;
+      const startTime = originalDateNow();
+
+      // First poll is normal
+      (global.fetch as jest.Mock).mockResolvedValueOnce(mockStatusResponse('running'));
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // Simulate time past deadline
+      Date.now = jest.fn(() => startTime + 60 * 60 * 1000); // 1 hour later
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(mockStatusResponse('running'));
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toContain('Você selecionou 12 estados');
+      expect(result.current.error).toContain('45 dias');
+      expect(result.current.error).toContain('Tente com menos de 10 estados ou período de 30 dias');
+
+      Date.now = originalDateNow;
+    });
+
+    it('should include correct uf count and days for single-state short-range search', async () => {
+      const { result } = renderHook(() => useSearchJob(mockTrackEvent));
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(mockJobCreation());
+      await act(async () => {
+        result.current.buscar(mockSearchParams); // 1 UF, 2024-01-01 to 2024-01-07 = 6 days
+      });
+
+      const originalDateNow = Date.now;
+      const startTime = originalDateNow();
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(mockStatusResponse('running'));
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      Date.now = jest.fn(() => startTime + 60 * 60 * 1000);
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(mockStatusResponse('running'));
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+
+      expect(result.current.error).toContain('Você selecionou 1 estados');
+      expect(result.current.error).toContain('6 dias');
+
+      Date.now = originalDateNow;
+    });
+  });
+
+  describe('handleCancel — backend DELETE call', () => {
+    it('should call DELETE /api/buscar/{jobId} when cancelling an active job', async () => {
+      const { result } = renderHook(() => useSearchJob(mockTrackEvent));
+      await startSearch(result); // mocks job creation, jobId = 'test-job-123'
+
+      // Mock the DELETE fetch (fire-and-forget, so resolved or rejected both fine)
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
+
+      await act(async () => {
+        result.current.handleCancel();
+      });
+
+      // Find the DELETE call among all fetch calls
+      const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+      const deleteCall = fetchCalls.find(
+        ([url, opts]) => opts?.method === 'DELETE' && url === '/api/buscar/cancel?job_id=test-job-123'
+      );
+
+      expect(deleteCall).toBeDefined();
+    });
+
+    it('should NOT call DELETE when cancelling with no active job', async () => {
+      const { result } = renderHook(() => useSearchJob(mockTrackEvent));
+      // No buscar() called — no active job
+
+      const fetchCallsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+      await act(async () => {
+        result.current.handleCancel();
+      });
+
+      const fetchCallsAfter = (global.fetch as jest.Mock).mock.calls.length;
+      expect(fetchCallsAfter).toBe(fetchCallsBefore); // no new fetch calls
+    });
+
+    it('should stop loading and reset state after cancel with active job', async () => {
+      const { result } = renderHook(() => useSearchJob(mockTrackEvent));
+      await startSearch(result);
+
+      expect(result.current.loading).toBe(true);
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
+
+      await act(async () => {
+        result.current.handleCancel();
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('should track search_cancelled event when handleCancel is called', async () => {
+      const { result } = renderHook(() => useSearchJob(mockTrackEvent));
+      await startSearch(result);
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
+
+      await act(async () => {
+        result.current.handleCancel();
+      });
+
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        'search_cancelled',
+        expect.objectContaining({
+          elapsed_time_ms: expect.any(Number),
+        })
+      );
+    });
+  });
+
   describe('Error resilience', () => {
     it('should continue polling with backoff on non-ok status response', async () => {
       const { result } = renderHook(() => useSearchJob(mockTrackEvent));

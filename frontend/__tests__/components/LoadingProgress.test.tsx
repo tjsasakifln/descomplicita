@@ -159,6 +159,213 @@ describe("LoadingProgress Component", () => {
       );
     });
   });
+
+  describe("LV5 — dynamic ETA proportional to volume", () => {
+    it("shows ~30s ETA for filtering phase when itemsFetched=10000 (2 × 15s base)", () => {
+      // volumeMultiplier = ceil(10000 / 5000) = 2 → 15 * 2 = 30s
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={10000}
+          itemsFiltered={5000}
+          elapsedSeconds={120}
+        />
+      );
+      expect(screen.getByText(/~30s restantes/)).toBeInTheDocument();
+    });
+
+    it("shows ~15s ETA for filtering phase when itemsFetched=5000 (1 × 15s base)", () => {
+      // volumeMultiplier = ceil(5000 / 5000) = 1 → 15 * 1 = 15s
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={5000}
+          itemsFiltered={0}
+          elapsedSeconds={60}
+        />
+      );
+      expect(screen.getByText(/~15s restantes/)).toBeInTheDocument();
+    });
+
+    it("shows ~45s ETA for filtering phase when itemsFetched=15000 (3 × 15s base)", () => {
+      // volumeMultiplier = ceil(15000 / 5000) = 3 → 15 * 3 = 45s
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={15000}
+          itemsFiltered={0}
+          elapsedSeconds={60}
+        />
+      );
+      expect(screen.getByText(/~45s restantes/)).toBeInTheDocument();
+    });
+
+    it("uses volumeMultiplier=1 when itemsFetched=0 (no data yet)", () => {
+      // volumeMultiplier = 1 (fallback) → 15 * 1 = 15s
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={0}
+          itemsFiltered={0}
+          elapsedSeconds={10}
+        />
+      );
+      expect(screen.getByText(/~15s restantes/)).toBeInTheDocument();
+    });
+  });
+
+  describe("LV5 — dynamic ETA for summarizing phase", () => {
+    it("shows ~20s ETA for summarizing when itemsFetched=10000 (2 × 10s base)", () => {
+      // volumeMultiplier = ceil(10000 / 5000) = 2 → 10 * 2 = 20s
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="summarizing"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={10000}
+          itemsFiltered={2000}
+          elapsedSeconds={180}
+        />
+      );
+      expect(screen.getByText(/~20s restantes/)).toBeInTheDocument();
+    });
+
+    it("shows ~10s ETA for summarizing when itemsFetched=1000 (1 × 10s base)", () => {
+      // volumeMultiplier = ceil(1000 / 5000) = 1 → 10 * 1 = 10s
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="summarizing"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={1000}
+          itemsFiltered={100}
+          elapsedSeconds={60}
+        />
+      );
+      expect(screen.getByText(/~10s restantes/)).toBeInTheDocument();
+    });
+  });
+
+  describe("LV6 — progress bar interpolation during filtering phase", () => {
+    it("shows 60% when filtering starts (itemsFiltered=0)", () => {
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={1000}
+          itemsFiltered={0}
+          elapsedSeconds={30}
+        />
+      );
+      const progressBar = screen.getByRole("progressbar");
+      expect(Number(progressBar.getAttribute("aria-valuenow"))).toBe(60);
+    });
+
+    it("shows interpolated value between 60 and 75 when filtering is halfway (itemsFiltered=500, itemsFetched=1000)", () => {
+      // filterRatio = 500/1000 = 0.5 → 60 + 0.5 * 15 = 67 (rounded) = ~67%
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={1000}
+          itemsFiltered={500}
+          elapsedSeconds={45}
+        />
+      );
+      const progressBar = screen.getByRole("progressbar");
+      const valuenow = Number(progressBar.getAttribute("aria-valuenow"));
+      expect(valuenow).toBeGreaterThan(60);
+      expect(valuenow).toBeLessThan(75);
+    });
+
+    it("shows 67% for filtering at 50% ratio (500 filtered / 1000 fetched)", () => {
+      // Math.round(60 + (500/1000) * 15) = Math.round(67.5) = 68
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={1000}
+          itemsFiltered={500}
+          elapsedSeconds={45}
+        />
+      );
+      const progressBar = screen.getByRole("progressbar");
+      const valuenow = Number(progressBar.getAttribute("aria-valuenow"));
+      // Accept 67 or 68 depending on rounding
+      expect(valuenow).toBeGreaterThanOrEqual(67);
+      expect(valuenow).toBeLessThanOrEqual(68);
+    });
+
+    it("shows 75% when all items have been filtered (itemsFiltered >= itemsFetched)", () => {
+      // filterRatio = 1000/1000 = 1.0 → Math.round(60 + 1.0 * 15) = 75
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={1000}
+          itemsFiltered={1000}
+          elapsedSeconds={60}
+        />
+      );
+      const progressBar = screen.getByRole("progressbar");
+      expect(Number(progressBar.getAttribute("aria-valuenow"))).toBe(75);
+    });
+
+    it("caps filterRatio at 1.0 when itemsFiltered exceeds itemsFetched", () => {
+      // filterRatio clamped to 1.0 → 75
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={500}
+          itemsFiltered={600}
+          elapsedSeconds={60}
+        />
+      );
+      const progressBar = screen.getByRole("progressbar");
+      expect(Number(progressBar.getAttribute("aria-valuenow"))).toBe(75);
+    });
+
+    it("shows 60% for filtering when itemsFetched=0 (no items yet, no interpolation)", () => {
+      render(
+        <LoadingProgress
+          {...defaultProps}
+          phase="filtering"
+          ufsCompleted={5}
+          ufsTotal={5}
+          itemsFetched={0}
+          itemsFiltered={0}
+          elapsedSeconds={10}
+        />
+      );
+      const progressBar = screen.getByRole("progressbar");
+      expect(Number(progressBar.getAttribute("aria-valuenow"))).toBe(60);
+    });
+  });
 });
 
 describe("Carousel Data — carouselData.ts", () => {

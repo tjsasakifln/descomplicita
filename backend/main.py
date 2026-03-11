@@ -987,6 +987,40 @@ async def job_status(
     )
 
 
+@app.delete("/buscar/{job_id}")
+@limiter.limit("10/minute")
+async def cancel_job(
+    job_id: str,
+    request: Request,
+    job_store=Depends(get_job_store),
+    task_runner=Depends(get_task_runner),
+):
+    """Cancel a running search job.
+
+    Returns 200 {"status": "cancelled"} on success.
+    Returns 404 if the job does not exist.
+    Returns 409 if the job has already completed or failed.
+    """
+    job = await job_store.get(job_id)
+    if not job:
+        raise error_response(ErrorCode.JOB_NOT_FOUND, status_code=404)
+
+    if job.status in ("completed", "failed"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Job already {job.status} and cannot be cancelled.",
+        )
+
+    # Cancel the asyncio task if still running
+    if task_runner:
+        await task_runner.cancel_job(job_id)
+
+    # Mark job as failed with cancellation message
+    await job_store.fail(job_id, "Busca cancelada pelo usuário.")
+
+    return {"status": "cancelled"}
+
+
 @app.get("/buscar/{job_id}/result", response_model=JobResultResponse)
 @limiter.limit("5/minute")
 async def job_result(
@@ -1178,6 +1212,7 @@ v1_router.add_api_route("/buscar/{job_id}/status", job_status, methods=["GET"], 
 v1_router.add_api_route("/buscar/{job_id}/result", job_result, methods=["GET"], response_model=JobResultResponse)
 v1_router.add_api_route("/buscar/{job_id}/items", job_items, methods=["GET"])
 v1_router.add_api_route("/buscar/{job_id}/download", job_download, methods=["GET"])
+v1_router.add_api_route("/buscar/{job_id}", cancel_job, methods=["DELETE"])
 v1_router.add_api_route("/setores", listar_setores, methods=["GET"])
 v1_router.add_api_route("/health", health, methods=["GET"])
 v1_router.add_api_route("/auth/token", auth_token, methods=["POST"])

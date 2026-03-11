@@ -1,0 +1,151 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`LargeVolumeWarning — snapshot matches snapshot for UF-only trigger 1`] = `
+<div
+  aria-live="polite"
+  class="mb-4 p-4 rounded-card border animate-fade-in-up"
+  role="status"
+>
+  <div
+    class="flex items-start gap-3"
+  >
+    <span
+      aria-hidden="true"
+      class="text-lg flex-shrink-0 mt-0.5"
+    >
+      ⏱
+    </span>
+    <div
+      class="text-sm space-y-1"
+    >
+      <p
+        class="font-semibold"
+      >
+        Busca de grande volume detectada
+      </p>
+      <ul
+        class="list-disc list-inside space-y-0.5"
+      >
+        <li>
+          15
+           estados selecionados (
+          75
+           combinações UF × modalidade)
+        </li>
+        <li>
+          Tempo estimado: ~
+          8
+           minutos
+        </li>
+      </ul>
+      <p
+        class="mt-2 opacity-80"
+      >
+        Considere selecionar menos estados ou um período menor para resultados mais rápidos.
+      </p>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`LargeVolumeWarning — snapshot matches snapshot for combined trigger 1`] = `
+<div
+  aria-live="polite"
+  class="mb-4 p-4 rounded-card border animate-fade-in-up"
+  role="status"
+>
+  <div
+    class="flex items-start gap-3"
+  >
+    <span
+      aria-hidden="true"
+      class="text-lg flex-shrink-0 mt-0.5"
+    >
+      ⏱
+    </span>
+    <div
+      class="text-sm space-y-1"
+    >
+      <p
+        class="font-semibold"
+      >
+        Busca de grande volume detectada
+      </p>
+      <ul
+        class="list-disc list-inside space-y-0.5"
+      >
+        <li>
+          20
+           estados selecionados (
+          100
+           combinações UF × modalidade)
+        </li>
+        <li>
+          Período de 
+          60
+           dias selecionado
+        </li>
+        <li>
+          Tempo estimado: ~
+          12
+           minutos
+        </li>
+      </ul>
+      <p
+        class="mt-2 opacity-80"
+      >
+        Considere selecionar menos estados ou um período menor para resultados mais rápidos.
+      </p>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`LargeVolumeWarning — snapshot matches snapshot for date-only trigger 1`] = `
+<div
+  aria-live="polite"
+  class="mb-4 p-4 rounded-card border animate-fade-in-up"
+  role="status"
+>
+  <div
+    class="flex items-start gap-3"
+  >
+    <span
+      aria-hidden="true"
+      class="text-lg flex-shrink-0 mt-0.5"
+    >
+      ⏱
+    </span>
+    <div
+      class="text-sm space-y-1"
+    >
+      <p
+        class="font-semibold"
+      >
+        Busca de grande volume detectada
+      </p>
+      <ul
+        class="list-disc list-inside space-y-0.5"
+      >
+        <li>
+          Período de 
+          60
+           dias selecionado
+        </li>
+        <li>
+          Tempo estimado: ~
+          7
+           minutos
+        </li>
+      </ul>
+      <p
+        class="mt-2 opacity-80"
+      >
+        Considere selecionar menos estados ou um período menor para resultados mais rápidos.
+      </p>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`LargeVolumeWarning — snapshot matches snapshot for null render (thresholds not met) 1`] = `null`;

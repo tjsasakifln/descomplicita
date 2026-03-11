@@ -1,0 +1,40 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getBackendHeaders } from "@/lib/backendAuth";
+
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+
+export async function DELETE(request: NextRequest) {
+  const job_id = request.nextUrl.searchParams.get("job_id");
+
+  if (!job_id) {
+    return NextResponse.json(
+      { error: "Missing required query parameter: job_id" },
+      { status: 400 }
+    );
+  }
+
+  const headers = await getBackendHeaders();
+
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/buscar/${job_id}`, {
+      method: "DELETE",
+      headers,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Backend unavailable" },
+      { status: 503 }
+    );
+  }
+
+  if (!response.ok) {
+    return NextResponse.json(
+      { error: "Failed to cancel job" },
+      { status: response.status }
+    );
+  }
+
+  const data = await response.json();
+  return NextResponse.json(data);
+}

@@ -30,9 +30,11 @@ export interface UseSearchJobReturn {
   elapsedSeconds: number;
   downloadLoading: boolean;
   downloadError: string | null;
+  completedAt: Date | null;
   buscar: (params: SearchSubmitParams) => Promise<void>;
   handleCancel: () => void;
   handleDownload: (params: { downloadId: string; sectorName: string; dataInicial: string; dataFinal: string }) => Promise<void>;
+  handleDownloadCsv: (params: { downloadId: string; sectorName: string; dataInicial: string; dataFinal: string }) => Promise<void>;
   clearResult: () => void;
 }
 
@@ -45,6 +47,7 @@ export function useSearchJob(
   const [rawCount, setRawCount] = useState(0);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [completedAt, setCompletedAt] = useState<Date | null>(null);
 
   const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
   const [ufsCompleted, setUfsCompleted] = useState(0);
@@ -58,6 +61,7 @@ export function useSearchJob(
   const searchStartTimeRef = useRef<number>(0);
   const pollCountRef = useRef<number>(0);
   const originalTitleRef = useRef<string>("");
+  const searchContextRef = useRef<{ ufCount: number; days: number }>({ ufCount: 0, days: 0 });
 
   useEffect(() => {
     originalTitleRef.current = document.title;
@@ -87,6 +91,7 @@ export function useSearchJob(
   }, []);
 
   const handleCancel = useCallback(() => {
+    const currentJobId = jobIdRef.current;
     stopPolling();
     setLoading(false);
     resetProgressState();
@@ -94,6 +99,10 @@ export function useSearchJob(
       elapsed_time_ms: Date.now() - searchStartTimeRef.current,
       last_phase: searchPhase,
     });
+    // Cancel the backend job (fire-and-forget)
+    if (currentJobId) {
+      try { fetch(`/api/buscar/cancel?job_id=${currentJobId}`, { method: "DELETE" }).catch(() => {}); } catch (_e) { void _e; }
+    }
   }, [stopPolling, resetProgressState, trackEvent, searchPhase]);
 
   const notifyCompletion = useCallback((totalOps: number) => {
@@ -161,7 +170,11 @@ export function useSearchJob(
     const poll = async () => {
       if (Date.now() > deadline) {
         stopPolling();
-        setError("A consulta excedeu o tempo limite. Tente com menos estados ou um periodo menor.");
+        const ctx = searchContextRef.current;
+        setError(
+          `A consulta excedeu o tempo limite. Você selecionou ${ctx.ufCount} estados e ${ctx.days} dias. ` +
+          "Tente com menos de 10 estados ou período de 30 dias."
+        );
         setLoading(false);
         resetProgressState();
         return;
@@ -196,6 +209,7 @@ export function useSearchJob(
             if (resultData) {
               setResult(resultData);
               setRawCount(resultData.total_raw || 0);
+              setCompletedAt(new Date());
 
               const totalOps = resultData.resumo?.total_oportunidades || 0;
               notifyCompletion(totalOps);
@@ -251,10 +265,15 @@ export function useSearchJob(
     setError(null);
     setResult(null);
     setRawCount(0);
+    setCompletedAt(null);
     resetProgressState();
     setSearchPhase("queued");
 
     searchStartTimeRef.current = Date.now();
+    searchContextRef.current = {
+      ufCount: params.ufs.length,
+      days: dateDiffInDays(params.dataInicial, params.dataFinal),
+    };
 
     trackEvent("search_started", {
       ufs: params.ufs,
@@ -450,6 +469,7 @@ export function useSearchJob(
     elapsedSeconds,
     downloadLoading,
     downloadError,
+    completedAt,
     buscar,
     handleCancel,
     handleDownload,

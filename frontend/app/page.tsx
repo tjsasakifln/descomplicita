@@ -11,9 +11,16 @@ import { SearchHeader } from "./components/SearchHeader";
 import { SearchForm } from "./components/SearchForm";
 import { UfSelector } from "./components/UfSelector";
 import { DateRangeSelector } from "./components/DateRangeSelector";
+import { LargeVolumeWarning } from "./components/LargeVolumeWarning";
 import { SearchSummary } from "./components/SearchSummary";
 import { SearchActions } from "./components/SearchActions";
 import type { SavedSearch } from "../lib/savedSearches";
+
+function dateDiffInDays(date1: string, date2: string): number {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  return Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 // Task 15 (TD-042): Dynamic imports for heavy components
 const SaveSearchDialog = dynamic(
@@ -145,6 +152,11 @@ export default function HomePage() {
           onDataInicialChange={form.setDataInicial} onDataFinalChange={form.setDataFinal}
           validationErrors={form.validationErrors} />
 
+        <LargeVolumeWarning
+          ufCount={form.ufsSelecionadas.size}
+          dateRangeDays={dateDiffInDays(form.dataInicial, form.dataFinal)}
+        />
+
         <button onClick={handleBuscar} disabled={job.loading || !form.canSearch} type="button" aria-busy={job.loading}
           className="w-full bg-brand-navy text-white py-3 sm:py-4 rounded-button text-base sm:text-lg font-semibold hover:bg-brand-blue-hover active:bg-brand-blue disabled:bg-ink-faint disabled:text-ink-muted disabled:cursor-not-allowed transition-all duration-200">
           {job.loading ? "Buscando..." : `Buscar ${form.searchLabel}`}
@@ -190,7 +202,7 @@ export default function HomePage() {
 
         {hasResults && (
           <div className="mt-6 sm:mt-8 space-y-4 sm:space-y-6 animate-fade-in-up">
-            <SearchSummary result={job.result!} />
+            <SearchSummary result={job.result!} completedAt={job.completedAt ?? undefined} />
             <ItemsList jobId={job.result!.download_id} totalFiltered={job.result!.total_filtrado} />
             <SearchActions result={job.result!} rawCount={job.rawCount} sectorName={form.sectorName}
               downloadLoading={job.downloadLoading} downloadError={job.downloadError}

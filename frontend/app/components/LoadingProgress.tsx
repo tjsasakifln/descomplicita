@@ -23,30 +23,43 @@ const PHASE_TO_INDEX: Record<string, number> = {
 };
 
 const PROGRESS_MAP: Partial<Record<SearchPhase, number>> = {
-  queued: 3, filtering: 60, summarizing: 75, generating_excel: 90,
+  queued: 3, summarizing: 75, generating_excel: 90,
 };
 
-function calculateProgress(phase: SearchPhase, ufsCompleted: number, ufsTotal: number): number {
+function calculateProgress(phase: SearchPhase, ufsCompleted: number, ufsTotal: number, itemsFetched: number, itemsFiltered: number): number {
   if (phase === "fetching") {
     const ufProgress = ufsTotal > 0 ? ufsCompleted / ufsTotal : 0;
     return Math.round(5 + ufProgress * 50);
   }
+  // Task 6: Interpolate 60-90% during filtering based on filtered/fetched ratio
+  if (phase === "filtering") {
+    if (itemsFetched > 0 && itemsFiltered > 0) {
+      const filterRatio = Math.min(itemsFiltered / itemsFetched, 1);
+      return Math.round(60 + filterRatio * 15);
+    }
+    return 60;
+  }
   return PROGRESS_MAP[phase] ?? 3;
 }
 
-const ETA_MAP: Partial<Record<SearchPhase, string>> = {
-  filtering: "~15s restantes", summarizing: "~10s restantes", generating_excel: "~5s restantes",
-};
+function formatETA(remaining: number): string | null {
+  if (remaining <= 0) return null;
+  const m = Math.floor(remaining / 60), s = remaining % 60;
+  return m > 0 ? `~${m}min ${s.toString().padStart(2, "0")}s restantes` : `~${s}s restantes`;
+}
 
-function getETA(phase: SearchPhase, ufsCompleted: number, ufsTotal: number, elapsedSeconds: number): string | null {
+function getETA(phase: SearchPhase, ufsCompleted: number, ufsTotal: number, elapsedSeconds: number, itemsFetched: number): string | null {
   if (phase === "queued") return null;
   if (phase === "fetching" && ufsCompleted > 0 && ufsTotal > 0) {
     const remaining = Math.max(0, Math.round((ufsTotal - ufsCompleted) * (elapsedSeconds / ufsCompleted) + 20));
-    if (remaining <= 0) return null;
-    const m = Math.floor(remaining / 60), s = remaining % 60;
-    return m > 0 ? `~${m}min ${s.toString().padStart(2, "0")}s restantes` : `~${s}s restantes`;
+    return formatETA(remaining);
   }
-  return ETA_MAP[phase] ?? null;
+  // Dynamic ETAs based on volume (Task 5: multiply base by ceil(itemsFetched / 5000))
+  const volumeMultiplier = itemsFetched > 0 ? Math.ceil(itemsFetched / 5000) : 1;
+  if (phase === "filtering") return formatETA(15 * volumeMultiplier);
+  if (phase === "summarizing") return formatETA(10 * volumeMultiplier);
+  if (phase === "generating_excel") return formatETA(5 * volumeMultiplier);
+  return null;
 }
 
 const STATUS_MAP: Partial<Record<SearchPhase, string>> = {
@@ -90,8 +103,8 @@ export function LoadingProgress({
   }, [shuffledItems.length]);
 
   const currentStageIndex = PHASE_TO_INDEX[phase] ?? 0;
-  const progress = calculateProgress(phase, ufsCompleted, ufsTotal);
-  const eta = getETA(phase, ufsCompleted, ufsTotal, elapsedSeconds);
+  const progress = calculateProgress(phase, ufsCompleted, ufsTotal, itemsFetched, itemsFiltered);
+  const eta = getETA(phase, ufsCompleted, ufsTotal, elapsedSeconds, itemsFetched);
   const statusMessage = getStatusMessage(phase, ufsCompleted, ufsTotal, itemsFetched);
   const stageConfig = STAGES[currentStageIndex] || STAGES[0];
 

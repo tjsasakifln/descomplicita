@@ -151,6 +151,21 @@ class DurableTaskRunner:
 
         return interrupted_ids
 
+    async def cancel_job(self, job_id: str) -> bool:
+        """Cancel a running job by ID. Returns True if cancelled."""
+        task = self._running_tasks.get(job_id)
+        if task is None:
+            return False
+        task.cancel()
+        self._running_tasks.pop(job_id, None)
+        # Clean up persisted params
+        if self._redis:
+            try:
+                await self._redis.delete(self._params_key(job_id))
+            except Exception:
+                pass
+        return True
+
     @property
     def running_count(self) -> int:
         """Number of currently running tasks."""

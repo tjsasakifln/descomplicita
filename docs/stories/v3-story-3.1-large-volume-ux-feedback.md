@@ -22,26 +22,26 @@ Implementar advertencia proativa para buscas de grande volume, ETAs dinamicos ba
 
 ## Tasks
 
-- [ ] Task 1: FE-016 -- Implementar banner inline (nao modal) quando usuario seleciona >10 UFs OU date range >30 dias
-- [ ] Task 2: FE-016 -- Banner mostra: estimativa de tempo, numero de combinacoes UF x modalidade, sugestao de reducao ("Considere selecionar menos estados para resultados mais rapidos")
-- [ ] Task 3: FE-016 -- Banner usa tokens semanticos de cor (nao hardcoded), visivel em todos os 5 temas
-- [ ] Task 4: FE-017 -- Enriquecer mensagem de timeout: incluir quantos UFs e dias foram selecionados, sugestao especifica ("Tente com menos de 10 estados ou periodo de 30 dias")
-- [ ] Task 5: ETA dinamico -- Calcular ETAs pos-fetching baseados em volume real: multiplicar estimativas base por `ceil(itemsFetched / 5000)`
-- [ ] Task 6: Progress bar -- Interpolar movimento da barra entre 60-90% durante fase de filtering (proporcional ao volume)
-- [ ] Task 7: Indicador de frescor -- Exibir "Dados consultados em {timestamp}" no header dos resultados
-- [ ] Task 8: Cancel button -- Verificar que cancel realmente para o job no backend (nao apenas o polling frontend)
+- [x] Task 1: FE-016 -- Implementar banner inline (nao modal) quando usuario seleciona >10 UFs OU date range >30 dias
+- [x] Task 2: FE-016 -- Banner mostra: estimativa de tempo, numero de combinacoes UF x modalidade, sugestao de reducao ("Considere selecionar menos estados para resultados mais rapidos")
+- [x] Task 3: FE-016 -- Banner usa tokens semanticos de cor (nao hardcoded), visivel em todos os 5 temas
+- [x] Task 4: FE-017 -- Enriquecer mensagem de timeout: incluir quantos UFs e dias foram selecionados, sugestao especifica ("Tente com menos de 10 estados ou periodo de 30 dias")
+- [x] Task 5: ETA dinamico -- Calcular ETAs pos-fetching baseados em volume real: multiplicar estimativas base por `ceil(itemsFetched / 5000)`
+- [x] Task 6: Progress bar -- Interpolar movimento da barra entre 60-90% durante fase de filtering (proporcional ao volume)
+- [x] Task 7: Indicador de frescor -- Exibir "Dados consultados em {timestamp}" no header dos resultados
+- [x] Task 8: Cancel button -- Verificar que cancel realmente para o job no backend (nao apenas o polling frontend)
 
 ## Criterios de Aceite
 
-- [ ] Banner de advertencia aparece ao selecionar >10 UFs
-- [ ] Banner de advertencia aparece ao selecionar date range >30 dias
-- [ ] Banner mostra estimativa de tempo realista (baseada em formula do backend)
-- [ ] Banner visivel e legivel em todos os 5 temas (light, paperwhite, sepia, dim, dark)
-- [ ] Mensagem de timeout inclui contexto: "Voce selecionou X estados e Y dias"
-- [ ] ETAs pos-fetching proporcionais ao volume real (nao hardcoded)
-- [ ] Progress bar nao fica presa em 60% durante filtering de grandes volumes
-- [ ] Timestamp "Dados consultados em..." visivel nos resultados
-- [ ] ETA accuracy < 30% erro absoluto medio para buscas > 1000 items
+- [x] Banner de advertencia aparece ao selecionar >10 UFs
+- [x] Banner de advertencia aparece ao selecionar date range >30 dias
+- [x] Banner mostra estimativa de tempo realista (baseada em formula do backend)
+- [x] Banner visivel e legivel em todos os 5 temas (light, paperwhite, sepia, dim, dark)
+- [x] Mensagem de timeout inclui contexto: "Voce selecionou X estados e Y dias"
+- [x] ETAs pos-fetching proporcionais ao volume real (nao hardcoded)
+- [x] Progress bar nao fica presa em 60% durante filtering de grandes volumes
+- [x] Timestamp "Dados consultados em..." visivel nos resultados
+- [x] ETA accuracy < 30% erro absoluto medio para buscas > 1000 items
 
 ## Testes Requeridos
 
@@ -68,8 +68,8 @@ Implementar advertencia proativa para buscas de grande volume, ETAs dinamicos ba
 
 ## Definition of Done
 
-- [ ] Code implemented and reviewed
-- [ ] Tests written and passing
-- [ ] Banner funcional em todos os 5 temas
-- [ ] No regressions in existing tests
-- [ ] Acceptance criteria verified
+- [x] Code implemented and reviewed
+- [x] Tests written and passing
+- [x] Banner funcional em todos os 5 temas
+- [x] No regressions in existing tests
+- [x] Acceptance criteria verified
