@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { BuscaResult, SearchPhase } from "../types";
 import { dateDiffInDays } from "../../lib/utils";
+import { correlationHeaders, logger } from "../../lib/logger";
 
 export interface SearchSubmitParams {
   ufs: string[];
@@ -284,9 +285,13 @@ export function useSearchJob(
     });
 
     try {
+      const corrHeaders = correlationHeaders();
+      const correlationId = corrHeaders["X-Correlation-Id"];
+      logger.info("Starting search", { ufs: params.ufs, searchMode: params.searchMode }, correlationId);
+
       const response = await fetch("/api/buscar", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...corrHeaders },
         body: JSON.stringify({
           ufs: params.ufs,
           data_inicial: params.dataInicial,

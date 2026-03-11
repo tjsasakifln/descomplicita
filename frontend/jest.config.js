@@ -49,14 +49,14 @@ const customJestConfig = {
     '!**/jest.config.js',
   ],
 
-  // Coverage thresholds (target: 65% per Story 2.0, current: 67.93%)
-  // Progress: 49.45% → 67.93% (+18.48% from Story 2.0 decomposition)
+  // Coverage thresholds (story-3.1: branches raised to 65%)
+  // Progress: 52.74% → 68.95% branches (+16.21% from story-3.1)
   coverageThreshold: {
     global: {
-      branches: 50,   // Current: 52.74%
-      functions: 57,  // Current: 59.89%
-      lines: 65,      // Current: 66.30%
-      statements: 65,  // Current: 67.93%
+      branches: 65,    // Current: 68.95%
+      functions: 65,    // Current: 69.25%
+      lines: 65,        // Current: 67.24%
+      statements: 65,   // Current: 66.84%
     },
   },
 

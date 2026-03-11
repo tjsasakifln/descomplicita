@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import { Button } from "./Button";
+import { Input } from "./Input";
 
 interface SaveSearchDialogProps {
   saveSearchName: string;
@@ -62,13 +63,10 @@ export function SaveSearchDialog({
         <h3 id="save-search-dialog-title" className="text-lg font-semibold text-ink mb-4">Salvar Busca</h3>
 
         <div className="mb-4">
-          <label htmlFor="save-search-name" className="block text-sm font-medium text-ink-secondary mb-2">
-            Nome da busca:
-          </label>
-          <input
+          <Input
             ref={inputRef}
             id="save-search-name"
-            type="text"
+            label="Nome da busca:"
             value={saveSearchName}
             onChange={(e) => onNameChange(e.target.value)}
             onKeyDown={(e) => {
@@ -78,22 +76,11 @@ export function SaveSearchDialog({
               }
             }}
             placeholder="Ex: Uniformes Sul do Brasil"
-            className="w-full border border-strong rounded-input px-4 py-2.5 text-base
-                       bg-surface-0 text-ink
-                       focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue
-                       transition-colors"
             maxLength={50}
+            hint={`${saveSearchName.length}/50 caracteres`}
+            error={saveError ?? undefined}
           />
-          <p className="text-xs text-ink-muted mt-1">
-            {saveSearchName.length}/50 caracteres
-          </p>
         </div>
-
-        {saveError && (
-          <div className="mb-4 p-3 bg-error-subtle border border-error/20 rounded text-sm text-error" role="alert">
-            {saveError}
-          </div>
-        )}
 
         <div className="flex gap-3 justify-end">
           <Button onClick={onCancel} type="button" variant="ghost" size="sm">

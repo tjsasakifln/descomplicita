@@ -20,6 +20,45 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+
+class PersistenceMetrics:
+    """Counters for database operation failures (TD-DB-013).
+
+    Replaces silent except-log-return-None with observable metrics.
+    """
+
+    def __init__(self) -> None:
+        self.connect_failures: int = 0
+        self.record_search_failures: int = 0
+        self.complete_search_failures: int = 0
+        self.fail_search_failures: int = 0
+        self.cancel_search_failures: int = 0
+        self.get_recent_searches_failures: int = 0
+        self.get_or_create_user_failures: int = 0
+        self.set_preference_failures: int = 0
+        self.get_preference_failures: int = 0
+        self.get_all_preferences_failures: int = 0
+
+    def to_dict(self) -> dict[str, int]:
+        """Return all counters as a dict for monitoring/health endpoints."""
+        return {
+            "connect_failures": self.connect_failures,
+            "record_search_failures": self.record_search_failures,
+            "complete_search_failures": self.complete_search_failures,
+            "fail_search_failures": self.fail_search_failures,
+            "cancel_search_failures": self.cancel_search_failures,
+            "get_recent_searches_failures": self.get_recent_searches_failures,
+            "get_or_create_user_failures": self.get_or_create_user_failures,
+            "set_preference_failures": self.set_preference_failures,
+            "get_preference_failures": self.get_preference_failures,
+            "get_all_preferences_failures": self.get_all_preferences_failures,
+        }
+
+    @property
+    def total_failures(self) -> int:
+        return sum(self.to_dict().values())
+
+
 # Supabase configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -36,6 +75,7 @@ class Database:
         self.supabase_url = supabase_url
         self.supabase_key = supabase_key
         self._client = None
+        self.metrics = PersistenceMetrics()
 
     async def connect(self) -> None:
         """Initialize Supabase client."""
@@ -54,6 +94,7 @@ class Database:
             self._client.table("users").select("id").limit(1).execute()
             logger.info("Supabase connected: %s", self.supabase_url)
         except Exception as e:
+            self.metrics.connect_failures += 1
             logger.warning("Supabase connection failed (%s), persistence disabled", e)
             self._client = None
 
@@ -98,6 +139,7 @@ class Database:
                 return result.data[0] if result.data else None
             return None
         except Exception as e:
+            self.metrics.get_or_create_user_failures += 1
             logger.warning("Failed to get/create user %s: %s", user_id, e)
             return None
 
@@ -133,6 +175,7 @@ class Database:
                 }
             ).execute()
         except Exception as e:
+            self.metrics.record_search_failures += 1
             logger.warning("Failed to record search %s: %s", job_id, e)
 
     async def complete_search(
@@ -156,6 +199,7 @@ class Database:
                 }
             ).eq("job_id", job_id).execute()
         except Exception as e:
+            self.metrics.complete_search_failures += 1
             logger.warning("Failed to complete search %s: %s", job_id, e)
 
     async def fail_search(self, job_id: str) -> None:
@@ -170,6 +214,7 @@ class Database:
                 }
             ).eq("job_id", job_id).execute()
         except Exception as e:
+            self.metrics.fail_search_failures += 1
             logger.warning("Failed to mark search %s as failed: %s", job_id, e)
 
     async def cancel_search(self, job_id: str) -> None:
@@ -188,6 +233,7 @@ class Database:
                 }
             ).eq("job_id", job_id).execute()
         except Exception as e:
+            self.metrics.cancel_search_failures += 1
             logger.warning("Failed to mark search %s as cancelled: %s", job_id, e)
 
     async def get_recent_searches(
@@ -215,6 +261,7 @@ class Database:
             )
             return result.data or []
         except Exception as e:
+            self.metrics.get_recent_searches_failures += 1
             logger.warning("Failed to get recent searches: %s", e)
             return []
 
@@ -239,6 +286,7 @@ class Database:
                 on_conflict="user_id,key",
             ).execute()
         except Exception as e:
+            self.metrics.set_preference_failures += 1
             logger.warning("Failed to set preference %s: %s", key, e)
 
     async def get_preference(
@@ -258,6 +306,7 @@ class Database:
                 return json.loads(val) if isinstance(val, str) else val
             return None
         except Exception as e:
+            self.metrics.get_preference_failures += 1
             logger.warning("Failed to get preference %s: %s", key, e)
             return None
 
@@ -276,5 +325,6 @@ class Database:
                 prefs[row["key"]] = json.loads(val) if isinstance(val, str) else val
             return prefs
         except Exception as e:
+            self.metrics.get_all_preferences_failures += 1
             logger.warning("Failed to get all preferences: %s", e)
             return {}

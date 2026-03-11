@@ -141,7 +141,7 @@ export default function HomePage() {
         <h2 className="sr-only">Formulário de Busca</h2>
         <ErrorBoundary>
         <SearchForm searchMode={form.searchMode} onSearchModeChange={form.setSearchMode} setores={form.setores}
-          setoresLoading={form.setoresLoading} setorId={form.setorId} onSetorIdChange={form.setSetorId} termosArray={form.termosArray}
+          setoresLoading={form.setoresLoading} setoresFallback={form.setoresFallback} setorId={form.setorId} onSetorIdChange={form.setSetorId} termosArray={form.termosArray}
           onTermosArrayChange={form.setTermosArray} termoInput={form.termoInput}
           onTermoInputChange={form.setTermoInput} onFormChange={job.clearResult} />
 

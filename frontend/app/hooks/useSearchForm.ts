@@ -12,6 +12,7 @@ function getDefaultDate(daysAgo: number): string {
 export interface UseSearchFormReturn {
   setores: Setor[];
   setoresLoading: boolean;
+  setoresFallback: boolean;
   setorId: string;
   setSetorId: (id: string) => void;
   searchMode: "setor" | "termos";
@@ -46,6 +47,7 @@ export interface UseSearchFormReturn {
 export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
   const [setores, setSetores] = useState<Setor[]>([]);
   const [setoresLoading, setSetoresLoading] = useState(true);
+  const [setoresFallback, setSetoresFallback] = useState(false);
   const [setorId, setSetorIdState] = useState("vestuario");
   const [searchMode, setSearchModeState] = useState<"setor" | "termos">("setor");
   const [termosArray, setTermosArray] = useState<string[]>([]);
@@ -60,11 +62,17 @@ export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
     fetch("/api/setores")
       .then(res => res.json())
       .then(data => {
-        if (data.setores) setSetores(data.setores);
-        else setSetores(FALLBACK_SETORES);
+        if (data.setores) {
+          setSetores(data.setores);
+          setSetoresFallback(false);
+        } else {
+          setSetores(FALLBACK_SETORES);
+          setSetoresFallback(true);
+        }
       })
       .catch(() => {
         setSetores(FALLBACK_SETORES);
+        setSetoresFallback(true);
       })
       .finally(() => {
         setSetoresLoading(false);
@@ -184,6 +192,7 @@ export function useSearchForm(onFormChange?: () => void): UseSearchFormReturn {
   return {
     setores,
     setoresLoading,
+    setoresFallback,
     setorId,
     setSetorId,
     searchMode,

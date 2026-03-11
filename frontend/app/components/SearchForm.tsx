@@ -1,6 +1,7 @@
 "use client";
 
 import type { Setor } from "../types";
+import { Select } from "./Select";
 import { Spinner } from "./Spinner";
 
 interface SearchFormProps {
@@ -8,6 +9,7 @@ interface SearchFormProps {
   onSearchModeChange: (mode: "setor" | "termos") => void;
   setores: Setor[];
   setoresLoading?: boolean;
+  setoresFallback?: boolean;
   setorId: string;
   onSetorIdChange: (id: string) => void;
   termosArray: string[];
@@ -22,6 +24,7 @@ export function SearchForm({
   onSearchModeChange,
   setores,
   setoresLoading,
+  setoresFallback,
   setorId,
   onSetorIdChange,
   termosArray,
@@ -69,19 +72,23 @@ export function SearchForm({
               <span className="text-sm text-ink-muted">Carregando setores...</span>
             </div>
           ) : (
-            <select
-              id="setor"
-              value={setorId}
-              onChange={e => onSetorIdChange(e.target.value)}
-              className="w-full border border-strong rounded-input px-4 py-3 text-base
-                         bg-surface-0 text-ink
-                         focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue
-                         transition-colors"
-            >
-              {setores.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            <>
+              <Select
+                id="setor"
+                value={setorId}
+                onChange={e => onSetorIdChange(e.target.value)}
+                options={setores.map(s => ({ value: s.id, label: s.name }))}
+                hint={setoresFallback ? undefined : undefined}
+              />
+              {setoresFallback && (
+                <p className="text-xs text-ink-warning mt-1.5 flex items-center gap-1" role="status">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Usando lista de setores em cache (servidor indisponível)
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

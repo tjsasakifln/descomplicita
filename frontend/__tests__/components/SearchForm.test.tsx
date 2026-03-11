@@ -123,4 +123,156 @@ describe('SearchForm', () => {
     fireEvent.change(input, { target: { value: 'camisa polo,' } });
     expect(onTermosArrayChange).not.toHaveBeenCalled();
   });
+
+  it('should show fallback indicator when setoresFallback is true', () => {
+    render(<SearchForm {...defaultProps} setoresFallback={true} />);
+    expect(screen.getByText(/Usando lista de setores em cache/)).toBeInTheDocument();
+  });
+
+  it('should not show fallback indicator when setoresFallback is false', () => {
+    render(<SearchForm {...defaultProps} setoresFallback={false} />);
+    expect(screen.queryByText(/Usando lista de setores em cache/)).not.toBeInTheDocument();
+  });
+
+  it('should show loading state with spinner', () => {
+    render(<SearchForm {...defaultProps} setoresLoading={true} />);
+    expect(screen.getByText('Carregando setores...')).toBeInTheDocument();
+    expect(screen.getByLabelText('Carregando setores')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('should add term on space', () => {
+    const onTermosArrayChange = jest.fn();
+    const onTermoInputChange = jest.fn();
+    const onFormChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        onTermosArrayChange={onTermosArrayChange}
+        onTermoInputChange={onTermoInputChange}
+        onFormChange={onFormChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Separe termos/i);
+    fireEvent.change(input, { target: { value: 'uniforme ' } });
+    expect(onTermosArrayChange).toHaveBeenCalled();
+    expect(onTermoInputChange).toHaveBeenCalledWith('');
+  });
+
+  it('should not add empty term on space', () => {
+    const onTermosArrayChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        onTermosArrayChange={onTermosArrayChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Separe termos/i);
+    fireEvent.change(input, { target: { value: ' ' } });
+    expect(onTermosArrayChange).not.toHaveBeenCalled();
+  });
+
+  it('should not add duplicate term on space', () => {
+    const onTermosArrayChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        termosArray={['uniforme']}
+        onTermosArrayChange={onTermosArrayChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Adicionar mais/i);
+    fireEvent.change(input, { target: { value: 'uniforme ' } });
+    expect(onTermosArrayChange).not.toHaveBeenCalled();
+  });
+
+  it('should update input value on normal typing', () => {
+    const onTermoInputChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        onTermoInputChange={onTermoInputChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Separe termos/i);
+    fireEvent.change(input, { target: { value: 'test' } });
+    expect(onTermoInputChange).toHaveBeenCalledWith('test');
+  });
+
+  it('should remove last term on Backspace with empty input', () => {
+    const onTermosArrayChange = jest.fn();
+    const onFormChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        termosArray={['a', 'b']}
+        termoInput=""
+        onTermosArrayChange={onTermosArrayChange}
+        onFormChange={onFormChange}
+      />
+    );
+    const input = screen.getByPlaceholderText(/Adicionar mais/i);
+    fireEvent.keyDown(input, { key: 'Backspace' });
+    expect(onTermosArrayChange).toHaveBeenCalled();
+    expect(onFormChange).toHaveBeenCalled();
+  });
+
+  it('should add term on Enter key', () => {
+    const onTermosArrayChange = jest.fn();
+    const onTermoInputChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        termoInput="jaleco"
+        onTermosArrayChange={onTermosArrayChange}
+        onTermoInputChange={onTermoInputChange}
+      />
+    );
+    const input = screen.getByRole('textbox');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onTermosArrayChange).toHaveBeenCalled();
+    expect(onTermoInputChange).toHaveBeenCalledWith('');
+  });
+
+  it('should not add empty term on Enter', () => {
+    const onTermosArrayChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        termoInput=""
+        onTermosArrayChange={onTermosArrayChange}
+      />
+    );
+    const input = screen.getByRole('textbox');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onTermosArrayChange).not.toHaveBeenCalled();
+  });
+
+  it('should remove specific term when X clicked', () => {
+    const onTermosArrayChange = jest.fn();
+    const onFormChange = jest.fn();
+    render(
+      <SearchForm
+        {...defaultProps}
+        searchMode="termos"
+        termosArray={['uniforme', 'escolar']}
+        onTermosArrayChange={onTermosArrayChange}
+        onFormChange={onFormChange}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Remover termo uniforme'));
+    expect(onTermosArrayChange).toHaveBeenCalled();
+    expect(onFormChange).toHaveBeenCalled();
+  });
+
+  it('displays singular term count', () => {
+    render(<SearchForm {...defaultProps} searchMode="termos" termosArray={['uniforme']} />);
+    expect(screen.getByText(/1 termo selecionado$/)).toBeInTheDocument();
+  });
 });

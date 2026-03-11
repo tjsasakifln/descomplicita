@@ -36,6 +36,7 @@ from filter import filter_batch
 from llm import gerar_resumo, gerar_resumo_fallback
 from middleware.auth import APIKeyMiddleware
 from middleware.correlation_id import CorrelationIdMiddleware
+from middleware.deprecation import APIVersionMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from rate_limit import limiter
 from routers.auth import auth_login, auth_refresh, auth_signup, auth_token
@@ -203,6 +204,9 @@ app.add_middleware(
 
 # Security headers (CSP + HSTS) — v3-story-3.3
 app.add_middleware(SecurityHeadersMiddleware)
+
+# API versioning and deprecation headers (TD-SYS-012)
+app.add_middleware(APIVersionMiddleware)
 
 # Authentication middleware (JWT + API key fallback)
 app.add_middleware(APIKeyMiddleware)
