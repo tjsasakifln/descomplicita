@@ -5,10 +5,12 @@ Asserts that no keyword set in filter.py or sectors.py contains entries
 that are redundant under normalize_text() — i.e., two different original
 strings that normalize to the same value.
 """
-import pytest
+
 from collections import defaultdict
 
-from filter import KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO, normalize_text
+import pytest
+
+from filter import KEYWORDS_EXCLUSAO, KEYWORDS_UNIFORMES, normalize_text
 from sectors import SECTORS
 
 

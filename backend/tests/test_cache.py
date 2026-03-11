@@ -1,7 +1,8 @@
 """Unit tests for Redis cache and async PNCP client cache integration."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from app_cache.redis_cache import RedisCache
 
@@ -32,6 +33,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_cache_hit_returns_data(self, cache, mock_redis):
         import json
+
         data = [{"id": 1}, {"id": 2}]
         mock_redis.get = AsyncMock(return_value=json.dumps(data))
         result = await cache.get("key1")
@@ -47,11 +49,14 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_cache_stats(self, cache, mock_redis):
         import json
-        mock_redis.get = AsyncMock(side_effect=[
-            json.dumps([{"id": 1}]),  # hit
-            json.dumps([{"id": 1}]),  # hit
-            None,  # miss
-        ])
+
+        mock_redis.get = AsyncMock(
+            side_effect=[
+                json.dumps([{"id": 1}]),  # hit
+                json.dumps([{"id": 1}]),  # hit
+                None,  # miss
+            ]
+        )
         await cache.get("key1")
         await cache.get("key1")
         await cache.get("missing")
@@ -107,15 +112,19 @@ class TestCacheEndpoints:
 
     def test_cache_stats_endpoint(self, monkeypatch):
         monkeypatch.setattr("main._debug_enabled", True)
-        from unittest.mock import AsyncMock as AM, Mock
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import Mock
+
         mock_source = Mock()
         mock_source.cache_stats = AM(return_value={"entries": 0, "hits": 0, "misses": 0, "hit_ratio": 0.0})
 
-        from main import app
         from dependencies import get_pncp_source
+        from main import app
+
         app.dependency_overrides[get_pncp_source] = lambda: mock_source
 
         from fastapi.testclient import TestClient
+
         client = TestClient(app)
         response = client.get("/cache/stats")
         assert response.status_code == 200
@@ -127,15 +136,19 @@ class TestCacheEndpoints:
 
     def test_cache_clear_endpoint(self, monkeypatch):
         monkeypatch.setattr("main._debug_enabled", True)
-        from unittest.mock import AsyncMock as AM, Mock
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import Mock
+
         mock_source = Mock()
         mock_source.cache_clear = AM(return_value=0)
 
-        from main import app
         from dependencies import get_pncp_source
+        from main import app
+
         app.dependency_overrides[get_pncp_source] = lambda: mock_source
 
         from fastapi.testclient import TestClient
+
         client = TestClient(app)
         response = client.post("/cache/clear")
         assert response.status_code == 200

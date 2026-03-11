@@ -8,13 +8,13 @@ Note: Full cache hit/miss integration tests require Redis and are covered
 by test_cache.py (unit tests with mock Redis).
 """
 
-import pytest
 from unittest.mock import AsyncMock, Mock
 
+import pytest
 from fastapi.testclient import TestClient
 
-from main import app
 from dependencies import get_pncp_source
+from main import app
 
 
 @pytest.fixture
@@ -30,9 +30,14 @@ class TestCacheEndpointsIntegration:
         monkeypatch.setattr("main._debug_enabled", True)
 
         mock_source = Mock()
-        mock_source.cache_stats = AsyncMock(return_value={
-            "entries": 5, "hits": 10, "misses": 3, "hit_ratio": 0.77,
-        })
+        mock_source.cache_stats = AsyncMock(
+            return_value={
+                "entries": 5,
+                "hits": 10,
+                "misses": 3,
+                "hit_ratio": 0.77,
+            }
+        )
         app.dependency_overrides[get_pncp_source] = lambda: mock_source
 
         response = http_client.get("/cache/stats")

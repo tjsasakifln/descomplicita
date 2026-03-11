@@ -5,8 +5,9 @@ Verifies that filter_licitacao and filter_batch work with both:
 - NormalizedRecord field names (objeto, valor_estimado)
 """
 
-from datetime import datetime, timezone, timedelta
-from filter import filter_licitacao, filter_batch
+from datetime import datetime, timedelta, timezone
+
+from filter import filter_batch, filter_licitacao
 
 
 class TestFilterWithNormalizedFields:

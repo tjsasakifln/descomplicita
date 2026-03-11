@@ -84,11 +84,17 @@ class Database:
 
             # Create user profile if not exists (fallback)
             if email:
-                result = self._client.table("users").insert({
-                    "id": user_id,
-                    "email": email,
-                    "display_name": email.split("@")[0],
-                }).execute()
+                result = (
+                    self._client.table("users")
+                    .insert(
+                        {
+                            "id": user_id,
+                            "email": email,
+                            "display_name": email.split("@")[0],
+                        }
+                    )
+                    .execute()
+                )
                 return result.data[0] if result.data else None
             return None
         except Exception as e:
@@ -114,16 +120,18 @@ class Database:
             logger.debug("Skipping record_search: no user_id")
             return
         try:
-            self._client.table("search_history").insert({
-                "user_id": user_id,
-                "job_id": job_id,
-                "ufs": ufs,
-                "data_inicial": data_inicial,
-                "data_final": data_final,
-                "setor_id": setor_id,
-                "termos_busca": termos_busca,
-                "status": "queued",
-            }).execute()
+            self._client.table("search_history").insert(
+                {
+                    "user_id": user_id,
+                    "job_id": job_id,
+                    "ufs": ufs,
+                    "data_inicial": data_inicial,
+                    "data_final": data_final,
+                    "setor_id": setor_id,
+                    "termos_busca": termos_busca,
+                    "status": "queued",
+                }
+            ).execute()
         except Exception as e:
             logger.warning("Failed to record search %s: %s", job_id, e)
 
@@ -138,13 +146,15 @@ class Database:
         if not self._client:
             return
         try:
-            self._client.table("search_history").update({
-                "status": "completed",
-                "total_raw": total_raw,
-                "total_filtrado": total_filtrado,
-                "elapsed_seconds": round(elapsed_seconds, 2),
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("job_id", job_id).execute()
+            self._client.table("search_history").update(
+                {
+                    "status": "completed",
+                    "total_raw": total_raw,
+                    "total_filtrado": total_filtrado,
+                    "elapsed_seconds": round(elapsed_seconds, 2),
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("job_id", job_id).execute()
         except Exception as e:
             logger.warning("Failed to complete search %s: %s", job_id, e)
 
@@ -153,10 +163,12 @@ class Database:
         if not self._client:
             return
         try:
-            self._client.table("search_history").update({
-                "status": "failed",
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("job_id", job_id).execute()
+            self._client.table("search_history").update(
+                {
+                    "status": "failed",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("job_id", job_id).execute()
         except Exception as e:
             logger.warning("Failed to mark search %s as failed: %s", job_id, e)
 
@@ -169,10 +181,12 @@ class Database:
         if not self._client:
             return
         try:
-            self._client.table("search_history").update({
-                "status": "cancelled",
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("job_id", job_id).execute()
+            self._client.table("search_history").update(
+                {
+                    "status": "cancelled",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("job_id", job_id).execute()
         except Exception as e:
             logger.warning("Failed to mark search %s as cancelled: %s", job_id, e)
 
@@ -216,11 +230,14 @@ class Database:
         if not self._client or not user_id:
             return
         try:
-            self._client.table("user_preferences").upsert({
-                "user_id": user_id,
-                "key": key,
-                "value": json.dumps(value) if not isinstance(value, (dict, list)) else value,
-            }, on_conflict="user_id,key").execute()
+            self._client.table("user_preferences").upsert(
+                {
+                    "user_id": user_id,
+                    "key": key,
+                    "value": json.dumps(value) if not isinstance(value, (dict, list)) else value,
+                },
+                on_conflict="user_id,key",
+            ).execute()
         except Exception as e:
             logger.warning("Failed to set preference %s: %s", key, e)
 
@@ -234,11 +251,7 @@ class Database:
             return None
         try:
             result = (
-                self._client.table("user_preferences")
-                .select("value")
-                .eq("user_id", user_id)
-                .eq("key", key)
-                .execute()
+                self._client.table("user_preferences").select("value").eq("user_id", user_id).eq("key", key).execute()
             )
             if result.data:
                 val = result.data[0]["value"]
@@ -256,12 +269,7 @@ class Database:
         if not self._client or not user_id:
             return {}
         try:
-            result = (
-                self._client.table("user_preferences")
-                .select("key, value")
-                .eq("user_id", user_id)
-                .execute()
-            )
+            result = self._client.table("user_preferences").select("key, value").eq("user_id", user_id).execute()
             prefs = {}
             for row in result.data or []:
                 val = row["value"]

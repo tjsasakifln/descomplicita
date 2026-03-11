@@ -18,8 +18,7 @@ from base64 import urlsafe_b64decode, urlsafe_b64encode
 import pytest
 from fastapi.testclient import TestClient
 
-from auth.jwt import JWTError, generate_token, validate_token, JWT_ISSUER, JWT_AUDIENCE
-
+from auth.jwt import JWT_AUDIENCE, JWT_ISSUER, JWTError, generate_token, validate_token
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -184,9 +183,9 @@ class TestInvalidToken:
     def test_tampered_payload_raises_jwt_error(self):
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
         parts = token.split(".")
-        new_payload = urlsafe_b64encode(
-            json.dumps({"sub": "hacker", "iat": 0, "exp": 9999999999}).encode()
-        ).rstrip(b"=").decode()
+        new_payload = (
+            urlsafe_b64encode(json.dumps({"sub": "hacker", "iat": 0, "exp": 9999999999}).encode()).rstrip(b"=").decode()
+        )
         tampered = f"{parts[0]}.{new_payload}.{parts[2]}"
         with pytest.raises(JWTError, match="signature"):
             validate_token(tampered, secret=TEST_SECRET)
@@ -215,10 +214,13 @@ class TestInvalidToken:
     def test_rejects_token_with_wrong_audience(self):
         """JWT with incorrect audience is rejected."""
         import jwt as pyjwt
+
         payload = {
-            "sub": TEST_SUBJECT, "iat": int(time.time()),
+            "sub": TEST_SUBJECT,
+            "iat": int(time.time()),
             "exp": int(time.time()) + 3600,
-            "iss": JWT_ISSUER, "aud": "wrong-audience",
+            "iss": JWT_ISSUER,
+            "aud": "wrong-audience",
         }
         token = pyjwt.encode(payload, TEST_SECRET, algorithm="HS256")
         with pytest.raises(JWTError, match="audience"):
@@ -227,10 +229,13 @@ class TestInvalidToken:
     def test_rejects_token_with_wrong_issuer(self):
         """JWT with incorrect issuer is rejected."""
         import jwt as pyjwt
+
         payload = {
-            "sub": TEST_SUBJECT, "iat": int(time.time()),
+            "sub": TEST_SUBJECT,
+            "iat": int(time.time()),
             "exp": int(time.time()) + 3600,
-            "iss": "wrong-issuer", "aud": JWT_AUDIENCE,
+            "iss": "wrong-issuer",
+            "aud": JWT_AUDIENCE,
         }
         token = pyjwt.encode(payload, TEST_SECRET, algorithm="HS256")
         with pytest.raises(JWTError, match="issuer"):
@@ -318,6 +323,7 @@ class TestAuthMiddleware:
     @pytest.fixture()
     def client(self):
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     @pytest.fixture()
@@ -325,6 +331,7 @@ class TestAuthMiddleware:
         """Client with JWT_SECRET set so auth is enforced."""
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     def test_public_paths_do_not_require_auth(self, client):
@@ -342,6 +349,7 @@ class TestAuthMiddleware:
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
         token = generate_token("test_user", secret=TEST_SECRET)
         from main import app
+
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/jobs", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code != 401
@@ -350,6 +358,7 @@ class TestAuthMiddleware:
         """A tampered Bearer token is rejected with 401."""
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
         from main import app
+
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get(
             "/jobs",
@@ -363,6 +372,7 @@ class TestAuthMiddleware:
         token = generate_token("test_user", secret=TEST_SECRET, expiration_hours=0)
         time.sleep(1.1)
         from main import app
+
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/jobs", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 401
@@ -372,6 +382,7 @@ class TestAuthMiddleware:
         monkeypatch.setenv("API_KEY", "my-api-key")
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
         from main import app
+
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/jobs", headers={"X-API-Key": "my-api-key"})
         assert resp.status_code != 401
@@ -381,6 +392,7 @@ class TestAuthMiddleware:
         monkeypatch.setenv("API_KEY", "correct-key")
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
         from main import app
+
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/jobs", headers={"X-API-Key": "wrong-key"})
         assert resp.status_code == 401
@@ -402,6 +414,7 @@ class TestAuthTokenEndpoint:
     @pytest.fixture()
     def client(self):
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     def test_returns_503_when_jwt_secret_not_configured(self, client, monkeypatch):
@@ -450,6 +463,7 @@ class TestAuthTokenEndpoint:
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
         monkeypatch.setenv("API_KEY", "real-api-key")
         from main import app
+
         client = TestClient(app, raise_server_exceptions=False)
         token_resp = client.post("/auth/token", headers={"X-API-Key": "real-api-key"})
         assert token_resp.status_code == 200

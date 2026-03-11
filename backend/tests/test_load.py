@@ -15,8 +15,8 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
 from dependencies import get_orchestrator
+from main import app
 from schemas import ResumoLicitacoes
 from tests.conftest import get_test_job_store
 
@@ -24,10 +24,34 @@ from tests.conftest import get_test_job_store
 # All 27 Brazilian UF codes
 # ---------------------------------------------------------------------------
 
-ALL_UFS: List[str] = [
-    "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA",
-    "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN",
-    "RO", "RR", "RS", "SC", "SE", "SP", "TO",
+ALL_UFS: list[str] = [
+    "AC",
+    "AL",
+    "AM",
+    "AP",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MG",
+    "MS",
+    "MT",
+    "PA",
+    "PB",
+    "PE",
+    "PI",
+    "PR",
+    "RJ",
+    "RN",
+    "RO",
+    "RR",
+    "RS",
+    "SC",
+    "SE",
+    "SP",
+    "TO",
 ]
 
 POLL_TIMEOUT = 30
@@ -119,12 +143,18 @@ def client() -> TestClient:
 
 
 class TestLatencyScenarios:
-
     def _run_search_and_assert_completed(
-        self, client, ufs, data_inicial, data_final, monkeypatch, run_sync,
+        self,
+        client,
+        ufs,
+        data_inicial,
+        data_final,
+        monkeypatch,
+        run_sync,
         n_items_per_uf=50,
     ):
         from tests.mock_helpers import make_mock_orchestrator
+
         # Create items for all requested UFs
         items = []
         for uf in ufs:
@@ -217,7 +247,6 @@ class TestLatencyScenarios:
 
 
 class TestProgressTracking:
-
     def test_progress_reports_correctly(self, client, monkeypatch, run_sync):
         target_ufs = ["SP", "RJ", "MG"]
         num_ufs = len(target_ufs)
@@ -226,6 +255,7 @@ class TestProgressTracking:
         observed_statuses = []
 
         from tests.mock_helpers import make_mock_orchestrator
+
         items = [_make_licitacao(f"PNCP-SP-{i}", "SP") for i in range(10)]
         mock_orch = make_mock_orchestrator(items)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
@@ -270,6 +300,7 @@ class TestProgressTracking:
         assert data["elapsed_seconds"] >= 0.0
 
         from datetime import datetime
+
         try:
             datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
         except ValueError as exc:
@@ -281,6 +312,7 @@ class TestProgressTracking:
 
     def test_progress_ufs_total_matches_single_uf(self, client, monkeypatch, run_sync):
         from tests.mock_helpers import make_mock_orchestrator
+
         items = [_make_licitacao("PNCP-SP-0", "SP")]
         mock_orch = make_mock_orchestrator(items)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
@@ -302,6 +334,7 @@ class TestProgressTracking:
 
     def test_progress_ufs_total_matches_all_27_ufs(self, client, monkeypatch, run_sync):
         from tests.mock_helpers import make_mock_orchestrator
+
         items = [_make_licitacao(f"PNCP-SP-{i}", "SP") for i in range(5)]
         mock_orch = make_mock_orchestrator(items)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
@@ -323,21 +356,25 @@ class TestProgressTracking:
 
     def test_progress_phase_done_on_empty_results(self, client, monkeypatch, run_sync):
         from tests.mock_helpers import make_mock_orchestrator
+
         items = [_make_licitacao("PNCP-SP-0", "SP")]
         mock_orch = make_mock_orchestrator(items)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
 
         monkeypatch.setattr(
             "main.filter_batch",
-            lambda bids, **kwargs: ([], {
-                "total": len(bids),
-                "aprovadas": 0,
-                "rejeitadas_uf": 0,
-                "rejeitadas_valor": 0,
-                "rejeitadas_keyword": len(bids),
-                "rejeitadas_prazo": 0,
-                "rejeitadas_outros": 0,
-            }),
+            lambda bids, **kwargs: (
+                [],
+                {
+                    "total": len(bids),
+                    "aprovadas": 0,
+                    "rejeitadas_uf": 0,
+                    "rejeitadas_valor": 0,
+                    "rejeitadas_keyword": len(bids),
+                    "rejeitadas_prazo": 0,
+                    "rejeitadas_outros": 0,
+                },
+            ),
         )
 
         payload = {"ufs": ["SP"], "data_inicial": "2026-02-24", "data_final": "2026-03-02"}

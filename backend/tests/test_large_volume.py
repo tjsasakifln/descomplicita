@@ -17,13 +17,14 @@ Covers:
 import asyncio
 import json
 import time
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from io import BytesIO
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
-from main import app
+
 from job_store import JobStore, SearchJob
+from main import app
 from tests.conftest import get_test_job_store
 
 
@@ -51,6 +52,7 @@ def _create_completed_job_with_items(job_store, job_id, items):
 # LV4: Redis LIST pagination via LRANGE (DB-009)
 # ------------------------------------------------------------------
 
+
 class TestRedisListPagination:
     """DB-009: Items stored as Redis LIST, paginated via LRANGE."""
 
@@ -71,6 +73,7 @@ class TestRedisListPagination:
     @pytest.fixture
     def redis_store(self, mock_redis):
         from stores.redis_job_store import RedisJobStore
+
         return RedisJobStore(redis=mock_redis, max_jobs=3, ttl=5)
 
     @pytest.mark.asyncio
@@ -110,9 +113,7 @@ class TestRedisListPagination:
     async def test_get_items_page_uses_lrange(self, redis_store, mock_redis):
         """Pagination uses LRANGE (not full deserialization)."""
         mock_redis.llen = AsyncMock(return_value=85000)
-        mock_redis.lrange = AsyncMock(return_value=[
-            json.dumps({"obj": f"Item {i}"}).encode() for i in range(20)
-        ])
+        mock_redis.lrange = AsyncMock(return_value=[json.dumps({"obj": f"Item {i}"}).encode() for i in range(20)])
 
         items, total = await redis_store.get_items_page("j1", page=1, page_size=20)
 
@@ -120,16 +121,16 @@ class TestRedisListPagination:
         assert len(items) == 20
         assert items[0] == {"obj": "Item 0"}
         mock_redis.lrange.assert_called_once_with(
-            "job:j1:items", 0, 19  # LRANGE is inclusive
+            "job:j1:items",
+            0,
+            19,  # LRANGE is inclusive
         )
 
     @pytest.mark.asyncio
     async def test_get_items_page_correct_offset(self, redis_store, mock_redis):
         """Page 5 with page_size=20 = LRANGE 80..99."""
         mock_redis.llen = AsyncMock(return_value=200)
-        mock_redis.lrange = AsyncMock(return_value=[
-            json.dumps({"obj": f"Item {i}"}).encode() for i in range(80, 100)
-        ])
+        mock_redis.lrange = AsyncMock(return_value=[json.dumps({"obj": f"Item {i}"}).encode() for i in range(80, 100)])
 
         items, total = await redis_store.get_items_page("j1", page=5, page_size=20)
 
@@ -150,9 +151,7 @@ class TestRedisListPagination:
     @pytest.mark.asyncio
     async def test_get_all_items_uses_lrange_full(self, redis_store, mock_redis):
         """get_all_items uses LRANGE 0 -1 for full retrieval."""
-        mock_redis.lrange = AsyncMock(return_value=[
-            json.dumps({"obj": f"Item {i}"}).encode() for i in range(5)
-        ])
+        mock_redis.lrange = AsyncMock(return_value=[json.dumps({"obj": f"Item {i}"}).encode() for i in range(5)])
 
         items = await redis_store.get_all_items("j1")
 
@@ -163,6 +162,7 @@ class TestRedisListPagination:
 # ------------------------------------------------------------------
 # DB-015: No dual-write (Redis-only item storage)
 # ------------------------------------------------------------------
+
 
 class TestNoDualWrite:
     """DB-015: Items stored only in Redis when available."""
@@ -183,6 +183,7 @@ class TestNoDualWrite:
     @pytest.fixture
     def redis_store(self, mock_redis):
         from stores.redis_job_store import RedisJobStore
+
         return RedisJobStore(redis=mock_redis, max_jobs=3, ttl=5)
 
     @pytest.mark.asyncio
@@ -234,6 +235,7 @@ class TestNoDualWrite:
 # DB-006: Progress updates skip Redis (no write amplification)
 # ------------------------------------------------------------------
 
+
 class TestDeltaProgressUpdates:
     """DB-006: Progress updates are in-memory only."""
 
@@ -247,6 +249,7 @@ class TestDeltaProgressUpdates:
     @pytest.fixture
     def redis_store(self, mock_redis):
         from stores.redis_job_store import RedisJobStore
+
         return RedisJobStore(redis=mock_redis, max_jobs=3, ttl=5)
 
     @pytest.mark.asyncio
@@ -290,12 +293,14 @@ class TestDeltaProgressUpdates:
 # Excel limit + CSV export (v3-story-2.2 Tasks 7-8)
 # ------------------------------------------------------------------
 
+
 class TestExcelCsvLimit:
     """Excel limited to 10K items; CSV available for full dataset."""
 
     def test_create_csv_generates_valid_csv(self):
         """create_csv produces UTF-8 BOM CSV with correct columns."""
         from excel import create_csv
+
         items = [
             {
                 "tipo": "licitacao",
@@ -331,6 +336,7 @@ class TestExcelCsvLimit:
     def test_excel_item_limit_constant(self):
         """EXCEL_ITEM_LIMIT is 10,000."""
         from excel import EXCEL_ITEM_LIMIT
+
         assert EXCEL_ITEM_LIMIT == 10_000
 
     def test_download_csv_endpoint(self, client, job_store):
@@ -365,6 +371,7 @@ class TestExcelCsvLimit:
 # ------------------------------------------------------------------
 # In-memory JobStore: get_items_count and get_all_items
 # ------------------------------------------------------------------
+
 
 class TestJobStoreNewMethods:
     """Tests for new JobStore methods added in v3-story-2.2."""
@@ -413,6 +420,7 @@ class TestJobStoreNewMethods:
 # LV1: Frontend timeout >= backend timeout (property-based)
 # ------------------------------------------------------------------
 
+
 class TestTimeoutAlignment:
     """LV1: Frontend timeout should always >= backend timeout."""
 
@@ -420,20 +428,18 @@ class TestTimeoutAlignment:
         """Frontend polling timeout must exceed backend search timeout."""
         # Backend timeouts from config
         from config import SOURCES_CONFIG
-        max_backend_timeout = max(
-            src["timeout"] for src in SOURCES_CONFIG.values() if src.get("enabled")
-        )
+
+        max_backend_timeout = max(src["timeout"] for src in SOURCES_CONFIG.values() if src.get("enabled"))
 
         # Frontend timeout should be at least 2x backend to account for
         # filtering, Excel generation, and LLM summary
-        assert max_backend_timeout <= 600, (
-            f"Backend timeout ({max_backend_timeout}s) exceeds 10min safety limit"
-        )
+        assert max_backend_timeout <= 600, f"Backend timeout ({max_backend_timeout}s) exceeds 10min safety limit"
 
 
 # ------------------------------------------------------------------
 # LV2: Simulated 27-UF search (mock PNCP)
 # ------------------------------------------------------------------
+
 
 class TestLargeVolumeSearch:
     """LV2: 27-UF search with mock data completes without timeout."""
@@ -443,43 +449,75 @@ class TestLargeVolumeSearch:
         from tests.conftest import make_mock_orchestrator
 
         UFS_ALL = [
-            "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO",
-            "MA", "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR",
-            "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO",
+            "AC",
+            "AL",
+            "AM",
+            "AP",
+            "BA",
+            "CE",
+            "DF",
+            "ES",
+            "GO",
+            "MA",
+            "MG",
+            "MS",
+            "MT",
+            "PA",
+            "PB",
+            "PE",
+            "PI",
+            "PR",
+            "RJ",
+            "RN",
+            "RO",
+            "RR",
+            "RS",
+            "SC",
+            "SE",
+            "SP",
+            "TO",
         ]
 
         # 5 items per UF = 135 items (realistic for filtered results)
         raw_records = []
         for uf in UFS_ALL:
             for i in range(5):
-                raw_records.append({
-                    "codigoCompra": f"{uf}-{i}",
-                    "objetoCompra": f"Uniformes escolares {uf} lote {i}",
-                    "nomeOrgao": f"Prefeitura de {uf}",
-                    "uf": uf,
-                    "valorTotalEstimado": 50000 + i * 10000,
-                    "cnpj": "12345678000100",
-                    "anoCompra": "2026",
-                    "sequencialCompra": str(i),
-                })
+                raw_records.append(
+                    {
+                        "codigoCompra": f"{uf}-{i}",
+                        "objetoCompra": f"Uniformes escolares {uf} lote {i}",
+                        "nomeOrgao": f"Prefeitura de {uf}",
+                        "uf": uf,
+                        "valorTotalEstimado": 50000 + i * 10000,
+                        "cnpj": "12345678000100",
+                        "anoCompra": "2026",
+                        "sequencialCompra": str(i),
+                    }
+                )
 
         mock_orch = make_mock_orchestrator(raw_records)
 
         from dependencies import get_orchestrator
+
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
 
         # Use run_sync fixture behavior inline
         import main as main_module
+
         original_run_search_job = main_module.run_search_job
 
         async def _inline_run(job_id, request, js, orch, database=None):
             loop = asyncio.get_running_loop()
             orig_rie = loop.run_in_executor
+
             def _sync_rie(executor, func, *a):
                 fut = loop.create_future()
-                try: fut.set_result(func(*a))
-                except Exception as exc: fut.set_exception(exc)
+                try:
+                    fut.set_result(func(*a))
+                except Exception as exc:
+                    fut.set_exception(exc)
                 return fut
+
             loop.run_in_executor = _sync_rie
             try:
                 await original_run_search_job(job_id, request, js, orch, database=database)
@@ -489,15 +527,20 @@ class TestLargeVolumeSearch:
         monkeypatch.setattr("main.run_search_job", _inline_run)
 
         from tests.conftest import _test_task_runner
+
         async def _inline_enqueue(job_id, params, coro_factory):
             await coro_factory()
+
         _test_task_runner.enqueue = _inline_enqueue
 
-        response = client.post("/buscar", json={
-            "ufs": UFS_ALL,
-            "data_inicial": "2026-01-01",
-            "data_final": "2026-01-31",
-        })
+        response = client.post(
+            "/buscar",
+            json={
+                "ufs": UFS_ALL,
+                "data_inicial": "2026-01-01",
+                "data_final": "2026-01-31",
+            },
+        )
 
         assert response.status_code == 200
         job_id = response.json()["job_id"]
@@ -510,6 +553,7 @@ class TestLargeVolumeSearch:
 # ------------------------------------------------------------------
 # Pagination endpoint with large volume
 # ------------------------------------------------------------------
+
 
 class TestLargeVolumePagination:
     """Pagination of large item sets (85K items)."""

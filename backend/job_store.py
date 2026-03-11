@@ -3,7 +3,7 @@
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Optional
 
 
 @dataclass
@@ -12,16 +12,18 @@ class SearchJob:
 
     job_id: str
     status: str = "queued"  # queued | running | completed | failed | cancelled
-    progress: Dict = field(default_factory=lambda: {
-        "phase": "queued",
-        "ufs_completed": 0,
-        "ufs_total": 0,
-        "items_fetched": 0,
-        "items_filtered": 0,
-        "sources_completed": 0,
-        "sources_total": 0,
-    })
-    result: Optional[Dict] = None
+    progress: dict = field(
+        default_factory=lambda: {
+            "phase": "queued",
+            "ufs_completed": 0,
+            "ufs_total": 0,
+            "items_fetched": 0,
+            "items_filtered": 0,
+            "sources_completed": 0,
+            "sources_total": 0,
+        }
+    )
+    result: Optional[dict] = None
     error: Optional[str] = None
     created_at: float = field(default_factory=time.time)
     completed_at: Optional[float] = None
@@ -40,9 +42,9 @@ class JobStore:
     def __init__(self, max_jobs: int = 10, ttl: int = 1800) -> None:
         self.max_jobs = max_jobs
         self.ttl = ttl
-        self._jobs: Dict[str, SearchJob] = {}
-        self._excel: Dict[str, bytes] = {}
-        self._items: Dict[str, list] = {}
+        self._jobs: dict[str, SearchJob] = {}
+        self._excel: dict[str, bytes] = {}
+        self._items: dict[str, list] = {}
         self._lock = asyncio.Lock()
 
     async def create(self, job_id: str) -> SearchJob:
@@ -81,7 +83,7 @@ class JobStore:
                 job.status = "running"
             job.progress.update(kwargs)
 
-    async def complete(self, job_id: str, result: Dict) -> None:
+    async def complete(self, job_id: str, result: dict) -> None:
         """Mark a job as completed with its result.
 
         Args:
@@ -153,8 +155,7 @@ class JobStore:
             expired = [
                 jid
                 for jid, job in self._jobs.items()
-                if (job.completed_at and now - job.completed_at > self.ttl)
-                or (now - job.created_at > self.ttl)
+                if (job.completed_at and now - job.completed_at > self.ttl) or (now - job.created_at > self.ttl)
             ]
             for jid in expired:
                 del self._jobs[jid]
@@ -163,10 +164,7 @@ class JobStore:
     @property
     def active_count(self) -> int:
         """Count of queued + running jobs."""
-        return sum(
-            1 for job in self._jobs.values()
-            if job.status in ("queued", "running")
-        )
+        return sum(1 for job in self._jobs.values() if job.status in ("queued", "running"))
 
     @property
     def is_full(self) -> bool:
@@ -192,9 +190,7 @@ class JobStore:
         async with self._lock:
             self._items[job_id] = items
 
-    async def get_items_page(
-        self, job_id: str, page: int = 1, page_size: int = 20
-    ) -> tuple:
+    async def get_items_page(self, job_id: str, page: int = 1, page_size: int = 20) -> tuple:
         """Return a page of items and total count."""
         async with self._lock:
             items = self._items.get(job_id, [])

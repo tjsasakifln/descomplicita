@@ -12,7 +12,7 @@ Redis is the sole source of truth for job state.
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Coroutine, Dict, Optional, Set
+from collections.abc import Callable, Coroutine
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class DurableTaskRunner:
     def __init__(self, redis=None, job_params_ttl: int = 86400) -> None:
         self._redis = redis
         self._job_params_ttl = job_params_ttl
-        self._running_tasks: Dict[str, asyncio.Task] = {}
+        self._running_tasks: dict[str, asyncio.Task] = {}
         self._shutdown = False
 
     def _params_key(self, job_id: str) -> str:
@@ -106,8 +106,7 @@ class DurableTaskRunner:
                 try:
                     await job_store.fail(
                         job_id,
-                        "Job interrompido durante shutdown do servidor. "
-                        "Tente novamente.",
+                        "Job interrompido durante shutdown do servidor. Tente novamente.",
                     )
                     interrupted += 1
                 except Exception as e:
@@ -135,9 +134,7 @@ class DurableTaskRunner:
         try:
             cursor = 0
             while True:
-                cursor, keys = await self._redis.scan(
-                    cursor, match="job_params:*", count=100
-                )
+                cursor, keys = await self._redis.scan(cursor, match="job_params:*", count=100)
                 for key in keys:
                     job_id = key.replace("job_params:", "")
                     interrupted_ids.append(job_id)

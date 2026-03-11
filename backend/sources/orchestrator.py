@@ -6,8 +6,9 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from config import SOURCES_CONFIG
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
@@ -15,10 +16,7 @@ from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 logger = logging.getLogger(__name__)
 
 # Source priority (lower = higher priority). PNCP is canonical.
-_SOURCE_PRIORITY = {
-    name: cfg["priority"]
-    for name, cfg in SOURCES_CONFIG.items()
-}
+_SOURCE_PRIORITY = {name: cfg["priority"] for name, cfg in SOURCES_CONFIG.items()}
 
 
 @dataclass
@@ -36,14 +34,14 @@ class SourceStats:
 class OrchestratorResult:
     """Unified result from a multi-source parallel search."""
 
-    records: List[NormalizedRecord] = field(default_factory=list)
-    source_stats: Dict[str, SourceStats] = field(default_factory=dict)
+    records: list[NormalizedRecord] = field(default_factory=list)
+    source_stats: dict[str, SourceStats] = field(default_factory=dict)
     dedup_removed: int = 0
-    sources_used: List[str] = field(default_factory=list)
+    sources_used: list[str] = field(default_factory=list)
     truncated_combos: int = 0
 
 
-def get_enabled_source_names() -> List[str]:
+def get_enabled_source_names() -> list[str]:
     """Return list of enabled source names, respecting ENABLED_SOURCES env override.
 
     If ENABLED_SOURCES env var is set (comma-separated), use it as override.
@@ -53,10 +51,7 @@ def get_enabled_source_names() -> List[str]:
     env_override = os.environ.get("ENABLED_SOURCES", "").strip()
     if env_override:
         return [s.strip() for s in env_override.split(",") if s.strip()]
-    return [
-        name for name, cfg in SOURCES_CONFIG.items()
-        if cfg.get("enabled", False)
-    ]
+    return [name for name, cfg in SOURCES_CONFIG.items() if cfg.get("enabled", False)]
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +123,15 @@ def _count_filled_fields(record: NormalizedRecord) -> int:
     """Count non-None, non-empty fields for completeness comparison."""
     count = 0
     for fld in (
-        record.numero_licitacao, record.objeto, record.orgao,
-        record.cnpj_orgao, record.uf, record.municipio,
-        record.modalidade, record.status, record.url_edital,
+        record.numero_licitacao,
+        record.objeto,
+        record.orgao,
+        record.cnpj_orgao,
+        record.uf,
+        record.municipio,
+        record.modalidade,
+        record.status,
+        record.url_edital,
         record.url_fonte,
     ):
         if fld:
@@ -166,7 +167,7 @@ class MultiSourceOrchestrator:
 
     def __init__(
         self,
-        sources: List[DataSourceClient],
+        sources: list[DataSourceClient],
         default_timeout: float = 30.0,
         on_source_complete: Optional[Callable[[str, str], Any]] = None,
     ) -> None:
@@ -175,7 +176,7 @@ class MultiSourceOrchestrator:
         self._on_source_complete = on_source_complete
 
     @property
-    def enabled_sources(self) -> List[DataSourceClient]:
+    def enabled_sources(self) -> list[DataSourceClient]:
         """Return sources filtered by enabled config."""
         enabled_names = {n.lower() for n in get_enabled_source_names()}
         return [s for s in self.sources if s.source_name.lower() in enabled_names]
@@ -210,9 +211,7 @@ class MultiSourceOrchestrator:
         tasks = []
         num_ufs = len(query.ufs) if query.ufs else 1
         for source in sources:
-            base_timeout = SOURCES_CONFIG.get(
-                source.source_name.lower(), {}
-            ).get("timeout", self.default_timeout)
+            base_timeout = SOURCES_CONFIG.get(source.source_name.lower(), {}).get("timeout", self.default_timeout)
             # Scale timeout for PNCP when many UFs are selected:
             # base 300s is sized for ~3 UFs; add 10s per extra UF beyond 5
             timeout = base_timeout
@@ -220,22 +219,20 @@ class MultiSourceOrchestrator:
                 timeout = base_timeout + (num_ufs - 5) * 15
                 logger.info(
                     "PNCP timeout scaled %ds → %ds for %d UFs",
-                    base_timeout, timeout, num_ufs,
+                    base_timeout,
+                    timeout,
+                    num_ufs,
                 )
-            task = asyncio.create_task(
-                self._fetch_with_timeout(source, query, timeout)
-            )
+            task = asyncio.create_task(self._fetch_with_timeout(source, query, timeout))
             tasks.append((source.source_name, task))
 
         # Gather results (return_exceptions=True for graceful degradation)
-        results = await asyncio.gather(
-            *[t for _, t in tasks], return_exceptions=True
-        )
+        results = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
 
         # Process results
-        all_records: List[NormalizedRecord] = []
-        source_stats: Dict[str, SourceStats] = {}
-        sources_used: List[str] = []
+        all_records: list[NormalizedRecord] = []
+        source_stats: dict[str, SourceStats] = {}
+        sources_used: list[str] = []
         sources_completed = 0
 
         # Build source lookup for partial result recovery
@@ -253,7 +250,8 @@ class MultiSourceOrchestrator:
                 if partial:
                     logger.warning(
                         "Source %s timed out but recovered %d partial results",
-                        name, len(partial),
+                        name,
+                        len(partial),
                     )
                     source_stats[name] = SourceStats(
                         total_fetched=len(partial),
@@ -278,7 +276,9 @@ class MultiSourceOrchestrator:
                 records, elapsed_ms = result
                 logger.info(
                     "Source %s returned %d records in %dms",
-                    name, len(records), elapsed_ms,
+                    name,
+                    len(records),
+                    elapsed_ms,
                 )
                 source_stats[name] = SourceStats(
                     total_fetched=len(records),
@@ -297,7 +297,7 @@ class MultiSourceOrchestrator:
         deduped, dedup_removed = self._deduplicate(all_records)
 
         # Update after_dedup counts per source
-        source_record_counts: Dict[str, int] = {}
+        source_record_counts: dict[str, int] = {}
         for record in deduped:
             for src in record.sources:
                 source_record_counts[src] = source_record_counts.get(src, 0) + 1
@@ -311,9 +311,11 @@ class MultiSourceOrchestrator:
                 truncated += source.truncated_combos
 
         logger.info(
-            "Orchestrator complete: %d records from %d sources, %d duplicates removed, "
-            "%d combos truncated",
-            len(deduped), len(sources_used), dedup_removed, truncated,
+            "Orchestrator complete: %d records from %d sources, %d duplicates removed, %d combos truncated",
+            len(deduped),
+            len(sources_used),
+            dedup_removed,
+            truncated,
         )
 
         return OrchestratorResult(
@@ -329,7 +331,7 @@ class MultiSourceOrchestrator:
         source: DataSourceClient,
         query: SearchQuery,
         timeout: float,
-    ) -> Tuple[List[NormalizedRecord], int]:
+    ) -> tuple[list[NormalizedRecord], int]:
         """Fetch from a single source with timeout.
 
         Returns:
@@ -347,9 +349,7 @@ class MultiSourceOrchestrator:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         return records, elapsed_ms
 
-    def _deduplicate(
-        self, records: List[NormalizedRecord]
-    ) -> Tuple[List[NormalizedRecord], int]:
+    def _deduplicate(self, records: list[NormalizedRecord]) -> tuple[list[NormalizedRecord], int]:
         """Deduplicate records by composite key.
 
         Strategy:
@@ -364,7 +364,7 @@ class MultiSourceOrchestrator:
         # Sort by priority so PNCP records are processed first
         records.sort(key=lambda r: _source_priority(r.source))
 
-        seen: Dict[str, NormalizedRecord] = {}
+        seen: dict[str, NormalizedRecord] = {}
         duplicates = 0
 
         for record in records:

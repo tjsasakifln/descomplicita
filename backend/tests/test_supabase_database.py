@@ -11,21 +11,23 @@ Test coverage:
 - JWT audience validation (story-0.2)
 """
 
-import time
 import json
-import pytest
+import time
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import jwt as pyjwt
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+import pytest
 
 from database import Database
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
 
+
 class MockSupabaseResponse:
     """Mock Supabase API response."""
+
     def __init__(self, data=None, error=None):
         self.data = data or []
         self.error = error
@@ -97,6 +99,7 @@ def db_disconnected():
 # Connection tests
 # ============================================================================
 
+
 class TestDatabaseConnection:
     """Test database connection and disconnection."""
 
@@ -125,6 +128,7 @@ class TestDatabaseConnection:
 # ============================================================================
 # Search History CRUD tests
 # ============================================================================
+
 
 class TestSearchHistory:
     """Test search history operations with user_id isolation."""
@@ -304,6 +308,7 @@ class TestSearchHistory:
 # User Preferences tests
 # ============================================================================
 
+
 class TestUserPreferences:
     """Test user preferences operations."""
 
@@ -378,12 +383,14 @@ class TestUserPreferences:
     async def test_get_all_preferences(self):
         """get_all_preferences should return all prefs as a dict."""
         db = Database(supabase_url="https://test.supabase.co", supabase_key="test-key")
-        db._client = make_mock_client({
-            "user_preferences": [
-                {"key": "theme", "value": '"dark"'},
-                {"key": "language", "value": '"pt-BR"'},
-            ]
-        })
+        db._client = make_mock_client(
+            {
+                "user_preferences": [
+                    {"key": "theme", "value": '"dark"'},
+                    {"key": "language", "value": '"pt-BR"'},
+                ]
+            }
+        )
 
         result = await db.get_all_preferences(user_id="user-123")
         assert result == {"theme": "dark", "language": "pt-BR"}
@@ -392,6 +399,7 @@ class TestUserPreferences:
 # ============================================================================
 # Graceful degradation tests
 # ============================================================================
+
 
 class TestGracefulDegradation:
     """Test that all operations degrade gracefully when Supabase is unavailable."""
@@ -464,13 +472,14 @@ class TestGracefulDegradation:
 # Auth middleware integration tests
 # ============================================================================
 
+
 class TestAuthMiddleware:
     """Test authentication middleware with Supabase JWT support."""
 
     @pytest.mark.asyncio
     async def test_supabase_jwt_validation(self):
         """Supabase JWT should be validated and user_id extracted."""
-        from auth.supabase_auth import validate_supabase_token, SupabaseAuthError
+        from auth.supabase_auth import SupabaseAuthError, validate_supabase_token
 
         # Valid token payload structure
         mock_payload = {
@@ -489,7 +498,7 @@ class TestAuthMiddleware:
     @pytest.mark.asyncio
     async def test_supabase_jwt_invalid_role_rejected(self):
         """Tokens with non-authenticated role should be rejected."""
-        from auth.supabase_auth import validate_supabase_token, SupabaseAuthError
+        from auth.supabase_auth import SupabaseAuthError, validate_supabase_token
 
         mock_payload = {
             "sub": "user-uuid-123",
@@ -505,7 +514,7 @@ class TestAuthMiddleware:
     @pytest.mark.asyncio
     async def test_supabase_jwt_missing_sub_rejected(self):
         """Tokens without 'sub' claim should be rejected."""
-        from auth.supabase_auth import validate_supabase_token, SupabaseAuthError
+        from auth.supabase_auth import SupabaseAuthError, validate_supabase_token
 
         mock_payload = {
             "role": "authenticated",
@@ -520,7 +529,7 @@ class TestAuthMiddleware:
     @pytest.mark.asyncio
     async def test_no_supabase_secret_raises_error(self):
         """Missing SUPABASE_JWT_SECRET should raise SupabaseAuthError."""
-        from auth.supabase_auth import validate_supabase_token, SupabaseAuthError
+        from auth.supabase_auth import SupabaseAuthError, validate_supabase_token
 
         with patch("auth.supabase_auth.SUPABASE_JWT_SECRET", ""):
             with pytest.raises(SupabaseAuthError, match="not configured"):
@@ -549,7 +558,7 @@ class TestAuthMiddleware:
 
     def test_jwt_rejected_with_wrong_audience(self):
         """A real JWT signed with aud='wrong-audience' must be rejected (story-0.2)."""
-        from auth.supabase_auth import validate_supabase_token, SupabaseAuthError
+        from auth.supabase_auth import SupabaseAuthError, validate_supabase_token
 
         secret = "test-secret-for-audience-check"
         payload = {
@@ -570,6 +579,7 @@ class TestAuthMiddleware:
 # ============================================================================
 # PostgreSQL compatibility tests
 # ============================================================================
+
 
 class TestPostgreSQLCompatibility:
     """Verify that data types are PostgreSQL-compatible."""

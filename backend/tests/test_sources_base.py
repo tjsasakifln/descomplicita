@@ -1,7 +1,9 @@
 """Unit tests for sources/base.py — DataSourceClient ABC, NormalizedRecord, SearchQuery."""
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 
 
@@ -147,9 +149,17 @@ class TestDataSourceClientABC:
 
             def normalize(self, raw):
                 return NormalizedRecord(
-                    id="1", source="test", sources=["test"],
-                    numero_licitacao="1", objeto="", orgao="", cnpj_orgao="",
-                    uf="", municipio="", valor_estimado=None, modalidade="",
+                    id="1",
+                    source="test",
+                    sources=["test"],
+                    numero_licitacao="1",
+                    objeto="",
+                    orgao="",
+                    cnpj_orgao="",
+                    uf="",
+                    municipio="",
+                    valor_estimado=None,
+                    modalidade="",
                 )
 
             def is_healthy(self):

@@ -24,13 +24,22 @@ logger = logging.getLogger(__name__)
 
 # Paths that bypass authentication entirely (no request.state setup)
 PUBLIC_PATHS = {
-    "/health", "/docs", "/redoc", "/openapi.json",
-    "/auth/token", "/auth/signup", "/auth/login", "/auth/refresh",
+    "/health",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/auth/token",
+    "/auth/signup",
+    "/auth/login",
+    "/auth/refresh",
 }
 
 # Paths that allow anonymous access (auth is optional, user_id=None if unauthenticated)
 OPTIONAL_AUTH_PATHS = {
-    "/buscar", "/setores", "/search-history", "/exportar",
+    "/buscar",
+    "/setores",
+    "/search-history",
+    "/exportar",
 }
 
 # Path prefixes that allow anonymous access (for sub-routes like /buscar/{job_id}/status)
@@ -151,7 +160,5 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
         return JSONResponse(
             status_code=401,
-            content={
-                "detail": "Authentication required. Provide Authorization: Bearer <token> or X-API-Key header."
-            },
+            content={"detail": "Authentication required. Provide Authorization: Bearer <token> or X-API-Key header."},
         )

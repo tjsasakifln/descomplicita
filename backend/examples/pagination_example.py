@@ -14,9 +14,7 @@ sys.path.insert(0, "..")
 from pncp_client import PNCPClient
 
 # Configure logging to see pagination progress
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s | %(levelname)-8s | %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-8s | %(message)s")
 
 
 def example_basic_pagination():
@@ -27,9 +25,7 @@ def example_basic_pagination():
 
     # Fetch all records for São Paulo in January 2025
     bids = []
-    for bid in client.fetch_all(
-        data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP"]
-    ):
+    for bid in client.fetch_all(data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP"]):
         bids.append(bid)
 
     print(f"Total bids fetched: {len(bids)}")
@@ -49,9 +45,7 @@ def example_multiple_ufs():
     # Fetch records for SP, RJ, and MG
     bids_by_uf = {}
 
-    for bid in client.fetch_all(
-        data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP", "RJ", "MG"]
-    ):
+    for bid in client.fetch_all(data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP", "RJ", "MG"]):
         uf = bid.get("uf", "UNKNOWN")
         bids_by_uf[uf] = bids_by_uf.get(uf, 0) + 1
 
@@ -96,9 +90,7 @@ def example_generator_usage():
     count = 0
     high_value_count = 0
 
-    for bid in client.fetch_all(
-        data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP"]
-    ):
+    for bid in client.fetch_all(data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP"]):
         count += 1
 
         # Process each bid immediately

@@ -8,19 +8,18 @@ Exit codes: 0 = PASS, 1 = FAIL
 Usage:
     python scripts/audit_quality_gate.py [--threshold-sector 0.03] [--threshold-global 0.01]
 """
+
+import argparse
 import json
 import sys
-import os
-import argparse
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add parent dir to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from filter import match_keywords
 from sectors import SECTORS
-
 
 # Known false positive patterns by sector (ground truth from audit 2026-03-05)
 # These are test cases derived from real PNCP data
@@ -140,10 +139,14 @@ def run_audit(threshold_sector: float = 0.03, threshold_global: float = 0.01) ->
         for pattern in fp_patterns:
             epi_kw = EPI_ONLY_KEYWORDS if sector_id == "vestuario" else None
             ok, kw, score = match_keywords(
-                pattern, sector.keywords, sector.exclusions,
+                pattern,
+                sector.keywords,
+                sector.exclusions,
                 epi_only_keywords=epi_kw,
-                keywords_a=sector.keywords_a, keywords_b=sector.keywords_b,
-                keywords_c=sector.keywords_c, threshold=sector.threshold,
+                keywords_a=sector.keywords_a,
+                keywords_b=sector.keywords_b,
+                keywords_c=sector.keywords_c,
+                threshold=sector.threshold,
             )
             if not ok:
                 fps_caught += 1
@@ -158,10 +161,14 @@ def run_audit(threshold_sector: float = 0.03, threshold_global: float = 0.01) ->
         for pattern in tp_patterns:
             epi_kw = EPI_ONLY_KEYWORDS if sector_id == "vestuario" else None
             ok, kw, score = match_keywords(
-                pattern, sector.keywords, sector.exclusions,
+                pattern,
+                sector.keywords,
+                sector.exclusions,
                 epi_only_keywords=epi_kw,
-                keywords_a=sector.keywords_a, keywords_b=sector.keywords_b,
-                keywords_c=sector.keywords_c, threshold=sector.threshold,
+                keywords_a=sector.keywords_a,
+                keywords_b=sector.keywords_b,
+                keywords_c=sector.keywords_c,
+                threshold=sector.threshold,
             )
             if ok:
                 tps_caught += 1
@@ -173,18 +180,20 @@ def run_audit(threshold_sector: float = 0.03, threshold_global: float = 0.01) ->
         total_tested = len(fp_patterns) + len(tp_patterns)
         fp_rate = len(fps_missed) / max(total_tested, 1)
 
-        results.append({
-            "sector": sector_id,
-            "sector_name": sector.name,
-            "fp_patterns_tested": len(fp_patterns),
-            "fp_caught": fps_caught,
-            "fp_missed": fps_missed,
-            "tp_patterns_tested": len(tp_patterns),
-            "tp_caught": tps_caught,
-            "tp_missed": tps_missed,
-            "fp_rate": fp_rate,
-            "passed": fp_rate <= threshold_sector and len(tps_missed) == 0,
-        })
+        results.append(
+            {
+                "sector": sector_id,
+                "sector_name": sector.name,
+                "fp_patterns_tested": len(fp_patterns),
+                "fp_caught": fps_caught,
+                "fp_missed": fps_missed,
+                "tp_patterns_tested": len(tp_patterns),
+                "tp_caught": tps_caught,
+                "tp_missed": tps_missed,
+                "fp_rate": fp_rate,
+                "passed": fp_rate <= threshold_sector and len(tps_missed) == 0,
+            }
+        )
 
     total_patterns = total_fp + total_tp + total_tn + total_fn
     global_fp_rate = total_fp / max(total_patterns, 1)

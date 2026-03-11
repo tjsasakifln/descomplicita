@@ -5,10 +5,11 @@ Tests whether the PNCP API's `palavraChave` parameter filters results server-sid
 Compares response counts with and without the parameter using real search terms.
 """
 
-import httpx
 import json
 import time
 from datetime import date, timedelta
+
+import httpx
 
 BASE_URL = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
 HEADERS = {
@@ -41,15 +42,13 @@ def fetch(params: dict, label: str) -> dict:
                 print("Sample objects:")
                 for i, item in enumerate(data["data"][:3]):
                     obj = item.get("objetoCompra", "N/A")
-                    print(f"  [{i+1}] {obj[:120]}")
+                    print(f"  [{i + 1}] {obj[:120]}")
             return {
                 "status": 200,
                 "totalRegistros": total,
                 "totalPaginas": total_pages,
                 "pageItems": page_items,
-                "sampleObjects": [
-                    item.get("objetoCompra", "") for item in data.get("data", [])[:5]
-                ],
+                "sampleObjects": [item.get("objetoCompra", "") for item in data.get("data", [])[:5]],
             }
         elif resp.status_code == 204:
             print("No content (204)")

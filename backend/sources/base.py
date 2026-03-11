@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -12,8 +12,8 @@ class SearchQuery:
 
     data_inicial: str
     data_final: str
-    ufs: Optional[List[str]] = None
-    modalidades: Optional[List[int]] = None
+    ufs: Optional[list[str]] = None
+    modalidades: Optional[list[int]] = None
 
 
 @dataclass
@@ -27,7 +27,7 @@ class NormalizedRecord:
 
     id: str
     source: str
-    sources: List[str]
+    sources: list[str]
     numero_licitacao: str
     objeto: str
     orgao: str
@@ -43,9 +43,9 @@ class NormalizedRecord:
     tipo: str = "licitacao"
     url_edital: Optional[str] = None
     url_fonte: Optional[str] = None
-    raw_data: Dict[str, Any] = field(default_factory=dict)
+    raw_data: dict[str, Any] = field(default_factory=dict)
 
-    def to_legacy_dict(self) -> Dict[str, Any]:
+    def to_legacy_dict(self) -> dict[str, Any]:
         """Return a dict compatible with the existing pipeline (filter, excel, llm).
 
         Merges raw_data (which contains all original API fields) with the
@@ -53,26 +53,28 @@ class NormalizedRecord:
         (NormalizedRecord) field names are accessible.
         """
         result = dict(self.raw_data)
-        result.update({
-            "id": self.id,
-            "tipo": self.tipo,
-            "source": self.source,
-            "sources": self.sources,
-            "numero_licitacao": self.numero_licitacao,
-            "objeto": self.objeto,
-            "orgao": self.orgao,
-            "cnpj_orgao": self.cnpj_orgao,
-            "uf": self.uf,
-            "municipio": self.municipio,
-            "valor_estimado": self.valor_estimado,
-            "modalidade": self.modalidade,
-            "modalidade_codigo": self.modalidade_codigo,
-            "data_publicacao": self.data_publicacao,
-            "data_abertura": self.data_abertura,
-            "status": self.status,
-            "url_edital": self.url_edital,
-            "url_fonte": self.url_fonte,
-        })
+        result.update(
+            {
+                "id": self.id,
+                "tipo": self.tipo,
+                "source": self.source,
+                "sources": self.sources,
+                "numero_licitacao": self.numero_licitacao,
+                "objeto": self.objeto,
+                "orgao": self.orgao,
+                "cnpj_orgao": self.cnpj_orgao,
+                "uf": self.uf,
+                "municipio": self.municipio,
+                "valor_estimado": self.valor_estimado,
+                "modalidade": self.modalidade,
+                "modalidade_codigo": self.modalidade_codigo,
+                "data_publicacao": self.data_publicacao,
+                "data_abertura": self.data_abertura,
+                "status": self.status,
+                "url_edital": self.url_edital,
+                "url_fonte": self.url_fonte,
+            }
+        )
         return result
 
 
@@ -91,7 +93,7 @@ class DataSourceClient(ABC):
         ...
 
     @abstractmethod
-    async def fetch_records(self, query: SearchQuery) -> List[NormalizedRecord]:
+    async def fetch_records(self, query: SearchQuery) -> list[NormalizedRecord]:
         """Fetch and normalize procurement records matching the query.
 
         Args:

@@ -1,0 +1,67 @@
+# Ruff configuration for Descomplicita backend
+# Story 2.1 (TD-SYS-003): Python linter and formatter
+
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "B008",    # do not perform function calls in argument defaults (FastAPI Depends)
+    "B904",    # raise ... from err (too noisy in existing code)
+    "SIM102",  # collapsible if (readability preference)
+    "SIM108",  # ternary operator (readability preference)
+    "SIM105",  # suppressible exception (contextlib.suppress not always clearer)
+    "SIM103",  # needless bool (readability preference)
+    "SIM113",  # enumerate-for-loop (style preference)
+    "UP007",   # use X | Y for union types (keep Optional for readability)
+    "UP045",   # use X | None (keep Optional for readability)
+    "UP017",   # datetime-timezone-utc (keep datetime.timezone.utc for clarity)
+    "UP042",   # replace-str-enum (keep StrEnum compat for 3.11)
+    "RUF002",  # ambiguous unicode in docstrings (Portuguese text)
+    "RUF003",  # ambiguous unicode in comments (Portuguese text)
+    "RUF013",  # implicit optional (prefer explicit Optional)
+    "RUF059",  # unused unpacked variable (often intentional)
+    "B023",    # function uses loop variable (reviewed, safe in our usage)
+    "B905",    # zip without explicit strict (style preference)
+    "B033",    # duplicate value (reviewed, intentional in keyword lists)
+    "E701",    # multiple statements on one line (used in concise patterns)
+]
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "E501",    # line length in tests
+    "B",       # bugbear in tests
+    "SIM",     # simplify in tests
+    "RUF012",  # mutable class variables in tests
+    "F401",    # unused imports in test files (may be fixture re-exports)
+    "F841",    # unused variables in tests (intermediate assertions)
+    "UP035",   # deprecated typing imports (tests not modified per story constraint)
+]
+"main.py" = [
+    "F401",    # unused imports (backward-compat re-exports for test monkeypatches)
+]
+
+[lint.isort]
+known-first-party = [
+    "auth", "clients", "middleware", "sources", "stores",
+    "routers", "services",
+    "config", "database", "dependencies", "error_codes",
+    "exceptions", "excel", "filter", "job_store", "llm",
+    "pncp_client", "rate_limit", "schemas", "schemas_contract",
+    "sectors", "task_queue",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"

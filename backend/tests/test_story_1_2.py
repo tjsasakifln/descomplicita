@@ -6,15 +6,17 @@ Covers:
 - saved_searches.name CHECK constraint (TD-DB-008)
 """
 
-import pytest
 from unittest.mock import AsyncMock, Mock
-from fastapi.testclient import TestClient
-from main import app, limiter
 
+import pytest
+from fastapi.testclient import TestClient
+
+from main import app, limiter
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def client():
@@ -25,6 +27,7 @@ def client():
 # ---------------------------------------------------------------------------
 # Rate Limiting on Auth Endpoints (TD-SYS-015)
 # ---------------------------------------------------------------------------
+
 
 class TestAuthRateLimiting:
     """Burst of 15+ requests in /auth/login within 1 minute returns 429."""
@@ -82,7 +85,8 @@ class TestAuthRateLimiting:
     def test_rate_limit_is_per_ip(self, client):
         """Rate limit uses get_remote_address (per-IP), not global."""
         # TestClient sends from 'testclient' — just verify the limiter key_func
-        from slowapi import _rate_limit_exceeded_handler  # noqa: F401
+        from slowapi import _rate_limit_exceeded_handler
+
         assert limiter._key_func.__name__ == "get_remote_address"
 
     def test_normal_request_within_limit_succeeds(self, client):
@@ -104,13 +108,16 @@ class TestAuthRateLimiting:
 # Transparencia API Key Validation (TD-SYS-023)
 # ---------------------------------------------------------------------------
 
+
 class TestTransparenciaApiKeyValidation:
     """TransparenciaSource must fail explicitly when API key is absent."""
 
     def test_source_without_key_sets_flag_false(self):
         """Creating source without API key sets _api_key_configured=False."""
-        from sources.transparencia_source import TransparenciaSource
         import os
+
+        from sources.transparencia_source import TransparenciaSource
+
         # Ensure env var is not set
         env_key = os.environ.pop("TRANSPARENCIA_API_KEY", None)
         try:
@@ -123,15 +130,18 @@ class TestTransparenciaApiKeyValidation:
     def test_source_with_key_sets_flag_true(self):
         """Creating source with API key sets _api_key_configured=True."""
         from sources.transparencia_source import TransparenciaSource
+
         source = TransparenciaSource(api_key="my-valid-key")
         assert source._api_key_configured is True
 
     @pytest.mark.asyncio
     async def test_fetch_records_raises_without_key(self):
         """fetch_records raises PermissionError when API key is absent."""
-        from sources.transparencia_source import TransparenciaSource
-        from sources.base import SearchQuery
         import os
+
+        from sources.base import SearchQuery
+        from sources.transparencia_source import TransparenciaSource
+
         env_key = os.environ.pop("TRANSPARENCIA_API_KEY", None)
         try:
             source = TransparenciaSource(api_key="")
@@ -145,8 +155,10 @@ class TestTransparenciaApiKeyValidation:
     @pytest.mark.asyncio
     async def test_check_sanctions_raises_without_key(self):
         """check_sanctions raises PermissionError when API key is absent."""
-        from sources.transparencia_source import TransparenciaSource
         import os
+
+        from sources.transparencia_source import TransparenciaSource
+
         env_key = os.environ.pop("TRANSPARENCIA_API_KEY", None)
         try:
             source = TransparenciaSource(api_key="")
@@ -159,9 +171,10 @@ class TestTransparenciaApiKeyValidation:
     @pytest.mark.asyncio
     async def test_fetch_records_works_with_key(self):
         """fetch_records does NOT raise when API key is present."""
-        from sources.transparencia_source import TransparenciaSource
-        from sources.base import SearchQuery
         import httpx
+
+        from sources.base import SearchQuery
+        from sources.transparencia_source import TransparenciaSource
 
         source = TransparenciaSource(api_key="valid-key-123")
 
@@ -185,26 +198,33 @@ class TestTransparenciaApiKeyValidation:
 # saved_searches.name CHECK Constraint (TD-DB-008)
 # ---------------------------------------------------------------------------
 
+
 class TestSavedSearchesNameConstraint:
     """Verify migration 005 adds length constraint on saved_searches.name."""
 
     def test_migration_file_exists(self):
         """Migration 005 SQL file exists."""
         import os
+
         path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "supabase", "migrations", "005_saved_searches_name_length.sql",
+            "supabase",
+            "migrations",
+            "005_saved_searches_name_length.sql",
         )
         assert os.path.exists(path), f"Migration file not found at {path}"
 
     def test_migration_contains_check_constraint(self):
         """Migration SQL contains the CHECK constraint."""
         import os
+
         path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "supabase", "migrations", "005_saved_searches_name_length.sql",
+            "supabase",
+            "migrations",
+            "005_saved_searches_name_length.sql",
         )
-        with open(path, "r") as f:
+        with open(path) as f:
             sql = f.read()
         assert "CHECK" in sql
         assert "length(name)" in sql
@@ -214,10 +234,13 @@ class TestSavedSearchesNameConstraint:
     def test_migration_constraint_name(self):
         """Constraint has a descriptive name."""
         import os
+
         path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "supabase", "migrations", "005_saved_searches_name_length.sql",
+            "supabase",
+            "migrations",
+            "005_saved_searches_name_length.sql",
         )
-        with open(path, "r") as f:
+        with open(path) as f:
             sql = f.read()
         assert "saved_searches_name_length_check" in sql

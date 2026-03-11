@@ -14,7 +14,20 @@ class TestSectorConfig:
     def test_all_sectors_exist(self):
         sectors = list_sectors()
         ids = {s["id"] for s in sectors}
-        assert ids == {"vestuario", "alimentos", "informatica", "limpeza", "mobiliario", "papelaria", "engenharia", "saude", "veiculos", "hospitalar", "seguranca", "servicos_gerais"}
+        assert ids == {
+            "vestuario",
+            "alimentos",
+            "informatica",
+            "limpeza",
+            "mobiliario",
+            "papelaria",
+            "engenharia",
+            "saude",
+            "veiculos",
+            "hospitalar",
+            "seguranca",
+            "servicos_gerais",
+        }
 
     def test_get_sector_returns_config(self):
         s = get_sector("vestuario")
@@ -23,6 +36,7 @@ class TestSectorConfig:
 
     def test_get_sector_invalid_raises(self):
         import pytest
+
         with pytest.raises(KeyError):
             get_sector("inexistente")
 
@@ -32,9 +46,15 @@ class TestInformaticaSector:
 
     def _match(self, texto):
         s = SECTORS["informatica"]
-        return match_keywords(texto, s.keywords, s.exclusions,
-                              keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                              keywords_c=s.keywords_c, threshold=s.threshold)
+        return match_keywords(
+            texto,
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
 
     def test_matches_notebooks(self):
         ok, kw, _score = self._match("Registro de Preços para aquisição de notebooks para a FIPASE")
@@ -74,9 +94,15 @@ class TestLimpezaSector:
 
     def _match(self, texto):
         s = SECTORS["limpeza"]
-        return match_keywords(texto, s.keywords, s.exclusions,
-                              keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                              keywords_c=s.keywords_c, threshold=s.threshold)
+        return match_keywords(
+            texto,
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
 
     def test_matches_material_limpeza(self):
         ok, _, _score = self._match("AQUISIÇÃO FUTURA DE DIVERSOS MATERIAIS DE LIMPEZA")
@@ -95,16 +121,12 @@ class TestLimpezaSector:
 
     def test_excludes_nebulizacao(self):
         """Audit FP: pest control nebulization matched 'inseticida'."""
-        ok, _, _score = self._match(
-            "Registro de preços de serviços de nebulização costal com inseticida fornecido"
-        )
+        ok, _, _score = self._match("Registro de preços de serviços de nebulização costal com inseticida fornecido")
         assert ok is False
 
     def test_excludes_limpeza_veiculos(self):
         """Audit FP: automotive cleaning products matched 'limpeza'."""
-        ok, _, _score = self._match(
-            "AQUISIÇÃO DE LUBRIFICANTES E PRODUTOS DE LIMPEZA PESADA PARA VEÍCULOS"
-        )
+        ok, _, _score = self._match("AQUISIÇÃO DE LUBRIFICANTES E PRODUTOS DE LIMPEZA PESADA PARA VEÍCULOS")
         assert ok is False
 
 
@@ -160,9 +182,15 @@ class TestEngenhariaSector:
 
     def _match(self, texto):
         s = SECTORS["engenharia"]
-        return match_keywords(texto, s.keywords, s.exclusions,
-                              keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                              keywords_c=s.keywords_c, threshold=s.threshold)
+        return match_keywords(
+            texto,
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
 
     def test_matches_materiais_construcao(self):
         ok, _, _score = self._match("AQUISIÇÃO DE MATERIAIS DE CONSTRUÇÃO DIVERSOS")
@@ -559,18 +587,22 @@ class TestAlimentosSector:
 
     def _match(self, texto):
         s = SECTORS["alimentos"]
-        return match_keywords(texto, s.keywords, s.exclusions,
-                              keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                              keywords_c=s.keywords_c, threshold=s.threshold)
+        return match_keywords(
+            texto,
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
 
     def test_matches_generos_alimenticios(self):
         ok, _, _score = self._match("Gêneros Alimentícios Remanescentes")
         assert ok is True
 
     def test_matches_merenda_escolar(self):
-        ok, _, _score = self._match(
-            "REGISTRO DE PREÇOS PARA AQUISIÇÃO DE GÊNEROS ALIMENTÍCIOS PARA MERENDA ESCOLAR"
-        )
+        ok, _, _score = self._match("REGISTRO DE PREÇOS PARA AQUISIÇÃO DE GÊNEROS ALIMENTÍCIOS PARA MERENDA ESCOLAR")
         assert ok is True
 
     def test_matches_cafe(self):
@@ -951,9 +983,7 @@ class TestSegurancaSector:
 
     def test_excludes_seguranca_do_trabalho(self):
         """Critical exclusion: 'segurança do trabalho' is very common."""
-        ok, _, _score = self._match(
-            "Contratação de empresa para prestação de serviços de segurança do trabalho"
-        )
+        ok, _, _score = self._match("Contratação de empresa para prestação de serviços de segurança do trabalho")
         assert ok is False
 
     def test_excludes_seguranca_ocupacional(self):
@@ -1034,9 +1064,7 @@ class TestSegurancaSector:
         assert ok is False
 
     def test_excludes_seguranca_e_saude_trabalho(self):
-        ok, _, _score = self._match(
-            "CONTRATAÇÃO DE EMPRESA PARA SEGURANÇA E SAÚDE DO TRABALHO NAS OBRAS MUNICIPAIS"
-        )
+        ok, _, _score = self._match("CONTRATAÇÃO DE EMPRESA PARA SEGURANÇA E SAÚDE DO TRABALHO NAS OBRAS MUNICIPAIS")
         assert ok is False
 
     def test_excludes_seguranca_nutricional(self):
@@ -1312,36 +1340,60 @@ class TestTierScoring:
     def test_tier_a_keyword_approves(self):
         """Tier A keyword alone should approve (score 1.0 >= 0.6)."""
         s = SECTORS["informatica"]
-        ok, kw, score = match_keywords("Aquisição de notebooks", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Aquisição de notebooks",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
         assert score == 1.0
 
     def test_tier_b_keyword_approves(self):
         """Tier B keyword alone should approve (score 0.7 >= 0.6)."""
         s = SECTORS["informatica"]
-        ok, kw, score = match_keywords("Aquisição de computadores", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Aquisição de computadores",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
         assert score == 0.7
 
     def test_tier_c_keyword_alone_rejects(self):
         """Tier C keyword alone should NOT approve (score 0.3 < 0.6)."""
         s = SECTORS["informatica"]
-        ok, kw, score = match_keywords("Aquisição de projetores", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Aquisição de projetores",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
         assert score == 0.3
 
     def test_tier_c_plus_tier_a_approves(self):
         """Tier C + Tier A keywords should approve (max score 1.0)."""
         s = SECTORS["informatica"]
-        ok, kw, score = match_keywords("Aquisição de projetores e notebooks", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Aquisição de projetores e notebooks",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
         assert score == 1.0
 
@@ -1349,27 +1401,45 @@ class TestTierScoring:
         """Tier C scoring is additive: multiple tier C keywords accumulate (Task 4)."""
         s = SECTORS["informatica"]
         # Multiple tier C keywords: servidor + monitor + projetor = 0.3 + 0.3 + 0.3 = 0.9
-        ok, kw, score = match_keywords("Servidor com monitor e projetor", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Servidor com monitor e projetor",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
         assert abs(score - 0.9) < 0.01  # additive: 3 x 0.3
 
     def test_no_match_returns_zero_score(self):
         """No keywords matched should return score 0.0."""
         s = SECTORS["informatica"]
-        ok, kw, score = match_keywords("Aquisição de medicamentos", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Aquisição de medicamentos",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
         assert score == 0.0
 
     def test_exclusion_returns_zero_score(self):
         """Excluded items should return score 0.0."""
         s = SECTORS["informatica"]
-        ok, kw, score = match_keywords("Capacitação de servidores públicos", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, kw, score = match_keywords(
+            "Capacitação de servidores públicos",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
         assert score == 0.0
 
@@ -1394,67 +1464,121 @@ class TestFQ001Exclusions:
     # --- FQ-001.1: Limpeza exclusions ---
     def test_limpeza_excludes_limpeza_urbana(self):
         s = SECTORS["limpeza"]
-        ok, _, _score = match_keywords("Contratação de serviço de limpeza urbana", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Contratação de serviço de limpeza urbana",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_limpeza_excludes_limpeza_publica(self):
         s = SECTORS["limpeza"]
-        ok, _, _score = match_keywords("Serviço de limpeza pública do município", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Serviço de limpeza pública do município",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_limpeza_excludes_descartavel_cirurgico(self):
         s = SECTORS["limpeza"]
-        ok, _, _score = match_keywords("Aquisição de campo cirúrgico descartável", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de campo cirúrgico descartável",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_limpeza_excludes_avental_descartavel(self):
         s = SECTORS["limpeza"]
-        ok, _, _score = match_keywords("Compra de avental descartável hospitalar", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Compra de avental descartável hospitalar",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_limpeza_still_matches_detergente(self):
         """New exclusions should not affect legitimate matches."""
         s = SECTORS["limpeza"]
-        ok, _, _score = match_keywords("Aquisição de detergente e desinfetante", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de detergente e desinfetante",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
 
     # --- FQ-001.1: Engenharia exclusions ---
     def test_engenharia_excludes_infraestrutura_fibra(self):
         s = SECTORS["engenharia"]
-        ok, _, _score = match_keywords("Implantação de infraestrutura de fibra óptica", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Implantação de infraestrutura de fibra óptica",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_engenharia_excludes_cobertura_ambulatorial(self):
         s = SECTORS["engenharia"]
-        ok, _, _score = match_keywords("Plano de saúde com cobertura ambulatorial", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Plano de saúde com cobertura ambulatorial",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_engenharia_excludes_cobertura_veicular(self):
         s = SECTORS["engenharia"]
-        ok, _, _score = match_keywords("Seguro com cobertura veicular total", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Seguro com cobertura veicular total",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_engenharia_still_matches_pavimentacao(self):
         s = SECTORS["engenharia"]
-        ok, _, _score = match_keywords("Contratação de pavimentação asfáltica", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Contratação de pavimentação asfáltica",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
 
     # --- FQ-001.1: Veiculos exclusions ---
@@ -1483,88 +1607,156 @@ class TestFQ001Exclusions:
     def test_vestuario_epi_only_rejected(self):
         """EPI-only procurements should be rejected for vestuario."""
         from filter import EPI_ONLY_KEYWORDS
+
         s = SECTORS["vestuario"]
-        ok, _, _score = match_keywords("Aquisição de EPI - RESPIRADOR", s.keywords, s.exclusions,
-                                        epi_only_keywords=EPI_ONLY_KEYWORDS,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de EPI - RESPIRADOR",
+            s.keywords,
+            s.exclusions,
+            epi_only_keywords=EPI_ONLY_KEYWORDS,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_vestuario_epi_plus_uniforme_approved(self):
         """EPI + clothing context should be approved."""
         from filter import EPI_ONLY_KEYWORDS
+
         s = SECTORS["vestuario"]
-        ok, _, _score = match_keywords("Aquisição de EPIs e uniformes", s.keywords, s.exclusions,
-                                        epi_only_keywords=EPI_ONLY_KEYWORDS,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de EPIs e uniformes",
+            s.keywords,
+            s.exclusions,
+            epi_only_keywords=EPI_ONLY_KEYWORDS,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
 
     # --- FQ-001.3: Informatica exclusions ---
     def test_informatica_excludes_destinados_servidores(self):
         s = SECTORS["informatica"]
-        ok, _, _score = match_keywords("Materiais destinados aos servidores da prefeitura", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Materiais destinados aos servidores da prefeitura",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_informatica_excludes_capacitacao_servidores(self):
         s = SECTORS["informatica"]
-        ok, _, _score = match_keywords("Capacitação de servidores do município", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Capacitação de servidores do município",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_informatica_excludes_monitor_glicose(self):
         s = SECTORS["informatica"]
-        ok, _, _score = match_keywords("Aquisição de monitor de glicose para UBS", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de monitor de glicose para UBS",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_informatica_still_matches_servidor_rack(self):
         """IT server procurement should still be approved."""
         s = SECTORS["informatica"]
-        ok, _, _score = match_keywords("Aquisição de servidor rack Dell PowerEdge com nobreak", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de servidor rack Dell PowerEdge com nobreak",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
 
     # --- FQ-001.4: Alimentos exclusions ---
     def test_alimentos_excludes_oleo_motor(self):
         s = SECTORS["alimentos"]
-        ok, _, _score = match_keywords("Aquisição de óleo de motor para frota", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de óleo de motor para frota",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_alimentos_excludes_moinho_cafe(self):
         s = SECTORS["alimentos"]
-        ok, _, _score = match_keywords("Aquisição de moinho para café industrial", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de moinho para café industrial",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_alimentos_excludes_maquina_cafe(self):
         s = SECTORS["alimentos"]
-        ok, _, _score = match_keywords("Aquisição de máquina de café para escritório", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de máquina de café para escritório",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is False
 
     def test_alimentos_still_matches_cafe(self):
         """Cafe as food purchase should still be approved."""
         s = SECTORS["alimentos"]
-        ok, _, _score = match_keywords("AQUISIÇÃO PARCELADA DE CAFÉ PARA O ANO DE 2026", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "AQUISIÇÃO PARCELADA DE CAFÉ PARA O ANO DE 2026",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
 
     def test_alimentos_still_matches_cafe_em_po(self):
         s = SECTORS["alimentos"]
-        ok, _, _score = match_keywords("Aquisição de café em pó 500g", s.keywords, s.exclusions,
-                                        keywords_a=s.keywords_a, keywords_b=s.keywords_b,
-                                        keywords_c=s.keywords_c, threshold=s.threshold)
+        ok, _, _score = match_keywords(
+            "Aquisição de café em pó 500g",
+            s.keywords,
+            s.exclusions,
+            keywords_a=s.keywords_a,
+            keywords_b=s.keywords_b,
+            keywords_c=s.keywords_c,
+            threshold=s.threshold,
+        )
         assert ok is True
 
     # --- FQ-001.4: Mobiliario exclusions ---

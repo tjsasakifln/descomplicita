@@ -15,9 +15,9 @@ from typing import Optional
 
 from clients.async_pncp_client import AsyncPNCPClient
 from database import Database
+from sources.orchestrator import MultiSourceOrchestrator
 from sources.pncp_source import PNCPSource
 from sources.transparencia_source import TransparenciaSource
-from sources.orchestrator import MultiSourceOrchestrator
 from task_queue import DurableTaskRunner
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ class AppState:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         try:
             import redis.asyncio as aioredis
+
             self.redis = aioredis.from_url(
                 redis_url,
                 decode_responses=True,
@@ -61,16 +62,19 @@ class AppState:
         # --- Job Store ---
         if self.redis:
             from stores.redis_job_store import RedisJobStore
+
             self.job_store = RedisJobStore(redis=self.redis)
             logger.info("Using RedisJobStore")
         else:
             from job_store import JobStore
+
             self.job_store = JobStore()
             logger.info("Using in-memory JobStore (no Redis)")
 
         # --- Redis Cache ---
         if self.redis:
             from app_cache.redis_cache import RedisCache
+
             self.redis_cache = RedisCache(redis=self.redis)
             logger.info("Using RedisCache for PNCP responses")
         else:

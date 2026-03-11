@@ -64,13 +64,11 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
 
     # === ESTILOS ===
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(
-        start_color="2E7D32", end_color="2E7D32", fill_type="solid"
-    )
+    header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     cell_alignment = Alignment(vertical="top", wrap_text=True)
-    currency_format = '[$R$-416] #.##0,00'
+    currency_format = "[$R$-416] #.##0,00"
     date_format = "DD/MM/YYYY"
     datetime_format = "DD/MM/YYYY HH:MM"
 
@@ -168,9 +166,7 @@ def create_excel(licitacoes: list[dict]) -> BytesIO:
         total_row = len(licitacoes) + 2
         ws.cell(row=total_row, column=5, value="TOTAL:").font = Font(bold=True)
 
-        total_cell = ws.cell(
-            row=total_row, column=6, value=f"=SUM(F2:F{total_row - 1})"
-        )
+        total_cell = ws.cell(row=total_row, column=6, value=f"=SUM(F2:F{total_row - 1})")
         total_cell.number_format = currency_format
         total_cell.font = Font(bold=True)
 
@@ -258,10 +254,20 @@ def create_csv(licitacoes: list[dict]) -> bytes:
     writer = csv.writer(buf)
 
     # Header
-    writer.writerow([
-        "Tipo", "Objeto", "Órgão", "UF", "Município",
-        "Valor Estimado", "Modalidade", "Publicação", "Início", "Link",
-    ])
+    writer.writerow(
+        [
+            "Tipo",
+            "Objeto",
+            "Órgão",
+            "UF",
+            "Município",
+            "Valor Estimado",
+            "Modalidade",
+            "Publicação",
+            "Início",
+            "Link",
+        ]
+    )
 
     for lic in licitacoes:
         tipo = "Ata RP" if lic.get("tipo") == "ata_registro_preco" else "Licitação"
@@ -273,18 +279,20 @@ def create_csv(licitacoes: list[dict]) -> bytes:
             if cnpj and ano and seq
             else f"https://pncp.gov.br/app/editais?q={lic.get('codigoCompra', '')}"
         )
-        writer.writerow([
-            tipo,
-            _sanitize(lic.get("objetoCompra", "")),
-            _sanitize(lic.get("nomeOrgao", "")),
-            lic.get("uf", ""),
-            _sanitize(lic.get("municipio", "")),
-            lic.get("valorTotalEstimado", ""),
-            _sanitize(lic.get("modalidadeNome", "")),
-            lic.get("dataPublicacaoPncp", ""),
-            lic.get("dataAberturaProposta", ""),
-            link,
-        ])
+        writer.writerow(
+            [
+                tipo,
+                _sanitize(lic.get("objetoCompra", "")),
+                _sanitize(lic.get("nomeOrgao", "")),
+                lic.get("uf", ""),
+                _sanitize(lic.get("municipio", "")),
+                lic.get("valorTotalEstimado", ""),
+                _sanitize(lic.get("modalidadeNome", "")),
+                lic.get("dataPublicacaoPncp", ""),
+                lic.get("dataAberturaProposta", ""),
+                link,
+            ]
+        )
 
     # UTF-8 BOM for Excel compatibility
     return b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8")

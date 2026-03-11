@@ -1,12 +1,13 @@
 """Unit tests for sources/pncp_source.py — PNCPSource adapter."""
 
-import pytest
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from sources.pncp_source import PNCPSource, _parse_datetime
-from sources.base import SearchQuery, NormalizedRecord
+import pytest
+
 from clients.async_pncp_client import AsyncPNCPClient
+from sources.base import NormalizedRecord, SearchQuery
+from sources.pncp_source import PNCPSource, _parse_datetime
 
 
 class TestParseDatetime:
@@ -51,6 +52,7 @@ class TestPNCPSourceInit:
 
     def test_custom_config(self):
         from config import RetryConfig
+
         config = RetryConfig(max_retries=1, timeout=5)
         source = PNCPSource(config=config)
         assert source.client.config.max_retries == 1
@@ -183,20 +185,22 @@ class TestPNCPSourceFetchRecords:
     @pytest.mark.asyncio
     async def test_fetch_records_returns_normalized_records(self, source_with_mock_client):
         source = source_with_mock_client
-        source._client.fetch_all = AsyncMock(return_value=[
-            {
-                "numeroControlePNCP": "001",
-                "objetoCompra": "Uniformes",
-                "nomeOrgao": "Prefeitura Test",
-                "uf": "SP",
-                "municipio": "São Paulo",
-                "valorTotalEstimado": 100000.0,
-                "codigoCompra": "001",
-                "cnpj": "123",
-                "anoCompra": "2025",
-                "sequencialCompra": "1",
-            }
-        ])
+        source._client.fetch_all = AsyncMock(
+            return_value=[
+                {
+                    "numeroControlePNCP": "001",
+                    "objetoCompra": "Uniformes",
+                    "nomeOrgao": "Prefeitura Test",
+                    "uf": "SP",
+                    "municipio": "São Paulo",
+                    "valorTotalEstimado": 100000.0,
+                    "codigoCompra": "001",
+                    "cnpj": "123",
+                    "anoCompra": "2025",
+                    "sequencialCompra": "1",
+                }
+            ]
+        )
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31", ufs=["SP"])
         records = await source.fetch_records(query)
@@ -243,14 +247,34 @@ class TestPNCPSourceFetchRecords:
     @pytest.mark.asyncio
     async def test_fetch_records_multiple_items(self, source_with_mock_client):
         source = source_with_mock_client
-        source._client.fetch_all = AsyncMock(return_value=[
-            {"numeroControlePNCP": "001", "objetoCompra": "Item 1", "uf": "SP",
-             "municipio": "", "nomeOrgao": "", "valorTotalEstimado": 50000.0,
-             "codigoCompra": "001", "cnpj": "", "anoCompra": "", "sequencialCompra": ""},
-            {"numeroControlePNCP": "002", "objetoCompra": "Item 2", "uf": "RJ",
-             "municipio": "", "nomeOrgao": "", "valorTotalEstimado": 75000.0,
-             "codigoCompra": "002", "cnpj": "", "anoCompra": "", "sequencialCompra": ""},
-        ])
+        source._client.fetch_all = AsyncMock(
+            return_value=[
+                {
+                    "numeroControlePNCP": "001",
+                    "objetoCompra": "Item 1",
+                    "uf": "SP",
+                    "municipio": "",
+                    "nomeOrgao": "",
+                    "valorTotalEstimado": 50000.0,
+                    "codigoCompra": "001",
+                    "cnpj": "",
+                    "anoCompra": "",
+                    "sequencialCompra": "",
+                },
+                {
+                    "numeroControlePNCP": "002",
+                    "objetoCompra": "Item 2",
+                    "uf": "RJ",
+                    "municipio": "",
+                    "nomeOrgao": "",
+                    "valorTotalEstimado": 75000.0,
+                    "codigoCompra": "002",
+                    "cnpj": "",
+                    "anoCompra": "",
+                    "sequencialCompra": "",
+                },
+            ]
+        )
 
         query = SearchQuery(data_inicial="2025-01-01", data_final="2025-01-31")
         records = await source.fetch_records(query)
@@ -279,7 +303,6 @@ class TestPNCPSourceCacheDelegation:
 
 
 class TestPNCPSourceHealthCheck:
-
     def test_healthy_when_client_exists(self):
         source = PNCPSource()
         assert source.is_healthy() is True

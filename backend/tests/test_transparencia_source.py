@@ -1,27 +1,27 @@
 """Unit tests for sources/transparencia_source.py — TransparenciaSource adapter."""
 
-import pytest
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import httpx
+import pytest
 
+from config import RetryConfig
+from sources.base import NormalizedRecord, SearchQuery
 from sources.transparencia_source import (
-    TransparenciaSource,
-    SanctionResult,
-    _format_date_transparencia,
-    _parse_transparencia_date,
-    _generate_id,
     TRANSPARENCIA_PAGE_SIZE,
     UF_TO_IBGE,
+    SanctionResult,
+    TransparenciaSource,
+    _format_date_transparencia,
+    _generate_id,
+    _parse_transparencia_date,
 )
-from sources.base import SearchQuery, NormalizedRecord
-from config import RetryConfig
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def source():
@@ -60,6 +60,7 @@ def raw_minimal_item():
 # ---------------------------------------------------------------------------
 # Helper function tests
 # ---------------------------------------------------------------------------
+
 
 class TestFormatDateTransparencia:
     """Tests for _format_date_transparencia."""
@@ -122,6 +123,7 @@ class TestGenerateId:
 # TransparenciaSource init & properties
 # ---------------------------------------------------------------------------
 
+
 class TestTransparenciaSourceInit:
     """Tests for TransparenciaSource initialization and properties."""
 
@@ -158,6 +160,7 @@ class TestTransparenciaSourceInit:
 # ---------------------------------------------------------------------------
 # Normalization tests
 # ---------------------------------------------------------------------------
+
 
 class TestTransparenciaSourceNormalize:
     """Tests for TransparenciaSource.normalize() field mapping."""
@@ -259,6 +262,7 @@ class TestTransparenciaSourceNormalize:
 # Sanctions check tests (CEIS + CNEP)
 # ---------------------------------------------------------------------------
 
+
 class TestTransparenciaSourceSanctions:
     """Tests for check_sanctions() against CEIS and CNEP lists."""
 
@@ -357,6 +361,7 @@ class TestTransparenciaSourceSanctions:
 # ---------------------------------------------------------------------------
 # Fetch records tests (with mocked HTTP)
 # ---------------------------------------------------------------------------
+
 
 class TestTransparenciaSourceFetchRecords:
     """Tests for TransparenciaSource.fetch_records() with mocked API responses."""
@@ -513,13 +518,8 @@ class TestTransparenciaSourceFetchRecords:
     @pytest.mark.asyncio
     async def test_fetch_pagination(self, source):
         """Test that pagination fetches multiple pages (1-indexed)."""
-        page1_items = [
-            {"numero": f"{i:03d}/2026", "objeto": f"Item {i}"}
-            for i in range(TRANSPARENCIA_PAGE_SIZE)
-        ]
-        page2_items = [
-            {"numero": "999/2026", "objeto": "Last item"}
-        ]
+        page1_items = [{"numero": f"{i:03d}/2026", "objeto": f"Item {i}"} for i in range(TRANSPARENCIA_PAGE_SIZE)]
+        page2_items = [{"numero": "999/2026", "objeto": "Last item"}]
 
         resp1 = AsyncMock(spec=httpx.Response)
         resp1.status_code = 200
@@ -562,6 +562,7 @@ class TestTransparenciaSourceFetchRecords:
         source._get_client.return_value = client_mock
 
         progress_calls = []
+
         def on_progress(page, total, _):
             progress_calls.append((page, total))
 
@@ -575,6 +576,7 @@ class TestTransparenciaSourceFetchRecords:
 # ---------------------------------------------------------------------------
 # Retry / resilience tests
 # ---------------------------------------------------------------------------
+
 
 class TestTransparenciaSourceRetry:
     """Tests for retry and rate limiting behavior."""
@@ -628,6 +630,7 @@ class TestTransparenciaSourceRetry:
 # Health check tests
 # ---------------------------------------------------------------------------
 
+
 class TestTransparenciaSourceHealthCheck:
     """Tests for TransparenciaSource.is_healthy()."""
 
@@ -658,31 +661,38 @@ class TestTransparenciaSourceHealthCheck:
 # Config integration tests
 # ---------------------------------------------------------------------------
 
+
 class TestTransparenciaConfig:
     """Tests for Transparencia entry in SOURCES_CONFIG."""
 
     def test_transparencia_in_sources_config(self):
         from config import SOURCES_CONFIG
+
         assert "transparencia" in SOURCES_CONFIG
 
     def test_transparencia_enabled(self):
         from config import SOURCES_CONFIG
+
         assert SOURCES_CONFIG["transparencia"]["enabled"] is True
 
     def test_transparencia_base_url(self):
         from config import SOURCES_CONFIG
+
         assert "portaldatransparencia" in SOURCES_CONFIG["transparencia"]["base_url"]
 
     def test_transparencia_rate_limit(self):
         from config import SOURCES_CONFIG
+
         assert SOURCES_CONFIG["transparencia"]["rate_limit_rps"] == 3
 
     def test_transparencia_timeout(self):
         from config import SOURCES_CONFIG
+
         assert SOURCES_CONFIG["transparencia"]["timeout"] == 90
 
     def test_transparencia_auth_configured(self):
         from config import SOURCES_CONFIG
+
         auth = SOURCES_CONFIG["transparencia"]["auth"]
         assert auth is not None
         assert auth["type"] == "api_key"
@@ -694,16 +704,38 @@ class TestTransparenciaConfig:
 # UF to IBGE code mapping tests (SE-001.2)
 # ---------------------------------------------------------------------------
 
+
 class TestUFToIBGEMapping:
     """Tests for UF abbreviation to IBGE numeric code mapping."""
 
     ALL_UFS = {
-        "AC": 12, "AL": 27, "AM": 13, "AP": 16, "BA": 29,
-        "CE": 23, "DF": 53, "ES": 32, "GO": 52, "MA": 21,
-        "MG": 31, "MS": 50, "MT": 51, "PA": 15, "PB": 25,
-        "PE": 26, "PI": 22, "PR": 41, "RJ": 33, "RN": 24,
-        "RO": 11, "RR": 14, "RS": 43, "SC": 42, "SE": 28,
-        "SP": 35, "TO": 17,
+        "AC": 12,
+        "AL": 27,
+        "AM": 13,
+        "AP": 16,
+        "BA": 29,
+        "CE": 23,
+        "DF": 53,
+        "ES": 32,
+        "GO": 52,
+        "MA": 21,
+        "MG": 31,
+        "MS": 50,
+        "MT": 51,
+        "PA": 15,
+        "PB": 25,
+        "PE": 26,
+        "PI": 22,
+        "PR": 41,
+        "RJ": 33,
+        "RN": 24,
+        "RO": 11,
+        "RR": 14,
+        "RS": 43,
+        "SC": 42,
+        "SE": 28,
+        "SP": 35,
+        "TO": 17,
     }
 
     def test_mapping_has_all_27_ufs(self):
@@ -738,9 +770,16 @@ class TestUFConversionInFetchRecords:
         return response
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("uf,expected_code", [
-        ("SP", 35), ("RJ", 33), ("MG", 31), ("BA", 29), ("DF", 53),
-    ])
+    @pytest.mark.parametrize(
+        "uf,expected_code",
+        [
+            ("SP", 35),
+            ("RJ", 33),
+            ("MG", 31),
+            ("BA", 29),
+            ("DF", 53),
+        ],
+    )
     async def test_uf_converted_to_ibge_code(self, source, mock_empty_response, uf, expected_code):
         """Verify that each UF sigla is converted to the correct IBGE code in API params."""
         source._get_client = Mock()

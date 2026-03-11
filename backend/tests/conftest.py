@@ -2,14 +2,14 @@
 
 import asyncio
 import os
-import pytest
 from unittest.mock import AsyncMock, Mock
 
-from job_store import JobStore
-from task_queue import DurableTaskRunner
-from sources.orchestrator import OrchestratorResult, SourceStats
-from sources.base import NormalizedRecord
+import pytest
 
+from job_store import JobStore
+from sources.base import NormalizedRecord
+from sources.orchestrator import OrchestratorResult, SourceStats
+from task_queue import DurableTaskRunner
 
 # Module-level job store for tests (replaces the DI-provided one)
 _test_job_store = JobStore()
@@ -32,6 +32,7 @@ def get_test_task_runner():
 def _reset_rate_limiter():
     """Reset slowapi rate limiter state between tests."""
     from main import limiter
+
     yield
     try:
         limiter.reset()
@@ -50,8 +51,16 @@ def _disable_auth_for_tests(monkeypatch):
 @pytest.fixture(autouse=True)
 def _override_dependencies():
     """Override DI dependencies for testing (no Redis, in-memory stores)."""
+    from dependencies import (
+        get_database,
+        get_job_store,
+        get_orchestrator,
+        get_pncp_source,
+        get_redis,
+        get_redis_cache,
+        get_task_runner,
+    )
     from main import app
-    from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_redis, get_redis_cache, get_task_runner, get_database
 
     # Use test job store and task runner
     app.dependency_overrides[get_job_store] = get_test_job_store
@@ -148,12 +157,14 @@ def make_mock_orchestrator(raw_records=None, error=None):
 
     orch_result = OrchestratorResult(
         records=records,
-        source_stats={"pncp": SourceStats(
-            total_fetched=len(records),
-            after_dedup=len(records),
-            elapsed_ms=100,
-            status="success",
-        )},
+        source_stats={
+            "pncp": SourceStats(
+                total_fetched=len(records),
+                after_dedup=len(records),
+                elapsed_ms=100,
+                status="success",
+            )
+        },
         dedup_removed=0,
         sources_used=["pncp"],
     )

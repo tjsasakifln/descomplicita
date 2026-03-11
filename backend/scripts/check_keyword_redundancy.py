@@ -9,14 +9,15 @@ to the same string. Exits with code 1 if redundancies are found.
 Usage:
     python scripts/check_keyword_redundancy.py
 """
-import sys
+
 import os
+import sys
 from collections import defaultdict
 
 # Ensure backend/ is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from filter import KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO, normalize_text
+from filter import KEYWORDS_EXCLUSAO, KEYWORDS_UNIFORMES, normalize_text
 from sectors import SECTORS
 
 

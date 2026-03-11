@@ -13,11 +13,10 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from dependencies import get_orchestrator
 from exceptions import PNCPAPIError, PNCPRateLimitError
 from main import app
-from dependencies import get_orchestrator
 from tests.conftest import get_test_job_store
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -63,6 +62,7 @@ def _make_licitacao(numero: str = "2025NCP000001", uf: str = "SP") -> dict:
 
 async def _mock_gerar_resumo(bids, **kwargs):
     from schemas import ResumoLicitacoes
+
     return ResumoLicitacoes(
         resumo_executivo=f"{len(bids)} licitacao(es) encontrada(s)",
         total_oportunidades=len(bids),
@@ -108,10 +108,10 @@ def _post_sync(client, request) -> dict:
 
 
 class TestPNCPErrorResilience:
-
     def test_completes_with_partial_source_data(self, client, monkeypatch, run_sync):
         """Search completes when orchestrator returns partial data."""
         from tests.mock_helpers import make_mock_orchestrator
+
         items = [_make_licitacao("2025NCP000001", "SP")]
         mock_orch = make_mock_orchestrator(items)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
@@ -128,6 +128,7 @@ class TestPNCPErrorResilience:
     def test_fails_gracefully_when_pncp_100pct_offline(self, client, monkeypatch, run_sync):
         """When orchestrator raises PNCPAPIError, the job fails cleanly."""
         from tests.mock_helpers import make_mock_orchestrator
+
         mock_orch = make_mock_orchestrator(error=PNCPAPIError("Simulated full outage"))
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
 
@@ -145,6 +146,7 @@ class TestPNCPErrorResilience:
     def test_fails_gracefully_on_rate_limit(self, client, monkeypatch, run_sync):
         """When orchestrator raises PNCPRateLimitError, the job fails with a rate-limit message."""
         from tests.mock_helpers import make_mock_orchestrator
+
         error = PNCPRateLimitError("Too many requests — rate limit exceeded")
         error.retry_after = 60
         mock_orch = make_mock_orchestrator(error=error)
@@ -155,10 +157,7 @@ class TestPNCPErrorResilience:
         assert result["status"] == "failed"
         assert "error" in result
         error_msg = result["error"]["message"].lower()
-        assert any(
-            keyword in error_msg
-            for keyword in ("limitando", "aguarde", "rate", "60", "requisic")
-        )
+        assert any(keyword in error_msg for keyword in ("limitando", "aguarde", "rate", "60", "requisic"))
         assert "Traceback" not in result["error"]["message"]
         assert "PNCPRateLimitError" not in result["error"]["message"]
 
@@ -171,10 +170,10 @@ class TestPNCPErrorResilience:
 
 
 class TestPartialFailure:
-
     def test_completes_with_some_sources_failing(self, client, monkeypatch, run_sync):
         """Search completes when orchestrator returns data from available sources."""
         from tests.mock_helpers import make_mock_orchestrator
+
         sp_items = [_make_licitacao("2025NCP000010", "SP")]
         mock_orch = make_mock_orchestrator(sp_items)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
@@ -191,6 +190,7 @@ class TestPartialFailure:
     def test_partial_failure_result_contains_data(self, client, monkeypatch, run_sync):
         """Result of a partial-failure search includes available data."""
         from tests.mock_helpers import make_mock_orchestrator
+
         sp_items = [
             _make_licitacao("2025NCP000011", "SP"),
             _make_licitacao("2025NCP000012", "SP"),
@@ -224,10 +224,10 @@ class TestPartialFailure:
 
 
 class TestTimeoutBehavior:
-
     def test_zero_timeouts_all_scenarios(self, client, monkeypatch, run_sync):
         """Search with fast mocked responses completes without timing out."""
         from tests.mock_helpers import make_mock_orchestrator
+
         fast_licitacoes = [
             _make_licitacao("2025NCP000020", "SP"),
             _make_licitacao("2025NCP000021", "SP"),
@@ -252,6 +252,7 @@ class TestTimeoutBehavior:
     def test_zero_timeouts_empty_results(self, client, monkeypatch, run_sync):
         """Search that fetches zero bids should complete (not time out)."""
         from tests.mock_helpers import make_mock_orchestrator
+
         mock_orch = make_mock_orchestrator([])
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
 
@@ -267,10 +268,8 @@ class TestTimeoutBehavior:
     def test_zero_timeouts_large_result_set(self, client, monkeypatch, run_sync):
         """Search with many bids completes without timing out."""
         from tests.mock_helpers import make_mock_orchestrator
-        large_set = [
-            _make_licitacao(f"2025NCP{i:06d}", "SP")
-            for i in range(100)
-        ]
+
+        large_set = [_make_licitacao(f"2025NCP{i:06d}", "SP") for i in range(100)]
         mock_orch = make_mock_orchestrator(large_set)
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
 

@@ -16,12 +16,13 @@ import hmac
 import inspect
 import logging
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 from fastapi.testclient import TestClient
 
-from main import app
 from dependencies import get_orchestrator
+from main import app
 
 
 @pytest.fixture
@@ -89,7 +90,6 @@ class TestCORSWhitelist:
 
 
 class TestAPIKeyAuth:
-
     def test_missing_api_key_on_protected_endpoint_returns_401(self, monkeypatch):
         monkeypatch.setenv("API_KEY", "test-secret-key")
         client = TestClient(app)
@@ -132,24 +132,18 @@ class TestHmacCompareDigest:
     def test_middleware_uses_hmac_compare_digest(self):
         """DB-005: middleware/auth.py must use hmac.compare_digest for API key comparison."""
         from middleware import auth as auth_module
+
         source = inspect.getsource(auth_module.APIKeyMiddleware.dispatch)
-        assert "hmac.compare_digest" in source, (
-            "middleware/auth.py must use hmac.compare_digest for API key comparison"
-        )
-        assert "request_key == api_key" not in source, (
-            "middleware/auth.py must NOT use == for API key comparison"
-        )
+        assert "hmac.compare_digest" in source, "middleware/auth.py must use hmac.compare_digest for API key comparison"
+        assert "request_key == api_key" not in source, "middleware/auth.py must NOT use == for API key comparison"
 
     def test_auth_token_endpoint_uses_hmac_compare_digest(self):
         """DB-014: main.py /auth/token must use hmac.compare_digest for API key comparison."""
         import main as main_module
+
         source = inspect.getsource(main_module.auth_token)
-        assert "hmac.compare_digest" in source, (
-            "main.py auth_token must use hmac.compare_digest for API key comparison"
-        )
-        assert "request_key != api_key" not in source, (
-            "main.py auth_token must NOT use != for API key comparison"
-        )
+        assert "hmac.compare_digest" in source, "main.py auth_token must use hmac.compare_digest for API key comparison"
+        assert "request_key != api_key" not in source, "main.py auth_token must NOT use != for API key comparison"
 
 
 # ---------------------------------------------------------------------------
@@ -158,9 +152,9 @@ class TestHmacCompareDigest:
 
 
 class TestRateLimiting:
-
     def test_rate_limit_returns_429(self, client, monkeypatch):
         from tests.mock_helpers import make_mock_orchestrator
+
         mock_orch = make_mock_orchestrator([])
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
 
@@ -188,7 +182,6 @@ class TestRateLimiting:
 
 
 class TestDebugEndpointsFeatureFlag:
-
     def test_cache_stats_returns_404_when_disabled(self, client):
         response = client.get("/cache/stats")
         assert response.status_code == 404
@@ -208,9 +201,9 @@ class TestDebugEndpointsFeatureFlag:
 
 
 class TestTermosBuscaMaxLength:
-
     def test_501_chars_returns_422(self, client, monkeypatch):
         from tests.mock_helpers import make_mock_orchestrator
+
         mock_orch = make_mock_orchestrator([])
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))
@@ -230,6 +223,7 @@ class TestTermosBuscaMaxLength:
 
     def test_500_chars_accepted(self, client, monkeypatch):
         from tests.mock_helpers import make_mock_orchestrator
+
         mock_orch = make_mock_orchestrator([])
         app.dependency_overrides[get_orchestrator] = lambda: mock_orch
         monkeypatch.setattr("main.filter_batch", lambda bids, **kwargs: ([], {}))

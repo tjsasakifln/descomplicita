@@ -20,11 +20,10 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from dependencies import get_orchestrator
 from job_store import SearchJob
 from main import app
-from dependencies import get_orchestrator
 from tests.conftest import get_test_job_store
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -95,6 +94,7 @@ def client():
 def mock_pncp_client(monkeypatch):
     """Replace orchestrator with a mock that returns canned data."""
     from tests.mock_helpers import make_mock_orchestrator
+
     records = make_pncp_response("SP")["data"]
     mock_orch = make_mock_orchestrator(records)
     app.dependency_overrides[get_orchestrator] = lambda: mock_orch
@@ -133,22 +133,13 @@ def mock_pipeline(monkeypatch):
 
 
 class TestConcurrentSearches:
-
-    def test_5_simultaneous_searches_complete(
-        self, client, mock_pncp_client, mock_pipeline, run_sync
-    ):
+    def test_5_simultaneous_searches_complete(self, client, mock_pncp_client, mock_pipeline, run_sync):
         ufs_list = ["SP", "RJ", "MG", "RS", "PR"]
-        requests_data = [
-            {**VALID_REQUEST, "ufs": [uf]}
-            for uf in ufs_list
-        ]
+        requests_data = [{**VALID_REQUEST, "ufs": [uf]} for uf in ufs_list]
 
         job_ids = []
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {
-                executor.submit(client.post, "/buscar", json=req): req
-                for req in requests_data
-            }
+            futures = {executor.submit(client.post, "/buscar", json=req): req for req in requests_data}
             for future in as_completed(futures):
                 resp = future.result()
                 assert resp.status_code == 200
@@ -175,9 +166,7 @@ class TestConcurrentSearches:
         data = response.json()
         assert "detail" in data
 
-    def test_no_race_condition_10_runs(
-        self, client, mock_pncp_client, mock_pipeline, run_sync
-    ):
+    def test_no_race_condition_10_runs(self, client, mock_pncp_client, mock_pipeline, run_sync):
         for run in range(10):
             resp = client.post("/buscar", json=VALID_REQUEST)
             assert resp.status_code == 200
@@ -193,10 +182,7 @@ class TestConcurrentSearches:
 
 
 class TestJobLifecycle:
-
-    def test_job_transitions_queued_to_completed(
-        self, client, mock_pncp_client, mock_pipeline, run_sync
-    ):
+    def test_job_transitions_queued_to_completed(self, client, mock_pncp_client, mock_pipeline, run_sync):
         resp = client.post("/buscar", json=VALID_REQUEST)
         assert resp.status_code == 200
         data = resp.json()
@@ -244,9 +230,7 @@ class TestJobLifecycle:
         asyncio.run(_job_store.cleanup_expired())
         assert job_id in _job_store._jobs
 
-    def test_active_job_count_decrements_after_completion(
-        self, client, mock_pncp_client, mock_pipeline, run_sync
-    ):
+    def test_active_job_count_decrements_after_completion(self, client, mock_pncp_client, mock_pipeline, run_sync):
         resp = client.post("/buscar", json=VALID_REQUEST)
         assert resp.status_code == 200
         job_id = resp.json()["job_id"]

@@ -28,6 +28,7 @@ JWT_AUDIENCE: str = "descomplicita-client"
 
 class JWTError(Exception):
     """Raised when JWT validation fails."""
+
     pass
 
 
@@ -56,6 +57,7 @@ def generate_token(
     exp_hours = expiration_hours if expiration_hours is not None else JWT_EXPIRATION_HOURS
 
     import time
+
     now = int(time.time())
 
     payload = {
@@ -99,7 +101,6 @@ def validate_token(
     if secret == JWT_SECRET and JWT_SECRET_PREVIOUS:
         secrets_to_try.append(JWT_SECRET_PREVIOUS)
 
-    last_error = None
     for s in secrets_to_try:
         try:
             payload = pyjwt.decode(
@@ -116,8 +117,7 @@ def validate_token(
             raise JWTError("Invalid token issuer")
         except pyjwt.InvalidAudienceError:
             raise JWTError("Invalid token audience")
-        except pyjwt.InvalidTokenError as e:
-            last_error = e
+        except pyjwt.InvalidTokenError:
             continue
 
-    raise JWTError(f"Invalid token signature")
+    raise JWTError("Invalid token signature")

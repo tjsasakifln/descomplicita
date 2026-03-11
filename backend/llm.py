@@ -23,18 +23,20 @@ Usage:
     print(resumo.resumo_executivo)
 """
 
-from datetime import datetime
-from typing import Any
 import json
 import os
+from datetime import datetime
+from typing import Any
 
-from openai import AsyncOpenAI, APITimeoutError
+from openai import APITimeoutError, AsyncOpenAI
 
-from schemas import ResumoLicitacoes
 from excel import parse_datetime
+from schemas import ResumoLicitacoes
 
 
-async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uniformes e fardamentos") -> ResumoLicitacoes:
+async def gerar_resumo(
+    licitacoes: list[dict[str, Any]], sector_name: str = "uniformes e fardamentos"
+) -> ResumoLicitacoes:
     """
     Generate AI-powered executive summary of procurement bids.
 
@@ -66,10 +68,7 @@ async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uni
     # Validate API key
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError(
-            "OPENAI_API_KEY environment variable not set. "
-            "Please configure your OpenAI API key."
-        )
+        raise ValueError("OPENAI_API_KEY environment variable not set. Please configure your OpenAI API key.")
 
     # Prepare data for LLM (limit to 50 bids to avoid token overflow)
     # Pre-filter: exclude bids with past opening dates from LLM context
@@ -83,9 +82,7 @@ async def gerar_resumo(licitacoes: list[dict[str, Any]], sector_name: str = "uni
                 continue  # Skip past opening dates — not actionable
         dados_resumidos.append(
             {
-                "objeto": (lic.get("objetoCompra") or "")[
-                    :200
-                ],  # Truncate to 200 chars
+                "objeto": (lic.get("objetoCompra") or "")[:200],  # Truncate to 200 chars
                 "orgao": lic.get("nomeOrgao") or "",
                 "uf": lic.get("uf") or "",
                 "municipio": lic.get("municipio") or "",
@@ -242,14 +239,9 @@ def gerar_resumo_fallback(licitacoes: list[dict[str, Any]], sector_name: str = "
         dist_uf[uf] = dist_uf.get(uf, 0) + 1
 
     # Find top 3 bids by value
-    top_valor = sorted(
-        licitacoes, key=lambda x: x.get("valorTotalEstimado", 0) or 0, reverse=True
-    )[:3]
+    top_valor = sorted(licitacoes, key=lambda x: x.get("valorTotalEstimado", 0) or 0, reverse=True)[:3]
 
-    destaques = [
-        f"{lic.get('nomeOrgao', 'N/A')}: R$ {(lic.get('valorTotalEstimado') or 0):,.2f}"
-        for lic in top_valor
-    ]
+    destaques = [f"{lic.get('nomeOrgao', 'N/A')}: R$ {(lic.get('valorTotalEstimado') or 0):,.2f}" for lic in top_valor]
 
     # Check for urgency (deadline < 7 days)
     alerta = None
@@ -268,10 +260,7 @@ def gerar_resumo_fallback(licitacoes: list[dict[str, Any]], sector_name: str = "
                 break  # First urgent bid found
 
     return ResumoLicitacoes(
-        resumo_executivo=(
-            f"Encontradas {total} licitações de {sector_name} "
-            f"totalizando R$ {valor_total:,.2f}."
-        ),
+        resumo_executivo=(f"Encontradas {total} licitações de {sector_name} totalizando R$ {valor_total:,.2f}."),
         total_oportunidades=total,
         valor_total=valor_total,
         destaques=destaques,

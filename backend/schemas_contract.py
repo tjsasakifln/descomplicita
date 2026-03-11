@@ -9,17 +9,17 @@ Usage:
 
 import json
 
+from error_codes import ErrorCode
 from schemas import (
     BuscaRequest,
-    ResumoLicitacoes,
-    FilterStats,
     BuscaResponse,
+    FilterStats,
     JobCreatedResponse,
     JobProgress,
-    JobStatusResponse,
     JobResultResponse,
+    JobStatusResponse,
+    ResumoLicitacoes,
 )
-from error_codes import ErrorCode
 
 
 def generate_contract_schemas() -> dict:

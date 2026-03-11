@@ -12,13 +12,14 @@ import hashlib
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
 
-from config import RetryConfig, SOURCES_CONFIG
+from config import SOURCES_CONFIG, RetryConfig
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,34 @@ TRANSPARENCIA_PAGE_SIZE = 15
 # Mapping of UF abbreviations to IBGE numeric codes.
 # The Portal da Transparencia API expects numeric IBGE codes for the codigoUF
 # parameter, not state abbreviations (siglas).
-UF_TO_IBGE: Dict[str, int] = {
-    "AC": 12, "AL": 27, "AM": 13, "AP": 16, "BA": 29,
-    "CE": 23, "DF": 53, "ES": 32, "GO": 52, "MA": 21,
-    "MG": 31, "MS": 50, "MT": 51, "PA": 15, "PB": 25,
-    "PE": 26, "PI": 22, "PR": 41, "RJ": 33, "RN": 24,
-    "RO": 11, "RR": 14, "RS": 43, "SC": 42, "SE": 28,
-    "SP": 35, "TO": 17,
+UF_TO_IBGE: dict[str, int] = {
+    "AC": 12,
+    "AL": 27,
+    "AM": 13,
+    "AP": 16,
+    "BA": 29,
+    "CE": 23,
+    "DF": 53,
+    "ES": 32,
+    "GO": 52,
+    "MA": 21,
+    "MG": 31,
+    "MS": 50,
+    "MT": 51,
+    "PA": 15,
+    "PB": 25,
+    "PE": 26,
+    "PI": 22,
+    "PR": 41,
+    "RJ": 33,
+    "RN": 24,
+    "RO": 11,
+    "RR": 14,
+    "RS": 43,
+    "SC": 42,
+    "SE": 28,
+    "SP": 35,
+    "TO": 17,
 }
 
 
@@ -44,7 +66,7 @@ class SanctionResult:
     """Result of a sanctions check against CEIS and CNEP lists."""
 
     is_sanctioned: bool
-    sanctions: List[dict] = field(default_factory=list)
+    sanctions: list[dict] = field(default_factory=list)
 
 
 def _parse_transparencia_date(value: Optional[str]) -> Optional[datetime]:
@@ -158,9 +180,7 @@ class TransparenciaSource(DataSourceClient):
                         extra={"source": "transparencia"},
                     )
                     if attempt < self._config.max_retries:
-                        delay = self._config.base_delay * (
-                            self._config.exponential_base ** attempt
-                        )
+                        delay = self._config.base_delay * (self._config.exponential_base**attempt)
                         delay = min(delay, self._config.max_delay)
                         await asyncio.sleep(delay)
                         continue
@@ -175,9 +195,7 @@ class TransparenciaSource(DataSourceClient):
                     extra={"source": "transparencia"},
                 )
                 if attempt < self._config.max_retries:
-                    delay = self._config.base_delay * (
-                        self._config.exponential_base ** attempt
-                    )
+                    delay = self._config.base_delay * (self._config.exponential_base**attempt)
                     delay = min(delay, self._config.max_delay)
                     await asyncio.sleep(delay)
 
@@ -251,7 +269,7 @@ class TransparenciaSource(DataSourceClient):
             PermissionError: if TRANSPARENCIA_API_KEY is not configured.
         """
         self._require_api_key()
-        sanctions: List[dict] = []
+        sanctions: list[dict] = []
 
         for list_name, endpoint in [("CEIS", "ceis"), ("CNEP", "cnep")]:
             url = f"{self._base_url}/api-de-dados/{endpoint}"
@@ -281,7 +299,7 @@ class TransparenciaSource(DataSourceClient):
         self,
         query: SearchQuery,
         on_progress: Callable[[int, int, int], None] | None = None,
-    ) -> List[NormalizedRecord]:
+    ) -> list[NormalizedRecord]:
         """Fetch all Portal da Transparencia records matching the query.
 
         Handles pagination via 1-indexed page parameter.
@@ -292,7 +310,7 @@ class TransparenciaSource(DataSourceClient):
         self._require_api_key()
         url = f"{self._base_url}/api-de-dados/licitacoes"
 
-        params: Dict[str, Any] = {"pagina": 1}
+        params: dict[str, Any] = {"pagina": 1}
 
         if query.data_inicial:
             params["dataInicial"] = _format_date_transparencia(query.data_inicial)
@@ -300,7 +318,7 @@ class TransparenciaSource(DataSourceClient):
             params["dataFinal"] = _format_date_transparencia(query.data_final)
 
         target_ufs = query.ufs or [None]
-        all_records: List[NormalizedRecord] = []
+        all_records: list[NormalizedRecord] = []
 
         for uf in target_ufs:
             uf_params = dict(params)
@@ -310,7 +328,8 @@ class TransparenciaSource(DataSourceClient):
                     uf_params["codigoUF"] = ibge_code
                     logger.debug(
                         "Transparencia: UF '%s' mapped to IBGE code %d",
-                        uf, ibge_code,
+                        uf,
+                        ibge_code,
                         extra={"source": "transparencia"},
                     )
                 else:
@@ -341,11 +360,11 @@ class TransparenciaSource(DataSourceClient):
     async def _fetch_paginated(
         self,
         url: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         on_progress: Callable[[int, int, int], None] | None = None,
-    ) -> List[NormalizedRecord]:
+    ) -> list[NormalizedRecord]:
         """Fetch all pages from a paginated endpoint (1-indexed pages)."""
-        records: List[NormalizedRecord] = []
+        records: list[NormalizedRecord] = []
         page = 1
 
         while True:

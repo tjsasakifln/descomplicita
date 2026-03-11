@@ -1,10 +1,12 @@
 """Tests for paginated items endpoint (TD-M02)."""
 
 import time
+
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+
 from job_store import SearchJob
+from main import app
 from tests.conftest import get_test_job_store
 
 
@@ -202,6 +204,7 @@ class TestJobStoreItemsMethods:
     @pytest.mark.asyncio
     async def test_store_and_retrieve_items(self):
         from job_store import JobStore
+
         store = JobStore()
         items = [{"a": 1}, {"a": 2}, {"a": 3}]
         await store.store_items("test-1", items)
@@ -214,6 +217,7 @@ class TestJobStoreItemsMethods:
     @pytest.mark.asyncio
     async def test_get_items_page_second_page(self):
         from job_store import JobStore
+
         store = JobStore()
         items = [{"i": i} for i in range(5)]
         await store.store_items("test-2", items)
@@ -226,6 +230,7 @@ class TestJobStoreItemsMethods:
     @pytest.mark.asyncio
     async def test_get_items_page_nonexistent_job(self):
         from job_store import JobStore
+
         store = JobStore()
         page, total = await store.get_items_page("nonexistent", page=1, page_size=20)
         assert total == 0
@@ -234,6 +239,7 @@ class TestJobStoreItemsMethods:
     @pytest.mark.asyncio
     async def test_store_items_overwrites(self):
         from job_store import JobStore
+
         store = JobStore()
         await store.store_items("test-ow", [{"x": 1}])
         await store.store_items("test-ow", [{"x": 2}, {"x": 3}])

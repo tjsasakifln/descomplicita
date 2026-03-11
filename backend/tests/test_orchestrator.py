@@ -23,7 +23,6 @@ from sources.orchestrator import (
     get_enabled_source_names,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -46,9 +45,7 @@ def _make_record(
 ) -> NormalizedRecord:
     """Create a NormalizedRecord for testing."""
     if record_id is None:
-        record_id = hashlib.md5(
-            f"{source}-{numero}-{cnpj}".encode()
-        ).hexdigest()[:16]
+        record_id = hashlib.md5(f"{source}-{numero}-{cnpj}".encode()).hexdigest()[:16]
     return NormalizedRecord(
         id=record_id,
         source=source,
@@ -71,7 +68,7 @@ def _make_record(
 class FakeSource(DataSourceClient):
     """A fake DataSourceClient for testing."""
 
-    def __init__(self, name: str, records: List[NormalizedRecord] = None, delay: float = 0, error: Exception = None):
+    def __init__(self, name: str, records: list[NormalizedRecord] = None, delay: float = 0, error: Exception = None):
         self._name = name
         self._records = records or []
         self._delay = delay
@@ -81,7 +78,7 @@ class FakeSource(DataSourceClient):
     def source_name(self) -> str:
         return self._name
 
-    async def fetch_records(self, query: SearchQuery) -> List[NormalizedRecord]:
+    async def fetch_records(self, query: SearchQuery) -> list[NormalizedRecord]:
         if self._delay:
             await asyncio.sleep(self._delay)
         if self._error:
@@ -157,10 +154,10 @@ class TestDedupKeyFallback:
         assert key is not None
 
     def test_deterministic(self):
-        r1 = _make_record(cnpj="", numero="", objeto="Compra xyz", uf="RJ",
-                          data_pub=datetime(2025, 1, 15))
-        r2 = _make_record(cnpj="", numero="", objeto="Compra xyz", uf="RJ",
-                          data_pub=datetime(2025, 1, 15), source="comprasgov")
+        r1 = _make_record(cnpj="", numero="", objeto="Compra xyz", uf="RJ", data_pub=datetime(2025, 1, 15))
+        r2 = _make_record(
+            cnpj="", numero="", objeto="Compra xyz", uf="RJ", data_pub=datetime(2025, 1, 15), source="comprasgov"
+        )
         assert _dedup_key_fallback(r1) == _dedup_key_fallback(r2)
 
     def test_empty_objeto_returns_none(self):
@@ -179,9 +176,17 @@ class TestCountFilledFields:
 
     def test_minimal_record(self):
         record = NormalizedRecord(
-            id="x", source="test", sources=["test"],
-            numero_licitacao="", objeto="", orgao="", cnpj_orgao="",
-            uf="", municipio="", valor_estimado=None, modalidade="",
+            id="x",
+            source="test",
+            sources=["test"],
+            numero_licitacao="",
+            objeto="",
+            orgao="",
+            cnpj_orgao="",
+            uf="",
+            municipio="",
+            valor_estimado=None,
+            modalidade="",
         )
         assert _count_filled_fields(record) == 0
 
@@ -347,11 +352,15 @@ class TestOrchestratorDedup:
     async def test_duplicate_records_merged(self, query):
         """AC8: Same CNPJ+numero from two sources -> merged into one."""
         r_pncp = _make_record(
-            source="pncp", numero="001/2025", cnpj="12345678000190",
+            source="pncp",
+            numero="001/2025",
+            cnpj="12345678000190",
             status="Aberto",
         )
         r_compras = _make_record(
-            source="comprasgov", numero="001/2025", cnpj="12345678000190",
+            source="comprasgov",
+            numero="001/2025",
+            cnpj="12345678000190",
             url_edital="http://edital.gov.br",
         )
 
@@ -379,12 +388,17 @@ class TestOrchestratorDedup:
         """AC9: Even if comprasgov is more complete, source stays 'pncp'."""
         # PNCP record with fewer fields
         r_pncp = _make_record(
-            source="pncp", numero="001/2025", cnpj="12345678000190",
+            source="pncp",
+            numero="001/2025",
+            cnpj="12345678000190",
         )
         # Comprasgov with more fields filled
         r_compras = _make_record(
-            source="comprasgov", numero="001/2025", cnpj="12345678000190",
-            status="Aberto", url_edital="http://edital.gov.br",
+            source="comprasgov",
+            numero="001/2025",
+            cnpj="12345678000190",
+            status="Aberto",
+            url_edital="http://edital.gov.br",
             url_fonte="http://compras.gov.br/001",
         )
 
@@ -405,14 +419,22 @@ class TestOrchestratorDedup:
         """AC10: When CNPJ/numero missing, fallback to objeto+uf+data."""
         pub_date = datetime(2025, 1, 15)
         r1 = _make_record(
-            source="pncp", numero="", cnpj="",
+            source="pncp",
+            numero="",
+            cnpj="",
             objeto="Aquisicao de uniformes para escola",
-            uf="SP", data_pub=pub_date, record_id="pncp1",
+            uf="SP",
+            data_pub=pub_date,
+            record_id="pncp1",
         )
         r2 = _make_record(
-            source="querido_diario", numero="", cnpj="",
+            source="querido_diario",
+            numero="",
+            cnpj="",
             objeto="Aquisicao de uniformes para escola",
-            uf="SP", data_pub=pub_date, record_id="qd1",
+            uf="SP",
+            data_pub=pub_date,
+            record_id="qd1",
         )
 
         src1 = FakeSource("pncp", [r1])
@@ -455,20 +477,24 @@ class TestDedupPerformance:
         records = []
         # 5000 unique records
         for i in range(5000):
-            records.append(_make_record(
-                source="pncp",
-                numero=f"{i:05d}/2025",
-                cnpj=f"{i:014d}",
-                record_id=f"pncp_{i}",
-            ))
+            records.append(
+                _make_record(
+                    source="pncp",
+                    numero=f"{i:05d}/2025",
+                    cnpj=f"{i:014d}",
+                    record_id=f"pncp_{i}",
+                )
+            )
         # 5000 duplicates from different source
         for i in range(5000):
-            records.append(_make_record(
-                source="comprasgov",
-                numero=f"{i:05d}/2025",
-                cnpj=f"{i:014d}",
-                record_id=f"compras_{i}",
-            ))
+            records.append(
+                _make_record(
+                    source="comprasgov",
+                    numero=f"{i:05d}/2025",
+                    cnpj=f"{i:014d}",
+                    record_id=f"compras_{i}",
+                )
+            )
 
         orch = MultiSourceOrchestrator(sources=[])
 
@@ -479,6 +505,7 @@ class TestDedupPerformance:
         assert len(deduped) == 5000
         assert removed == 5000
         import os
+
         limit_ms = 500 if os.environ.get("CI") else 50
         assert elapsed_ms < limit_ms, f"Dedup took {elapsed_ms:.1f}ms (limit: {limit_ms}ms)"
 

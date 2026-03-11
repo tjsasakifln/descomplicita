@@ -13,7 +13,6 @@ Outputs:
 
 import json
 import sys
-import os
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -21,14 +20,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RetryConfig, setup_logging
-from pncp_client import PNCPClient
 from filter import (
-    KEYWORDS_UNIFORMES,
     KEYWORDS_EXCLUSAO,
-    normalize_text,
-    match_keywords,
+    KEYWORDS_UNIFORMES,
     filter_licitacao,
+    match_keywords,
+    normalize_text,
 )
+from pncp_client import PNCPClient
 
 setup_logging("INFO")
 
@@ -115,15 +114,50 @@ def find_potential_false_negatives(rejected_items: list[dict]) -> list[dict]:
     Look for objects that mention clothing-adjacent terms not in our keyword list.
     """
     clothing_hints = [
-        "epi", "equipamento de proteção individual", "equipamento de protecao individual",
-        "vestir", "tecido", "malha", "algodão", "algodao", "poliéster", "poliester",
-        "tnt", "não tecido", "nao tecido", "bordado", "serigrafia", "silk",
-        "crachá", "cracha", "luva", "luvas", "touca", "toucas",
-        "pijama", "pijamas", "roupão", "roupao", "lençol", "lencol",
-        "capa de chuva", "impermeável", "impermeavel",
-        "tênis", "tenis", "sandália", "sandalia", "chinelo",
-        "gravata", "cinto", "suspensório", "suspensorio",
-        "protetor", "manga", "perneira", "caneleira",
+        "epi",
+        "equipamento de proteção individual",
+        "equipamento de protecao individual",
+        "vestir",
+        "tecido",
+        "malha",
+        "algodão",
+        "algodao",
+        "poliéster",
+        "poliester",
+        "tnt",
+        "não tecido",
+        "nao tecido",
+        "bordado",
+        "serigrafia",
+        "silk",
+        "crachá",
+        "cracha",
+        "luva",
+        "luvas",
+        "touca",
+        "toucas",
+        "pijama",
+        "pijamas",
+        "roupão",
+        "roupao",
+        "lençol",
+        "lencol",
+        "capa de chuva",
+        "impermeável",
+        "impermeavel",
+        "tênis",
+        "tenis",
+        "sandália",
+        "sandalia",
+        "chinelo",
+        "gravata",
+        "cinto",
+        "suspensório",
+        "suspensorio",
+        "protetor",
+        "manga",
+        "perneira",
+        "caneleira",
     ]
 
     potential_fn = []
@@ -144,20 +178,55 @@ def find_suspicious_approvals(approved_items: list[dict]) -> list[dict]:
     """
     suspicious = []
     ambiguous_keywords = {
-        "camisa", "camisas", "bota", "botas", "colete", "coletes",
-        "avental", "aventais", "meia", "meias", "saia", "saias",
-        "boné", "bonés", "confecção", "confecções", "confeccao", "confeccoes",
-        "costura", "roupa", "roupas", "blusa", "blusas",
-        "calça", "calças", "bermuda", "bermudas", "sapato", "sapatos",
+        "camisa",
+        "camisas",
+        "bota",
+        "botas",
+        "colete",
+        "coletes",
+        "avental",
+        "aventais",
+        "meia",
+        "meias",
+        "saia",
+        "saias",
+        "boné",
+        "bonés",
+        "confecção",
+        "confecções",
+        "confeccao",
+        "confeccoes",
+        "costura",
+        "roupa",
+        "roupas",
+        "blusa",
+        "blusas",
+        "calça",
+        "calças",
+        "bermuda",
+        "bermudas",
+        "sapato",
+        "sapatos",
     }
 
     non_uniform_hints = [
-        "roupa de cama", "roupa de mesa", "roupa hospitalar de cama",
-        "colete salva", "colete balístico", "colete balistico",
-        "bota de borracha", "bota de segurança", "bota de seguranca",
-        "avental de chumbo", "avental radiológico", "avental radiologico",
-        "material de limpeza", "material hospitalar",
-        "enxoval", "cama mesa e banho", "toalha",
+        "roupa de cama",
+        "roupa de mesa",
+        "roupa hospitalar de cama",
+        "colete salva",
+        "colete balístico",
+        "colete balistico",
+        "bota de borracha",
+        "bota de segurança",
+        "bota de seguranca",
+        "avental de chumbo",
+        "avental radiológico",
+        "avental radiologico",
+        "material de limpeza",
+        "material hospitalar",
+        "enxoval",
+        "cama mesa e banho",
+        "toalha",
     ]
 
     for item in approved_items:
@@ -174,7 +243,7 @@ def find_suspicious_approvals(approved_items: list[dict]) -> list[dict]:
 
         # Flag 2: keyword matched but object is very generic
         if len(obj_norm) < 30 and kw:
-            item["fp_reason"] = f"very short description with keyword match"
+            item["fp_reason"] = "very short description with keyword match"
             if item not in suspicious:
                 suspicious.append(item)
 
@@ -199,13 +268,13 @@ def generate_report(results: dict, false_negatives: list, false_positives: list)
         "",
         "## Resumo",
         "",
-        f"| Métrica | Valor |",
-        f"|---------|-------|",
+        "| Métrica | Valor |",
+        "|---------|-------|",
         f"| Total de itens analisados | {total} |",
-        f"| Aprovados pelo filtro | {n_approved} ({100*n_approved/max(total,1):.1f}%) |",
-        f"| Rejeitados por keyword | {n_rej_kw} ({100*n_rej_kw/max(total,1):.1f}%) |",
-        f"| Rejeitados por valor | {n_rej_val} ({100*n_rej_val/max(total,1):.1f}%) |",
-        f"| Rejeitados por outros | {n_rej_other} ({100*n_rej_other/max(total,1):.1f}%) |",
+        f"| Aprovados pelo filtro | {n_approved} ({100 * n_approved / max(total, 1):.1f}%) |",
+        f"| Rejeitados por keyword | {n_rej_kw} ({100 * n_rej_kw / max(total, 1):.1f}%) |",
+        f"| Rejeitados por valor | {n_rej_val} ({100 * n_rej_val / max(total, 1):.1f}%) |",
+        f"| Rejeitados por outros | {n_rej_other} ({100 * n_rej_other / max(total, 1):.1f}%) |",
         f"| **Suspeita de falso positivo** | **{len(false_positives)}** |",
         f"| **Suspeita de falso negativo** | **{len(false_negatives)}** |",
         "",
@@ -214,7 +283,9 @@ def generate_report(results: dict, false_negatives: list, false_positives: list)
     ]
 
     for i, item in enumerate(results["approved"][:30]):
-        lines.append(f"### {i+1}. {item['uf']} — R$ {item['valor']:,.2f}" if item['valor'] else f"### {i+1}. {item['uf']}")
+        lines.append(
+            f"### {i + 1}. {item['uf']} — R$ {item['valor']:,.2f}" if item["valor"] else f"### {i + 1}. {item['uf']}"
+        )
         lines.append(f"**Objeto:** {item['objeto'][:200]}")
         lines.append(f"**Keywords:** {', '.join(item['keywords_found'])}")
         lines.append(f"**Órgão:** {item['orgao']}")
@@ -225,7 +296,7 @@ def generate_report(results: dict, false_negatives: list, false_positives: list)
 
     if false_positives:
         for i, item in enumerate(false_positives[:20]):
-            lines.append(f"### FP-{i+1}. {item['uf']}")
+            lines.append(f"### FP-{i + 1}. {item['uf']}")
             lines.append(f"**Objeto:** {item['objeto'][:200]}")
             lines.append(f"**Keywords matched:** {', '.join(item['keywords_found'])}")
             lines.append(f"**Razão da suspeita:** {item.get('fp_reason', 'N/A')}")
@@ -239,7 +310,7 @@ def generate_report(results: dict, false_negatives: list, false_positives: list)
 
     if false_negatives:
         for i, item in enumerate(false_negatives[:30]):
-            lines.append(f"### FN-{i+1}. {item['uf']}")
+            lines.append(f"### FN-{i + 1}. {item['uf']}")
             lines.append(f"**Objeto:** {item['objeto'][:200]}")
             lines.append(f"**Hints encontrados:** {', '.join(item.get('fn_hints', []))}")
             lines.append(f"**Bloqueado por exclusão:** {'Sim' if item.get('blocked_by_exclusion') else 'Não'}")
@@ -265,7 +336,7 @@ def generate_report(results: dict, false_negatives: list, false_positives: list)
         lines.append("## Itens Bloqueados por Exclusão (teriam matchado sem exclusão)")
         lines.append("")
         for i, item in enumerate(blocked[:20]):
-            lines.append(f"### EXC-{i+1}. {item['uf']}")
+            lines.append(f"### EXC-{i + 1}. {item['uf']}")
             lines.append(f"**Objeto:** {item['objeto'][:200]}")
             lines.append(f"**Keywords que teriam matchado:** {', '.join(item.get('keywords_without_exclusion', []))}")
             lines.append("")
@@ -305,16 +376,16 @@ def main():
 
     # Summary
     total = sum(len(v) for v in results.values())
-    print(f"\n{'='*60}")
-    print(f"  RESUMO")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("  RESUMO")
+    print(f"{'=' * 60}")
     print(f"  Total analisados:           {total}")
     print(f"  Aprovados:                  {len(results['approved'])}")
     print(f"  Rejeitados (keyword):       {len(results['rejected_keyword'])}")
     print(f"  Rejeitados (valor):         {len(results['rejected_value'])}")
     print(f"  Suspeita falso positivo:    {len(false_positives)}")
     print(f"  Suspeita falso negativo:    {len(false_negatives)}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

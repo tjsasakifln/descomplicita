@@ -4,17 +4,18 @@ import asyncio
 import logging
 import random
 import time
+from collections.abc import Callable
 from datetime import date, timedelta
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import httpx
 
 from config import (
-    RetryConfig,
     DEFAULT_MODALIDADES,
-    PRIORITY_MODALIDADES,
     MODALIDADE_REDUCTION_UF_THRESHOLD,
     PNCP_BASE_URL,
+    PRIORITY_MODALIDADES,
+    RetryConfig,
 )
 from exceptions import PNCPAPIError
 
@@ -25,9 +26,7 @@ logger = logging.getLogger(__name__)
 
 def calculate_delay(attempt: int, config: RetryConfig) -> float:
     """Calculate exponential backoff delay with optional jitter."""
-    delay = min(
-        config.base_delay * (config.exponential_base ** attempt), config.max_delay
-    )
+    delay = min(config.base_delay * (config.exponential_base**attempt), config.max_delay)
     if config.jitter:
         delay *= random.uniform(0.5, 1.5)
     return delay
@@ -109,14 +108,14 @@ class AsyncPNCPClient:
         uf: str | None = None,
         pagina: int = 1,
         tamanho: int = PNCP_PAGE_SIZE,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fetch a single page of procurement data from PNCP API."""
         await self._rate_limit()
 
         data_inicial_fmt = data_inicial.replace("-", "")
         data_final_fmt = data_final.replace("-", "")
 
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "dataInicial": data_inicial_fmt,
             "dataFinal": data_final_fmt,
             "codigoModalidadeContratacao": modalidade,
@@ -134,7 +133,10 @@ class AsyncPNCPClient:
             try:
                 logger.debug(
                     "Request %s params=%s attempt=%s/%s",
-                    url, params, attempt + 1, self.config.max_retries + 1,
+                    url,
+                    params,
+                    attempt + 1,
+                    self.config.max_retries + 1,
                 )
 
                 req_start = time.time()
@@ -153,7 +155,9 @@ class AsyncPNCPClient:
                         if ratio > 0.20:
                             logger.warning(
                                 "High 429 rate: %s/%s (%.0f%%) requests rate-limited",
-                                self._rate_limit_count, self._total_fetch_count, ratio * 100,
+                                self._rate_limit_count,
+                                self._total_fetch_count,
+                                ratio * 100,
                             )
                     retry_after = int(response.headers.get("Retry-After", "60"))
                     logger.warning("Rate limited (429). Waiting %ss", retry_after)
@@ -163,7 +167,8 @@ class AsyncPNCPClient:
                 if response.status_code == 200:
                     logger.debug(
                         "Success: fetched page %s (%s items)",
-                        pagina, len(response.json().get("data", [])),
+                        pagina,
+                        len(response.json().get("data", [])),
                     )
                     return response.json()
 
@@ -178,23 +183,22 @@ class AsyncPNCPClient:
                     }
 
                 if response.status_code not in self.config.retryable_status_codes:
-                    error_msg = (
-                        f"API returned non-retryable status {response.status_code}: "
-                        f"{response.text[:200]}"
-                    )
+                    error_msg = f"API returned non-retryable status {response.status_code}: {response.text[:200]}"
                     raise PNCPAPIError(error_msg)
 
                 if attempt < self.config.max_retries:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
                         "Error %s. Attempt %s/%s. Retrying in %.1fs",
-                        response.status_code, attempt + 1, self.config.max_retries + 1, delay,
+                        response.status_code,
+                        attempt + 1,
+                        self.config.max_retries + 1,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                 else:
                     raise PNCPAPIError(
-                        f"Failed after {self.config.max_retries + 1} attempts. "
-                        f"Last status: {response.status_code}"
+                        f"Failed after {self.config.max_retries + 1} attempts. Last status: {response.status_code}"
                     )
 
             except httpx.TimeoutException as e:
@@ -206,7 +210,8 @@ class AsyncPNCPClient:
                     pause = min(60, 15 * (ct // self._circuit_breaker_threshold))
                     logger.warning(
                         "Circuit breaker: %s consecutive timeouts, pausing %ss",
-                        ct, pause,
+                        ct,
+                        pause,
                     )
                     await asyncio.sleep(pause)
 
@@ -214,13 +219,15 @@ class AsyncPNCPClient:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
                         "Timeout: %s. Attempt %s/%s. Retrying in %.1fs",
-                        e, attempt + 1, self.config.max_retries + 1, delay,
+                        e,
+                        attempt + 1,
+                        self.config.max_retries + 1,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                 else:
                     raise PNCPAPIError(
-                        f"Failed after {self.config.max_retries + 1} attempts. "
-                        f"Last exception: {type(e).__name__}: {e}"
+                        f"Failed after {self.config.max_retries + 1} attempts. Last exception: {type(e).__name__}: {e}"
                     ) from e
 
             except (httpx.ConnectError, httpx.ReadError, ConnectionError, TimeoutError) as e:
@@ -232,7 +239,8 @@ class AsyncPNCPClient:
                     pause = min(60, 15 * (ct // self._circuit_breaker_threshold))
                     logger.warning(
                         "Circuit breaker: %s consecutive timeouts, pausing %ss",
-                        ct, pause,
+                        ct,
+                        pause,
                     )
                     await asyncio.sleep(pause)
 
@@ -240,21 +248,22 @@ class AsyncPNCPClient:
                     delay = calculate_delay(attempt, self.config)
                     logger.warning(
                         "Exception %s: %s. Attempt %s/%s. Retrying in %.1fs",
-                        type(e).__name__, e, attempt + 1, self.config.max_retries + 1, delay,
+                        type(e).__name__,
+                        e,
+                        attempt + 1,
+                        self.config.max_retries + 1,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                 else:
                     raise PNCPAPIError(
-                        f"Failed after {self.config.max_retries + 1} attempts. "
-                        f"Last exception: {type(e).__name__}: {e}"
+                        f"Failed after {self.config.max_retries + 1} attempts. Last exception: {type(e).__name__}: {e}"
                     ) from e
 
         raise PNCPAPIError("Unexpected: exhausted retries without raising exception")
 
     @staticmethod
-    def _chunk_date_range(
-        data_inicial: str, data_final: str, max_days: int = 30
-    ) -> list[tuple[str, str]]:
+    def _chunk_date_range(data_inicial: str, data_final: str, max_days: int = 30) -> list[tuple[str, str]]:
         """Split a date range into chunks of max_days."""
         d_start = date.fromisoformat(data_inicial)
         d_end = date.fromisoformat(data_final)
@@ -274,11 +283,11 @@ class AsyncPNCPClient:
         uf: str | None,
         on_progress: Callable[[int, int, int], None] | None,
         max_pages: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch all pages for a specific modality and UF combination."""
         pagina = 1
         items_fetched = 0
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         while True:
             response = await self.fetch_page(
@@ -297,7 +306,10 @@ class AsyncPNCPClient:
 
             logger.info(
                 "Page %s/%s: %s items (total records: %s)",
-                pagina, total_pages, len(data), total_registros,
+                pagina,
+                total_pages,
+                len(data),
+                total_registros,
             )
 
             if on_progress:
@@ -310,14 +322,21 @@ class AsyncPNCPClient:
             if not tem_proxima:
                 logger.info(
                     "Finished fetching modalidade=%s, UF=%s: %s total items across %s pages",
-                    modalidade, uf or "ALL", items_fetched, pagina,
+                    modalidade,
+                    uf or "ALL",
+                    items_fetched,
+                    pagina,
                 )
                 break
 
             if max_pages > 0 and pagina >= max_pages:
                 logger.info(
                     "Reached max_pages=%s for modalidade=%s, UF=%s: %s items fetched (total available: %s)",
-                    max_pages, modalidade, uf or "ALL", items_fetched, total_registros,
+                    max_pages,
+                    modalidade,
+                    uf or "ALL",
+                    items_fetched,
+                    total_registros,
                 )
                 self._truncated_combos += 1
                 break
@@ -334,14 +353,12 @@ class AsyncPNCPClient:
         uf: str | None,
         on_progress: Callable[[int, int, int], None] | None = None,
         max_pages: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch all pages for a single UF+modalidade combination with caching."""
         label = f"modalidade={modalidade}, UF={uf or 'ALL'}"
         logger.info("Fetching %s", label)
         try:
-            items = await self._fetch_by_uf(
-                data_inicial, data_final, modalidade, uf, on_progress, max_pages
-            )
+            items = await self._fetch_by_uf(data_inicial, data_final, modalidade, uf, on_progress, max_pages)
             logger.info("Completed %s: %s items", label, len(items))
             return items
         except PNCPAPIError as e:
@@ -356,7 +373,7 @@ class AsyncPNCPClient:
         modalidades: list[int] | None = None,
         on_progress: Callable[[int, int, int], None] | None = None,
         max_pages: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch all procurement records with concurrent UF x modalidade fetching."""
         self._truncated_combos = 0
         self._consecutive_timeouts = 0
@@ -366,7 +383,9 @@ class AsyncPNCPClient:
         if len(date_chunks) > 1:
             logger.info(
                 "Date range %s to %s split into %s chunks of up to 30 days",
-                data_inicial, data_final, len(date_chunks),
+                data_inicial,
+                data_final,
+                len(date_chunks),
             )
 
         num_ufs = len(ufs) if ufs else 1
@@ -376,19 +395,24 @@ class AsyncPNCPClient:
             modalidades_to_fetch = PRIORITY_MODALIDADES
             logger.info(
                 "Using %s priority modalidades (reduced from %s) for %s UFs",
-                len(modalidades_to_fetch), len(DEFAULT_MODALIDADES), num_ufs,
+                len(modalidades_to_fetch),
+                len(DEFAULT_MODALIDADES),
+                num_ufs,
             )
         else:
             modalidades_to_fetch = DEFAULT_MODALIDADES
 
         seen_ids: set[str] = set()
-        all_results: List[Dict[str, Any]] = []
+        all_results: list[dict[str, Any]] = []
 
         for chunk_idx, (chunk_start, chunk_end) in enumerate(date_chunks):
             if len(date_chunks) > 1:
                 logger.info(
                     "Processing date chunk %s/%s: %s to %s",
-                    chunk_idx + 1, len(date_chunks), chunk_start, chunk_end,
+                    chunk_idx + 1,
+                    len(date_chunks),
+                    chunk_start,
+                    chunk_end,
                 )
 
             tasks: list[tuple[int, str | None]] = []
@@ -405,18 +429,23 @@ class AsyncPNCPClient:
                 if effective_max_pages != max_pages:
                     logger.info(
                         "Reduced max_pages %s -> %s for %s tasks (cap ~600 total pages)",
-                        max_pages, effective_max_pages, len(tasks),
+                        max_pages,
+                        effective_max_pages,
+                        len(tasks),
                     )
 
             logger.info(
                 "Launching %s concurrent fetches (%s modalities x %s UFs), max_pages=%s",
-                len(tasks), len(modalidades_to_fetch), len(ufs or ["ALL"]), effective_max_pages,
+                len(tasks),
+                len(modalidades_to_fetch),
+                len(ufs or ["ALL"]),
+                effective_max_pages,
             )
 
             # Use semaphore to limit concurrency to 3 (same as old ThreadPoolExecutor)
             sem = asyncio.Semaphore(3)
 
-            async def _fetch_with_sem(mod: int, u: str | None) -> List[Dict[str, Any]]:
+            async def _fetch_with_sem(mod: int, u: str | None) -> list[dict[str, Any]]:
                 async with sem:
                     return await self._fetch_uf_modalidade(
                         chunk_start, chunk_end, mod, u, on_progress, effective_max_pages
@@ -429,7 +458,9 @@ class AsyncPNCPClient:
                 if isinstance(result, Exception):
                     logger.warning(
                         "Unexpected error fetching modalidade=%s, UF=%s: %s",
-                        modalidade, uf or "ALL", result,
+                        modalidade,
+                        uf or "ALL",
+                        result,
                     )
                     continue
                 for item in result:
@@ -441,12 +472,14 @@ class AsyncPNCPClient:
 
         logger.info(
             "Fetch complete: %s unique records across %s modalities and %s date chunks",
-            len(seen_ids), len(modalidades_to_fetch), len(date_chunks),
+            len(seen_ids),
+            len(modalidades_to_fetch),
+            len(date_chunks),
         )
         return all_results
 
     @staticmethod
-    def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_item(item: dict[str, Any]) -> dict[str, Any]:
         """Flatten nested PNCP API response into the flat format expected downstream."""
         unidade = item.get("unidadeOrgao") or {}
         orgao = item.get("orgaoEntidade") or {}

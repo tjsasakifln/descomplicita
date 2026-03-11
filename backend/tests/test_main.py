@@ -2,12 +2,14 @@
 
 import asyncio
 import time
-import pytest
-from unittest.mock import AsyncMock, Mock, patch
 from io import BytesIO
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
+
+from dependencies import get_database, get_job_store, get_orchestrator, get_pncp_source, get_task_runner
 from main import app, run_search_job
-from dependencies import get_job_store, get_orchestrator, get_pncp_source, get_task_runner, get_database
 from tests.conftest import get_test_job_store
 from tests.mock_helpers import make_mock_orchestrator
 
@@ -101,6 +103,7 @@ class TestHealthEndpoint:
 
     def test_health_timestamp_format(self, client):
         from datetime import datetime, timezone
+
         response = client.get("/health")
         data = response.json()
         timestamp = data["timestamp"]
@@ -114,6 +117,7 @@ class TestHealthEndpoint:
 
     def test_health_timestamp_changes(self, client):
         import time
+
         response1 = client.get("/health")
         time.sleep(0.01)
         response2 = client.get("/health")
@@ -126,6 +130,7 @@ class TestHealthEndpoint:
 
     def test_health_response_time(self, client):
         import time
+
         start = time.time()
         response = client.get("/health")
         elapsed = time.time() - start
@@ -272,6 +277,7 @@ class TestBuscarEndpoint:
     def run_sync(self, monkeypatch):
         """Make background search jobs complete synchronously."""
         import main as main_module
+
         original_run_search_job = main_module.run_search_job
 
         async def _inline_run_search_job(job_id, request, job_store, orchestrator, database=None):
@@ -352,6 +358,7 @@ class TestBuscarEndpoint:
 
         async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="1 licitação encontrada",
                 total_oportunidades=1,
@@ -381,6 +388,7 @@ class TestBuscarEndpoint:
 
         async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="Test summary",
                 total_oportunidades=1,
@@ -410,6 +418,7 @@ class TestBuscarEndpoint:
 
         async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="Test",
                 total_oportunidades=1,
@@ -437,6 +446,7 @@ class TestBuscarEndpoint:
 
         def mock_gerar_resumo_fallback(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="Fallback summary",
                 total_oportunidades=1,
@@ -453,6 +463,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_pncp_api_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
         from exceptions import PNCPAPIError
+
         self._override_orchestrator(make_mock_orchestrator(error=PNCPAPIError("Connection timeout")))
 
         result_resp = self._post_and_get_result(client, valid_request)
@@ -462,6 +473,7 @@ class TestBuscarEndpoint:
 
     def test_buscar_rate_limit_error_fails_job(self, client, valid_request, monkeypatch, run_sync):
         from exceptions import PNCPRateLimitError
+
         error = PNCPRateLimitError("Rate limit exceeded")
         error.retry_after = 120
         self._override_orchestrator(make_mock_orchestrator(error=error))
@@ -499,6 +511,7 @@ class TestBuscarEndpoint:
 
         async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="3 licitações",
                 total_oportunidades=len(bids),
@@ -519,6 +532,7 @@ class TestBuscarEndpoint:
 
         async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="Test",
                 total_oportunidades=1,
@@ -553,6 +567,7 @@ class TestJobStatusEndpoint:
 
     def test_status_returns_progress(self, client, job_store):
         from job_store import SearchJob
+
         job = SearchJob(job_id="running-status-test", status="running")
         job.progress["phase"] = "fetching"
         job.progress["sources_completed"] = 1
@@ -579,6 +594,7 @@ class TestJobResultEndpoint:
     @pytest.fixture
     def run_sync(self, monkeypatch):
         import main as main_module
+
         original_run_search_job = main_module.run_search_job
 
         async def _inline_run_search_job(job_id, request, job_store, orchestrator, database=None):
@@ -608,6 +624,7 @@ class TestJobResultEndpoint:
 
     def test_result_202_for_running_job(self, client, job_store):
         from job_store import SearchJob
+
         job = SearchJob(job_id="running-job", status="running")
         job_store._jobs["running-job"] = job
 
@@ -616,6 +633,7 @@ class TestJobResultEndpoint:
 
     def test_result_500_for_failed_job(self, client, job_store):
         from job_store import SearchJob
+
         job = SearchJob(
             job_id="failed-job",
             status="failed",
@@ -645,6 +663,7 @@ class TestJobResultEndpoint:
 
         async def mock_gerar_resumo(bids, **kwargs):
             from schemas import ResumoLicitacoes
+
             return ResumoLicitacoes(
                 resumo_executivo="Found 1 bid",
                 total_oportunidades=1,
@@ -686,6 +705,7 @@ class TestJobDownloadEndpoint:
 
     def test_download_409_for_running_job(self, client, job_store):
         from job_store import SearchJob
+
         job = SearchJob(job_id="running-job", status="running")
         job_store._jobs["running-job"] = job
 
@@ -694,6 +714,7 @@ class TestJobDownloadEndpoint:
 
     def test_download_returns_excel_bytes(self, client, job_store):
         from job_store import SearchJob
+
         excel_data = b"PK\x03\x04fake-excel"
         job = SearchJob(
             job_id="completed-job",
@@ -723,6 +744,7 @@ class TestJobLifecycle:
 
     def test_429_when_too_many_jobs(self, client, job_store):
         from job_store import SearchJob
+
         for i in range(job_store.max_jobs):
             job = SearchJob(job_id=f"fake-job-{i}", status="running")
             job_store._jobs[f"fake-job-{i}"] = job
@@ -737,6 +759,7 @@ class TestJobLifecycle:
 
     def test_job_cleanup(self, client, monkeypatch, job_store):
         from job_store import SearchJob
+
         old_job = SearchJob(
             job_id="old-job",
             status="completed",

@@ -9,10 +9,10 @@ import pytest_asyncio
 
 from job_store import JobStore, SearchJob
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def store():
@@ -23,6 +23,7 @@ def store():
 # ---------------------------------------------------------------------------
 # 1. SearchJob dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestSearchJob:
     """Tests for the SearchJob dataclass defaults and field types."""
@@ -77,6 +78,7 @@ class TestSearchJob:
 # 2. JobStore.create
 # ---------------------------------------------------------------------------
 
+
 class TestJobStoreCreate:
     @pytest.mark.asyncio
     async def test_create_returns_search_job(self, store):
@@ -101,6 +103,7 @@ class TestJobStoreCreate:
 # ---------------------------------------------------------------------------
 # 3. JobStore.update_progress
 # ---------------------------------------------------------------------------
+
 
 class TestJobStoreUpdateProgress:
     @pytest.mark.asyncio
@@ -144,6 +147,7 @@ class TestJobStoreUpdateProgress:
 # 4. JobStore.complete
 # ---------------------------------------------------------------------------
 
+
 class TestJobStoreComplete:
     @pytest.mark.asyncio
     async def test_sets_completed_status(self, store):
@@ -185,6 +189,7 @@ class TestJobStoreComplete:
 # 5. JobStore.fail
 # ---------------------------------------------------------------------------
 
+
 class TestJobStoreFail:
     @pytest.mark.asyncio
     async def test_sets_failed_status(self, store):
@@ -217,6 +222,7 @@ class TestJobStoreFail:
 # ---------------------------------------------------------------------------
 # 5b. JobStore.cancel (TD-DB-017)
 # ---------------------------------------------------------------------------
+
 
 class TestJobStoreCancel:
     @pytest.mark.asyncio
@@ -258,6 +264,7 @@ class TestJobStoreCancel:
 # 6. JobStore.get
 # ---------------------------------------------------------------------------
 
+
 class TestJobStoreGet:
     @pytest.mark.asyncio
     async def test_returns_existing_job(self, store):
@@ -274,6 +281,7 @@ class TestJobStoreGet:
 # ---------------------------------------------------------------------------
 # 7. JobStore.cleanup_expired
 # ---------------------------------------------------------------------------
+
 
 class TestJobStoreCleanupExpired:
     @pytest.mark.asyncio
@@ -336,6 +344,7 @@ class TestJobStoreCleanupExpired:
 # 8. JobStore.active_count
 # ---------------------------------------------------------------------------
 
+
 class TestJobStoreActiveCount:
     @pytest.mark.asyncio
     async def test_empty_store(self, store):
@@ -379,6 +388,7 @@ class TestJobStoreActiveCount:
 # 9. JobStore.is_full
 # ---------------------------------------------------------------------------
 
+
 class TestJobStoreIsFull:
     @pytest.mark.asyncio
     async def test_not_full_when_empty(self, store):
@@ -419,6 +429,7 @@ class TestJobStoreIsFull:
 # ---------------------------------------------------------------------------
 # 10. Concurrency
 # ---------------------------------------------------------------------------
+
 
 class TestJobStoreConcurrency:
     @pytest.mark.asyncio

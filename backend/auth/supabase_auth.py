@@ -12,7 +12,6 @@ The Supabase JWT contains:
 
 import logging
 import os
-import time
 from typing import Optional
 
 import jwt as pyjwt

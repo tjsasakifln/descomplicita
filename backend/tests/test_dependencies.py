@@ -1,7 +1,8 @@
 """Unit tests for DI provider functions (TD-013)."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 import dependencies
 
@@ -17,6 +18,7 @@ class TestDIProviders:
 
         # Should have in-memory fallback
         from job_store import JobStore
+
         store = dependencies.get_job_store()
         assert isinstance(store, JobStore)
 
@@ -36,6 +38,7 @@ class TestDIProviders:
 
         # Task runner should exist (TD-H02)
         from task_queue import DurableTaskRunner
+
         runner = dependencies.get_task_runner()
         assert isinstance(runner, DurableTaskRunner)
 
@@ -57,8 +60,9 @@ class TestLifespan:
     @pytest.mark.asyncio
     async def test_lifespan_context(self):
         """Lifespan should initialize and cleanup without errors."""
-        from main import app, lifespan
         import asyncio
+
+        from main import app, lifespan
 
         async with lifespan(app):
             # Dependencies should be initialized

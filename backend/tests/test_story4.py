@@ -17,7 +17,7 @@ import asyncio
 import json
 import os
 import tempfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -26,18 +26,17 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 
 from error_codes import ErrorCode, error_response
-from filter import filter_licitacao, filter_batch
+from filter import filter_batch, filter_licitacao
 from schemas import (
     BuscaRequest,
-    ResumoLicitacoes,
-    FilterStats,
     BuscaResponse,
+    FilterStats,
     JobCreatedResponse,
     JobProgress,
-    JobStatusResponse,
     JobResultResponse,
+    JobStatusResponse,
+    ResumoLicitacoes,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Error Codes (TD-L02/XD-API-03)
@@ -62,9 +61,7 @@ class TestErrorCodes:
 
     def test_error_code_to_dict_with_details(self):
         """Should include details when provided."""
-        result = ErrorCode.PNCP_RATE_LIMITED.to_dict(
-            details={"retry_after": 60}
-        )
+        result = ErrorCode.PNCP_RATE_LIMITED.to_dict(details={"retry_after": 60})
         assert result["error"]["details"]["retry_after"] == 60
 
     def test_error_response_creates_http_exception(self):
@@ -154,9 +151,9 @@ class TestDeadlineFilter:
         future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
         bids = [
-            self._make_bid(data_fim=past),   # rejected
+            self._make_bid(data_fim=past),  # rejected
             self._make_bid(data_fim=future),  # approved
-            self._make_bid(),                 # approved (no deadline)
+            self._make_bid(),  # approved (no deadline)
         ]
 
         approved, stats = filter_batch(bids, {"SP"})
@@ -183,6 +180,7 @@ class TestApiVersioning:
     @pytest.fixture()
     def client(self):
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     def test_v1_health_endpoint(self, client):
@@ -220,6 +218,7 @@ class TestStructuredErrors:
     @pytest.fixture()
     def client(self):
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     def test_job_not_found_returns_structured_error(self, client):
@@ -231,8 +230,9 @@ class TestStructuredErrors:
 
     def test_job_not_completed_download_returns_structured_error(self, client):
         """GET /buscar/{id}/download with unfinished job should return structured error."""
-        from tests.conftest import _test_job_store
         import asyncio
+
+        from tests.conftest import _test_job_store
 
         loop = asyncio.new_event_loop()
         loop.run_until_complete(_test_job_store.create("test-job-123"))
@@ -262,6 +262,7 @@ class TestDIArchitecture:
     def test_app_state_class_exists(self):
         """AppState should be importable."""
         from dependencies import AppState
+
         state = AppState()
         assert state.redis is None
         assert state.job_store is None
@@ -270,14 +271,15 @@ class TestDIArchitecture:
     def test_get_app_state_returns_singleton(self):
         """get_app_state should return the same instance."""
         from dependencies import get_app_state
+
         s1 = get_app_state()
         s2 = get_app_state()
         assert s1 is s2
 
     def test_dependency_overrides_work(self):
         """FastAPI dependency_overrides should work for test isolation."""
-        from main import app
         from dependencies import get_database
+        from main import app
 
         mock_db = Mock()
         mock_db.get_recent_searches = AsyncMock(return_value=[])
@@ -297,29 +299,49 @@ class TestDIArchitecture:
 
 class MockSupabaseResponse:
     """Mock Supabase API response for test_story4."""
+
     def __init__(self, data=None):
         self.data = data or []
 
 
 class MockTableQuery:
     """Mock Supabase table query builder for test_story4."""
+
     def __init__(self, data=None):
         self._data = data or []
-    def select(self, *a, **kw): return self
-    def insert(self, *a, **kw): return self
-    def update(self, *a, **kw): return self
-    def upsert(self, *a, **kw): return self
-    def eq(self, *a, **kw): return self
-    def order(self, *a, **kw): return self
-    def limit(self, *a, **kw): return self
-    def execute(self): return MockSupabaseResponse(self._data)
+
+    def select(self, *a, **kw):
+        return self
+
+    def insert(self, *a, **kw):
+        return self
+
+    def update(self, *a, **kw):
+        return self
+
+    def upsert(self, *a, **kw):
+        return self
+
+    def eq(self, *a, **kw):
+        return self
+
+    def order(self, *a, **kw):
+        return self
+
+    def limit(self, *a, **kw):
+        return self
+
+    def execute(self):
+        return MockSupabaseResponse(self._data)
 
 
 @pytest_asyncio.fixture()
 async def test_db():
     """Create a mock Supabase-backed database for testing."""
-    from database import Database
     from unittest.mock import Mock
+
+    from database import Database
+
     _db = Database(supabase_url="https://test.supabase.co", supabase_key="test-key")
     _db._client = Mock()
     _db._client.table = lambda name: MockTableQuery()
@@ -436,10 +458,12 @@ class TestDatabase:
     @pytest.mark.asyncio
     async def test_get_all_preferences(self, test_db):
         """Should return all preferences as dict for a user."""
-        test_db._client.table = lambda name: MockTableQuery(data=[
-            {"key": "a", "value": "1"},
-            {"key": "b", "value": '"hello"'},
-        ])
+        test_db._client.table = lambda name: MockTableQuery(
+            data=[
+                {"key": "a", "value": "1"},
+                {"key": "b", "value": '"hello"'},
+            ]
+        )
         all_prefs = await test_db.get_all_preferences(user_id=self.TEST_USER)
         assert "a" in all_prefs
         assert "b" in all_prefs
@@ -448,6 +472,7 @@ class TestDatabase:
     async def test_operations_when_not_connected(self):
         """Should silently no-op when database is not connected."""
         from database import Database
+
         db = Database(supabase_url="", supabase_key="")
         # Don't call connect — _client is None
         await db.record_search("x", ["SP"], "2026-01-01", "2026-01-31", "v", user_id="u")
@@ -489,8 +514,11 @@ class TestContractSchemas:
         schema = FilterStats.model_json_schema()
         props = schema["properties"]
         expected_fields = [
-            "rejeitadas_uf", "rejeitadas_valor", "rejeitadas_keyword",
-            "rejeitadas_prazo", "rejeitadas_outros",
+            "rejeitadas_uf",
+            "rejeitadas_valor",
+            "rejeitadas_keyword",
+            "rejeitadas_prazo",
+            "rejeitadas_outros",
         ]
         for field in expected_fields:
             assert field in props, f"Missing field: {field}"
@@ -510,8 +538,11 @@ class TestContractSchemas:
         schema = JobProgress.model_json_schema()
         props = schema["properties"]
         expected = [
-            "phase", "ufs_completed", "ufs_total",
-            "items_fetched", "items_filtered",
+            "phase",
+            "ufs_completed",
+            "ufs_total",
+            "items_fetched",
+            "items_filtered",
         ]
         for field in expected:
             assert field in props, f"Missing field: {field}"
@@ -519,6 +550,7 @@ class TestContractSchemas:
     def test_schema_contract_generation(self):
         """schemas_contract.py should generate valid JSON output."""
         from schemas_contract import generate_contract_schemas
+
         schemas = generate_contract_schemas()
         assert "BuscaRequest" in schemas
         assert "ResumoLicitacoes" in schemas
@@ -531,6 +563,7 @@ class TestContractSchemas:
     def test_all_error_codes_in_contract(self):
         """All ErrorCode values should appear in contract output."""
         from schemas_contract import generate_contract_schemas
+
         schemas = generate_contract_schemas()
         for code in ErrorCode:
             assert code.value in schemas["ErrorCodes"]
@@ -547,6 +580,7 @@ class TestStreamingDownload:
     @pytest.fixture()
     def client(self):
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     @pytest.mark.asyncio
@@ -578,6 +612,7 @@ class TestDedicatedExecutor:
     def test_filter_executor_exists(self):
         """main module should have a dedicated _filter_executor."""
         from main import _filter_executor
+
         assert _filter_executor is not None
         assert _filter_executor._max_workers == 4
         # Check thread name prefix
@@ -631,6 +666,7 @@ class TestSearchHistoryEndpoint:
     @pytest.fixture()
     def client(self):
         from main import app
+
         return TestClient(app, raise_server_exceptions=False)
 
     def test_search_history_without_db(self, client):

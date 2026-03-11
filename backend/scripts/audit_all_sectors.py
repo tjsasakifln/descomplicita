@@ -9,16 +9,14 @@ Usage:
 
 import json
 import sys
-import os
 from datetime import date, timedelta
 from pathlib import Path
-from collections import defaultdict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RetryConfig, setup_logging
+from filter import filter_licitacao, match_keywords
 from pncp_client import PNCPClient
-from filter import normalize_text, match_keywords, filter_licitacao
 from sectors import SECTORS, SectorConfig
 
 setup_logging("INFO")
@@ -70,7 +68,8 @@ def audit_sector(items: list[dict], sector: SectorConfig) -> dict:
         # Full filter (using sector keywords)
         fake_lic = {"uf": uf, "valorTotalEstimado": valor, "objetoCompra": objeto}
         ok, reason, _kw, _sc = filter_licitacao(
-            fake_lic, ufs_set,
+            fake_lic,
+            ufs_set,
             keywords=sector.keywords,
             exclusions=sector.exclusions,
         )
@@ -120,7 +119,8 @@ def analyze_cross_sector_conflicts(items: list[dict]) -> list[dict]:
         matching_sectors = []
         for sector in SECTORS.values():
             ok, _, _kw2, _sc2 = filter_licitacao(
-                fake_lic, ufs_set,
+                fake_lic,
+                ufs_set,
                 keywords=sector.keywords,
                 exclusions=sector.exclusions,
             )
@@ -128,10 +128,12 @@ def analyze_cross_sector_conflicts(items: list[dict]) -> list[dict]:
                 matching_sectors.append(sector.id)
 
         if len(matching_sectors) > 1:
-            conflicts.append({
-                "objeto": objeto[:200],
-                "sectors": matching_sectors,
-            })
+            conflicts.append(
+                {
+                    "objeto": objeto[:200],
+                    "sectors": matching_sectors,
+                }
+            )
 
     return conflicts
 
@@ -169,8 +171,8 @@ def generate_report(results: list[dict], conflicts: list[dict]) -> str:
             lines.append(f"### Aprovados (amostra — {r['approved_count']} total)")
             lines.append("")
             for i, item in enumerate(r["approved_sample"]):
-                val_str = f"R$ {item['valor']:,.2f}" if item['valor'] else "N/A"
-                lines.append(f"**{i+1}.** [{item['uf']}] {val_str}")
+                val_str = f"R$ {item['valor']:,.2f}" if item["valor"] else "N/A"
+                lines.append(f"**{i + 1}.** [{item['uf']}] {val_str}")
                 lines.append(f"  {item['objeto'][:180]}")
                 lines.append(f"  Keywords: {', '.join(item['keywords_found'][:5])}")
                 lines.append("")
@@ -182,7 +184,7 @@ def generate_report(results: list[dict], conflicts: list[dict]) -> str:
             lines.append(f"### Bloqueados por Exclusão ({r['blocked_by_exclusion_count']})")
             lines.append("")
             for i, item in enumerate(r["blocked_by_exclusion"]):
-                lines.append(f"**EXC-{i+1}.** {item['objeto'][:180]}")
+                lines.append(f"**EXC-{i + 1}.** {item['objeto'][:180]}")
                 lines.append(f"  Keywords que teriam matchado: {', '.join(item['kw_without_exc'][:5])}")
                 lines.append("")
 
@@ -193,7 +195,7 @@ def generate_report(results: list[dict], conflicts: list[dict]) -> str:
         lines.append("Itens que matcham em mais de um setor:")
         lines.append("")
         for i, c in enumerate(conflicts[:20]):
-            lines.append(f"**{i+1}.** Setores: {', '.join(c['sectors'])}")
+            lines.append(f"**{i + 1}.** Setores: {', '.join(c['sectors'])}")
             lines.append(f"  {c['objeto']}")
             lines.append("")
 
@@ -215,9 +217,11 @@ def main():
         print(f"\nAuditando setor: {sector.name}...")
         r = audit_sector(items, sector)
         results.append(r)
-        print(f"  Aprovados: {r['approved_count']}, "
-              f"Bloqueados excl: {r['blocked_by_exclusion_count']}, "
-              f"Rejeitados kw: {r['rejected_keyword_count']}")
+        print(
+            f"  Aprovados: {r['approved_count']}, "
+            f"Bloqueados excl: {r['blocked_by_exclusion_count']}, "
+            f"Rejeitados kw: {r['rejected_keyword_count']}"
+        )
 
     print("\nAnalisando conflitos cross-setor...")
     conflicts = analyze_cross_sector_conflicts(items)
@@ -232,16 +236,18 @@ def main():
     with open(output_dir / "audit_all_sectors_report.md", "w", encoding="utf-8") as f:
         f.write(report)
 
-    print(f"\nResultados salvos em scripts/audit_all_sectors_report.md")
+    print("\nResultados salvos em scripts/audit_all_sectors_report.md")
 
     # Summary table
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"{'Setor':<30} {'Aprov':>6} {'Excl':>6} {'Rej':>6}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for r in results:
-        print(f"{r['sector_name']:<30} {r['approved_count']:>6} "
-              f"{r['blocked_by_exclusion_count']:>6} {r['rejected_keyword_count']:>6}")
-    print(f"{'='*60}")
+        print(
+            f"{r['sector_name']:<30} {r['approved_count']:>6} "
+            f"{r['blocked_by_exclusion_count']:>6} {r['rejected_keyword_count']:>6}"
+        )
+    print(f"{'=' * 60}")
     print(f"Conflitos cross-setor: {len(conflicts)}")
 
 

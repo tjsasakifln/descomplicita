@@ -16,11 +16,11 @@ Test categories:
 import os
 from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
 
-from llm import gerar_resumo, gerar_resumo_fallback, format_resumo_html
+from llm import format_resumo_html, gerar_resumo, gerar_resumo_fallback
 from schemas import ResumoLicitacoes
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Empty Input Tests
@@ -349,9 +349,7 @@ async def test_gerar_resumo_empty_api_response(mock_openai):
     """Should raise error when API returns empty response."""
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse = AsyncMock(
-        return_value=Mock(choices=[Mock(message=Mock(parsed=None))])
-    )
+    mock_client.beta.chat.completions.parse = AsyncMock(return_value=Mock(choices=[Mock(message=Mock(parsed=None))]))
 
     licitacoes = [
         {
@@ -376,9 +374,7 @@ async def test_gerar_resumo_timeout(mock_openai):
 
     mock_client = Mock()
     mock_openai.return_value = mock_client
-    mock_client.beta.chat.completions.parse = AsyncMock(
-        side_effect=asyncio.TimeoutError("Request timed out")
-    )
+    mock_client.beta.chat.completions.parse = AsyncMock(side_effect=TimeoutError("Request timed out"))
 
     licitacoes = [
         {
@@ -579,9 +575,7 @@ def test_fallback_no_alert_for_past_dates():
 
     resumo = gerar_resumo_fallback(licitacoes)
 
-    assert resumo.alerta_urgencia is None, (
-        "Past dates should NOT trigger urgency alert"
-    )
+    assert resumo.alerta_urgencia is None, "Past dates should NOT trigger urgency alert"
 
 
 def test_fallback_alert_for_future_dates():
@@ -602,9 +596,7 @@ def test_fallback_alert_for_future_dates():
 
     resumo = gerar_resumo_fallback(licitacoes)
 
-    assert resumo.alerta_urgencia is not None, (
-        "Future date within 7 days should trigger urgency alert"
-    )
+    assert resumo.alerta_urgencia is not None, "Future date within 7 days should trigger urgency alert"
     assert "Prefeitura SP" in resumo.alerta_urgencia
 
 
@@ -675,9 +667,5 @@ async def test_gerar_resumo_excludes_past_dates_from_llm_input(mock_openai):
     call_args = mock_client.beta.chat.completions.parse.call_args
     user_prompt = call_args.kwargs["messages"][1]["content"]
 
-    assert "Prefeitura Antiga" not in user_prompt, (
-        "Past-date bid should be excluded from LLM input"
-    )
-    assert "Prefeitura Nova" in user_prompt, (
-        "Future-date bid should be included in LLM input"
-    )
+    assert "Prefeitura Antiga" not in user_prompt, "Past-date bid should be excluded from LLM input"
+    assert "Prefeitura Nova" in user_prompt, "Future-date bid should be included in LLM input"

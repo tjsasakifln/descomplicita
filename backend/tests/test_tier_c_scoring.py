@@ -7,14 +7,27 @@ Score capping: score never exceeds 1.0 even with many Tier C matches
 """
 
 import pytest
-from filter import match_keywords
 
+from filter import match_keywords
 
 # --- Shared fixtures ---
 
 KEYWORDS_A = {"uniforme", "fardamento"}
 KEYWORDS_B = {"jaleco", "camisa social"}
-KEYWORDS_C = {"epi", "epis", "bota", "botas", "meia", "meias", "avental", "aventais", "colete", "coletes", "confeccao", "costura"}
+KEYWORDS_C = {
+    "epi",
+    "epis",
+    "bota",
+    "botas",
+    "meia",
+    "meias",
+    "avental",
+    "aventais",
+    "colete",
+    "coletes",
+    "confeccao",
+    "costura",
+}
 EPI_ONLY = {"epi", "epis", "equipamento de protecao individual"}
 ALL_KEYWORDS = KEYWORDS_A | KEYWORDS_B | KEYWORDS_C
 

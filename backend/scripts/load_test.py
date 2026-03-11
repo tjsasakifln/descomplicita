@@ -2,16 +2,17 @@
 """Load test script for Descomplicita search pipeline (SP-001.5)."""
 
 import argparse
-import requests
-import time
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 
+import requests
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def poll_job(base_url: str, job_id: str, timeout: int = 300) -> dict:
     """Poll /status/<job_id> until done or timeout. Returns result dict."""
@@ -67,6 +68,7 @@ def run_search(base_url: str, ufs: list[str], days: int, poll_timeout: int = 300
 # Table printer
 # ---------------------------------------------------------------------------
 
+
 def _row(col1: str, col2: str, col3: str, widths: tuple[int, int, int]) -> str:
     return f"| {col1:<{widths[0]}} | {col2:<{widths[1]}} | {col3:<{widths[2]}} |"
 
@@ -91,11 +93,12 @@ def print_table(title: str, headers: tuple[str, str, str], rows: list[tuple[str,
 # Scenarios
 # ---------------------------------------------------------------------------
 
+
 def scenario_latency(base_url: str) -> list[tuple[str, str, str]]:
     """Run latency tests and return table rows."""
     cases = [
-        ("1 UF + 7 days",   ["SP"], 7),
-        ("5 UFs + 7 days",  ["SP", "RJ", "MG", "RS", "BA"], 7),
+        ("1 UF + 7 days", ["SP"], 7),
+        ("5 UFs + 7 days", ["SP", "RJ", "MG", "RS", "BA"], 7),
         ("3 UFs + 30 days", ["SP", "RJ", "MG"], 30),
     ]
     rows: list[tuple[str, str, str]] = []
@@ -165,10 +168,7 @@ def scenario_concurrency(base_url: str) -> list[tuple[str, str, str]]:
     times: list[float] = []
 
     with ThreadPoolExecutor(max_workers=n) as executor:
-        futures = {
-            executor.submit(run_search, base_url, ufs, days): idx
-            for idx, (ufs, days) in enumerate(uf_sets)
-        }
+        futures = {executor.submit(run_search, base_url, ufs, days): idx for idx, (ufs, days) in enumerate(uf_sets)}
         for future in as_completed(futures):
             elapsed, status = future.result()
             times.append(elapsed)
@@ -190,6 +190,7 @@ def scenario_concurrency(base_url: str) -> list[tuple[str, str, str]]:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(

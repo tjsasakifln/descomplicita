@@ -39,7 +39,13 @@ jobs:
       - name: Run linting
         run: |
           cd backend
+          pip install ruff
           ruff check .
+
+      - name: Check formatting
+        run: |
+          cd backend
+          ruff format --check .
 
       - name: Run tests with coverage
         run: |

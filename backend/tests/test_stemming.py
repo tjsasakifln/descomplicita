@@ -13,17 +13,16 @@ Tests cover:
 import pytest
 
 from filter import (
+    EPI_ONLY_KEYWORDS,
+    KEYWORDS_EXCLUSAO,
+    KEYWORDS_UNIFORMES,
+    _keyword_matches,
+    match_keywords,
+    normalize_text,
     stem_text,
     stem_word,
-    normalize_text,
-    match_keywords,
-    _keyword_matches,
-    KEYWORDS_UNIFORMES,
-    KEYWORDS_EXCLUSAO,
-    EPI_ONLY_KEYWORDS,
 )
 from sectors import SECTORS
-
 
 VESTUARIO = SECTORS["vestuario"]
 
@@ -84,6 +83,7 @@ class TestStemText:
     def test_stem_nfc_vs_nfd_identical(self):
         """NFC and NFD encoded input should produce identical stemmed output."""
         import unicodedata
+
         text = "confecção"
         nfc = unicodedata.normalize("NFC", text)
         nfd = unicodedata.normalize("NFD", text)
@@ -278,8 +278,7 @@ class TestAccentHandlingWithStemming:
             ("ô", "o"),
         ]
         for accented, plain in pairs:
-            assert normalize_text(accented) == normalize_text(plain), \
-                f"normalize_text mismatch: {accented} vs {plain}"
+            assert normalize_text(accented) == normalize_text(plain), f"normalize_text mismatch: {accented} vs {plain}"
 
 
 class TestKeywordMatchesHelper:

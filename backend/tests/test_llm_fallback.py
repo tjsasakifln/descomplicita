@@ -7,8 +7,9 @@ network issues, rate limits, or missing API keys.
 """
 
 from datetime import datetime, timedelta
-from schemas import ResumoLicitacoes
+
 from llm import gerar_resumo_fallback
+from schemas import ResumoLicitacoes
 
 
 class TestGerarResumoFallback:
@@ -279,9 +280,7 @@ class TestGerarResumoFallback:
                 "nomeOrgao": f"Órgão {i}",
                 "uf": ["SP", "RJ", "MG", "RS"][i % 4],
                 "valorTotalEstimado": 50_000.0 + (i * 10_000.0),
-                "dataAberturaProposta": (
-                    datetime.now() + timedelta(days=30)
-                ).isoformat(),
+                "dataAberturaProposta": (datetime.now() + timedelta(days=30)).isoformat(),
             }
             for i in range(150)
         ]
@@ -298,9 +297,7 @@ class TestGerarResumoFallback:
         import sys
         from unittest.mock import patch
 
-        licitacoes = [
-            {"nomeOrgao": "Teste Offline", "uf": "SP", "valorTotalEstimado": 100_000.0}
-        ]
+        licitacoes = [{"nomeOrgao": "Teste Offline", "uf": "SP", "valorTotalEstimado": 100_000.0}]
 
         # Mock OpenAI module to ensure no external dependencies
         with patch.dict(sys.modules, {"openai": None}):

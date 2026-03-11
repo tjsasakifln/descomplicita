@@ -1,12 +1,13 @@
 """PNCP data source adapter — wraps AsyncPNCPClient behind the DataSourceClient ABC."""
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
 
-from config import RetryConfig, MAX_PAGES_PER_COMBO
-from clients.async_pncp_client import AsyncPNCPClient
 from app_cache.redis_cache import RedisCache
+from clients.async_pncp_client import AsyncPNCPClient
+from config import MAX_PAGES_PER_COMBO, RetryConfig
 from sources.base import DataSourceClient, NormalizedRecord, SearchQuery
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class PNCPSource(DataSourceClient):
     ):
         self._client = async_client or AsyncPNCPClient(config)
         self._cache = cache
-        self._partial_results: List[dict] = []
+        self._partial_results: list[dict] = []
 
     @property
     def client(self) -> AsyncPNCPClient:
@@ -64,9 +65,7 @@ class PNCPSource(DataSourceClient):
         seq = raw.get("sequencialCompra", "")
 
         url_edital = raw.get("linkPncp") or (
-            f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seq}"
-            if cnpj and ano and seq
-            else None
+            f"https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seq}" if cnpj and ano and seq else None
         )
 
         return NormalizedRecord(
@@ -94,7 +93,7 @@ class PNCPSource(DataSourceClient):
         self,
         query: SearchQuery,
         on_progress: Callable[[int, int, int], None] | None = None,
-    ) -> List[NormalizedRecord]:
+    ) -> list[NormalizedRecord]:
         """Fetch PNCP records matching the query using async httpx client."""
         self._partial_results = []
 
@@ -111,12 +110,13 @@ class PNCPSource(DataSourceClient):
         except Exception as e:
             logger.warning(
                 "PNCP fetch interrupted (%s), returning %d partial results",
-                type(e).__name__, len(self._partial_results),
+                type(e).__name__,
+                len(self._partial_results),
             )
 
         return [self.normalize(item) for item in self._partial_results]
 
-    def get_partial_results(self) -> List[NormalizedRecord]:
+    def get_partial_results(self) -> list[NormalizedRecord]:
         """Return whatever was collected so far (for timeout recovery)."""
         return [self.normalize(item) for item in self._partial_results]
 
@@ -129,7 +129,7 @@ class PNCPSource(DataSourceClient):
         """Quick health check."""
         return self._client is not None
 
-    async def cache_stats(self) -> Dict[str, Any]:
+    async def cache_stats(self) -> dict[str, Any]:
         """Return cache statistics."""
         if self._cache:
             stats = self._cache.stats()

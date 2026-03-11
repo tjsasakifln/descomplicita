@@ -49,29 +49,33 @@ async def read_sqlite_data(db_path: str) -> dict:
         cursor = await db.execute("SELECT * FROM search_history ORDER BY created_at")
         rows = await cursor.fetchall()
         for row in rows:
-            data["search_history"].append({
-                "job_id": row["job_id"],
-                "ufs": json.loads(row["ufs"]),
-                "data_inicial": row["data_inicial"],
-                "data_final": row["data_final"],
-                "setor_id": row["setor_id"],
-                "termos_busca": row["termos_busca"],
-                "total_raw": row["total_raw"],
-                "total_filtrado": row["total_filtrado"],
-                "status": row["status"],
-                "created_at": row["created_at"],
-                "completed_at": row["completed_at"],
-                "elapsed_seconds": row["elapsed_seconds"],
-            })
+            data["search_history"].append(
+                {
+                    "job_id": row["job_id"],
+                    "ufs": json.loads(row["ufs"]),
+                    "data_inicial": row["data_inicial"],
+                    "data_final": row["data_final"],
+                    "setor_id": row["setor_id"],
+                    "termos_busca": row["termos_busca"],
+                    "total_raw": row["total_raw"],
+                    "total_filtrado": row["total_filtrado"],
+                    "status": row["status"],
+                    "created_at": row["created_at"],
+                    "completed_at": row["completed_at"],
+                    "elapsed_seconds": row["elapsed_seconds"],
+                }
+            )
 
         # Read user preferences
         cursor = await db.execute("SELECT * FROM user_preferences")
         rows = await cursor.fetchall()
         for row in rows:
-            data["user_preferences"].append({
-                "key": row["key"],
-                "value": row["value"],
-            })
+            data["user_preferences"].append(
+                {
+                    "key": row["key"],
+                    "value": row["value"],
+                }
+            )
 
     logger.info(
         "Read %d search_history rows and %d user_preferences rows from SQLite",
@@ -94,21 +98,24 @@ def migrate_to_supabase(data: dict, legacy_user_id: str) -> dict:
     # Migrate search history
     for record in data["search_history"]:
         try:
-            client.table("search_history").upsert({
-                "user_id": legacy_user_id,
-                "job_id": record["job_id"],
-                "ufs": record["ufs"],
-                "data_inicial": record["data_inicial"],
-                "data_final": record["data_final"],
-                "setor_id": record["setor_id"],
-                "termos_busca": record["termos_busca"],
-                "total_raw": record["total_raw"] or 0,
-                "total_filtrado": record["total_filtrado"] or 0,
-                "status": record["status"] or "completed",
-                "created_at": record["created_at"],
-                "completed_at": record["completed_at"],
-                "elapsed_seconds": record["elapsed_seconds"],
-            }, on_conflict="job_id").execute()
+            client.table("search_history").upsert(
+                {
+                    "user_id": legacy_user_id,
+                    "job_id": record["job_id"],
+                    "ufs": record["ufs"],
+                    "data_inicial": record["data_inicial"],
+                    "data_final": record["data_final"],
+                    "setor_id": record["setor_id"],
+                    "termos_busca": record["termos_busca"],
+                    "total_raw": record["total_raw"] or 0,
+                    "total_filtrado": record["total_filtrado"] or 0,
+                    "status": record["status"] or "completed",
+                    "created_at": record["created_at"],
+                    "completed_at": record["completed_at"],
+                    "elapsed_seconds": record["elapsed_seconds"],
+                },
+                on_conflict="job_id",
+            ).execute()
             results["search_history"] += 1
         except Exception as e:
             results["errors"].append(f"search_history {record['job_id']}: {e}")
@@ -123,11 +130,14 @@ def migrate_to_supabase(data: dict, legacy_user_id: str) -> dict:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-            client.table("user_preferences").upsert({
-                "user_id": legacy_user_id,
-                "key": pref["key"],
-                "value": value,
-            }, on_conflict="user_id,key").execute()
+            client.table("user_preferences").upsert(
+                {
+                    "user_id": legacy_user_id,
+                    "key": pref["key"],
+                    "value": value,
+                },
+                on_conflict="user_id,key",
+            ).execute()
             results["user_preferences"] += 1
         except Exception as e:
             results["errors"].append(f"user_preferences {pref['key']}: {e}")
@@ -152,12 +162,14 @@ def get_or_create_legacy_user() -> str:
         return result.data[0]["id"]
 
     # Create user via admin API
-    result = client.auth.admin.create_user({
-        "email": legacy_email,
-        "password": os.environ.get("LEGACY_USER_PASSWORD", "migration-temp-password-change-me"),
-        "email_confirm": True,
-        "user_metadata": {"display_name": "Legacy Migration User"},
-    })
+    result = client.auth.admin.create_user(
+        {
+            "email": legacy_email,
+            "password": os.environ.get("LEGACY_USER_PASSWORD", "migration-temp-password-change-me"),
+            "email_confirm": True,
+            "user_metadata": {"display_name": "Legacy Migration User"},
+        }
+    )
 
     user_id = str(result.user.id)
     logger.info("Created legacy user: %s (%s)", user_id, legacy_email)

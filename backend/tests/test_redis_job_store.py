@@ -1,8 +1,9 @@
 """Integration tests for Redis job store (TD-005)."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from stores.redis_job_store import RedisJobStore
 
@@ -77,15 +78,17 @@ class TestRedisJobStore:
     @pytest.mark.asyncio
     async def test_get_falls_back_to_redis(self, store, mock_redis):
         """After restart, job only in Redis should be recovered."""
-        job_data = json.dumps({
-            "job_id": "recovered",
-            "status": "completed",
-            "progress": {"phase": "done"},
-            "result": {"test": True},
-            "error": None,
-            "created_at": 1000000.0,
-            "completed_at": 1000001.0,
-        })
+        job_data = json.dumps(
+            {
+                "job_id": "recovered",
+                "status": "completed",
+                "progress": {"phase": "done"},
+                "result": {"test": True},
+                "error": None,
+                "created_at": 1000000.0,
+                "completed_at": 1000001.0,
+            }
+        )
         mock_redis.get = AsyncMock(return_value=job_data)
 
         job = await store.get("recovered")
@@ -120,6 +123,7 @@ class TestRedisJobStore:
     async def test_cleanup_uses_parent(self, store, mock_redis):
         """Cleanup should use in-memory cleanup (Redis handles its own TTL)."""
         import time
+
         await store.create("j1")
         await store.complete("j1", result={})
         job = await store.get("j1")

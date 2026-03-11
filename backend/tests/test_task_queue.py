@@ -9,7 +9,6 @@ import pytest
 from job_store import JobStore
 from task_queue import DurableTaskRunner
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -86,6 +85,7 @@ class TestEnqueueCompletes:
         async def make_work(n):
             async def work():
                 results.append(n)
+
             return work
 
         for i in range(3):
@@ -411,10 +411,12 @@ class TestRecoverInterrupted:
         """Scan cursor != 0 means more pages to fetch."""
         redis = AsyncMock()
         # First call returns cursor=42 (more pages), second returns cursor=0 (done)
-        redis.scan = AsyncMock(side_effect=[
-            (42, ["job_params:job-1", "job_params:job-2"]),
-            (0, ["job_params:job-3"]),
-        ])
+        redis.scan = AsyncMock(
+            side_effect=[
+                (42, ["job_params:job-1", "job_params:job-2"]),
+                (0, ["job_params:job-3"]),
+            ]
+        )
         runner = DurableTaskRunner(redis=redis)
 
         result = await runner.recover_interrupted()

@@ -1,13 +1,14 @@
 """Unit tests for keyword matching engine (filter.py)."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 from filter import (
-    normalize_text,
-    match_keywords,
-    filter_licitacao,
-    filter_batch,
-    KEYWORDS_UNIFORMES,
     KEYWORDS_EXCLUSAO,
+    KEYWORDS_UNIFORMES,
+    filter_batch,
+    filter_licitacao,
+    match_keywords,
+    normalize_text,
 )
 from sectors import SECTORS, SectorConfig
 
@@ -67,17 +68,13 @@ class TestMatchKeywords:
 
     def test_simple_match(self):
         """Should match simple uniform keywords."""
-        matched, keywords, _score = match_keywords(
-            "Aquisição de uniformes escolares", KEYWORDS_UNIFORMES
-        )
+        matched, keywords, _score = match_keywords("Aquisição de uniformes escolares", KEYWORDS_UNIFORMES)
         assert matched is True
         assert "uniformes" in keywords
 
     def test_no_match(self):
         """Should return False when no keywords match."""
-        matched, keywords, _score = match_keywords(
-            "Aquisição de software de gestão", KEYWORDS_UNIFORMES
-        )
+        matched, keywords, _score = match_keywords("Aquisição de software de gestão", KEYWORDS_UNIFORMES)
         assert matched is False
         assert keywords == []
 
@@ -113,9 +110,7 @@ class TestMatchKeywords:
         assert matched is False
 
         # "uniformização" should NOT match (excluded as standardization, not clothing)
-        matched, _, _score = match_keywords(
-            "Uniformização de processos", KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO
-        )
+        matched, _, _score = match_keywords("Uniformização de processos", KEYWORDS_UNIFORMES, KEYWORDS_EXCLUSAO)
         assert matched is False
 
     def test_exclusion_keywords_prevent_match(self):
@@ -148,9 +143,7 @@ class TestMatchKeywords:
 
     def test_compound_keyword_matching(self):
         """Should match multi-word keywords."""
-        matched, keywords, _score = match_keywords(
-            "Aquisição de uniforme escolar", KEYWORDS_UNIFORMES
-        )
+        matched, keywords, _score = match_keywords("Aquisição de uniforme escolar", KEYWORDS_UNIFORMES)
         assert matched is True
         assert "uniforme escolar" in keywords or "uniforme" in keywords
 
@@ -173,9 +166,7 @@ class TestMatchKeywords:
 
     def test_exclusions_none_parameter(self):
         """Should work correctly when exclusions=None."""
-        matched, keywords, _score = match_keywords(
-            "Compra de uniformes", KEYWORDS_UNIFORMES, exclusions=None
-        )
+        matched, keywords, _score = match_keywords("Compra de uniformes", KEYWORDS_UNIFORMES, exclusions=None)
         assert matched is True
         assert len(keywords) > 0
 
@@ -379,9 +370,7 @@ class TestFilterLicitacao:
             "dataAberturaProposta": future_date,
         }
         # Custom range: 100k-200k (should reject 75k)
-        aprovada, _, _kw2, _sc2 = filter_licitacao(
-            licitacao, {"SP"}, valor_min=100_000, valor_max=200_000
-        )
+        aprovada, _, _kw2, _sc2 = filter_licitacao(licitacao, {"SP"}, valor_min=100_000, valor_max=200_000)
         assert aprovada is False
 
     def test_rejects_missing_keywords(self):
@@ -516,7 +505,7 @@ class TestFilterLicitacao:
         # All should be accepted
         for i, bid in enumerate(historical_bids):
             aprovada, motivo, _kw, _sc = filter_licitacao(bid, {"SP", "RJ", "MG"})
-            assert aprovada is True, f"Bid {i+1} should be accepted, but got: {motivo}"
+            assert aprovada is True, f"Bid {i + 1} should be accepted, but got: {motivo}"
             assert motivo is None
 
     def test_batch_filter_accepts_historical_bids(self):
@@ -728,9 +717,7 @@ class TestFilterBatch:
             },
         ]
 
-        aprovadas, stats = filter_batch(
-            licitacoes, {"SP"}, valor_min=80_000, valor_max=120_000
-        )
+        aprovadas, stats = filter_batch(licitacoes, {"SP"}, valor_min=80_000, valor_max=120_000)
 
         assert len(aprovadas) == 1
         assert stats["aprovadas"] == 1
@@ -844,7 +831,8 @@ class TestSectorValueRanges:
         }
         sector = SECTORS["saude"]
         aprovada, _, _kw2, _sc2 = filter_licitacao(
-            licitacao, {"SP"},
+            licitacao,
+            {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
             keywords=sector.keywords,
@@ -860,7 +848,8 @@ class TestSectorValueRanges:
         }
         sector = SECTORS["saude"]
         aprovada, _, _kw2, _sc2 = filter_licitacao(
-            licitacao, {"SP"},
+            licitacao,
+            {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
             keywords=sector.keywords,
@@ -876,7 +865,8 @@ class TestSectorValueRanges:
         }
         sector = SECTORS["engenharia"]
         aprovada, motivo, _kw, _sc = filter_licitacao(
-            licitacao, {"SP"},
+            licitacao,
+            {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
             keywords=sector.keywords,
@@ -914,7 +904,8 @@ class TestSectorValueRanges:
         ]
 
         aprovadas, stats = filter_batch(
-            licitacoes, {"SP"},
+            licitacoes,
+            {"SP"},
             valor_min=sector.valor_min,
             valor_max=sector.valor_max,
             keywords=sector.keywords,
@@ -950,9 +941,7 @@ class TestCustomTermsWithSectorExclusions:
             keywords={"confeccao"},
             exclusions=vestuario.exclusions,
         )
-        assert approved is False, (
-            "Should be excluded: 'confeccao de placa' is in vestuario exclusions"
-        )
+        assert approved is False, "Should be excluded: 'confeccao de placa' is in vestuario exclusions"
 
     def test_custom_term_included_when_no_exclusion_match(self):
         """CP6b: 'confeccao de uniforme escolar' should be INCLUDED because
@@ -965,9 +954,7 @@ class TestCustomTermsWithSectorExclusions:
             keywords={"confeccao"},
             exclusions=vestuario.exclusions,
         )
-        assert approved is True, (
-            "Should be included: 'confeccao de uniforme' is not in exclusions"
-        )
+        assert approved is True, "Should be included: 'confeccao de uniforme' is not in exclusions"
         assert "confeccao" in matched
 
     def test_custom_term_filter_batch_excludes_false_positives(self):
@@ -976,8 +963,8 @@ class TestCustomTermsWithSectorExclusions:
         vestuario = SECTORS["vestuario"]
         bids = [
             self._make_bid("Confeccao de placa de sinalizacao"),  # FP - excluded
-            self._make_bid("Confeccao de uniforme escolar"),      # TP - included
-            self._make_bid("Confeccao de grades metalicas"),      # FP - excluded
+            self._make_bid("Confeccao de uniforme escolar"),  # TP - included
+            self._make_bid("Confeccao de grades metalicas"),  # FP - excluded
         ]
 
         aprovadas, stats = filter_batch(

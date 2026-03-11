@@ -7,8 +7,9 @@ Run with: pytest -m integration
 WARNING: These tests make real API calls and may be rate-limited.
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 try:
     from pncp_client import PNCPClient

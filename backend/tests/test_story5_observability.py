@@ -20,7 +20,6 @@ from middleware.correlation_id import (
 )
 from schemas import BuscaRequest, JobResultResponse
 
-
 # ---------------------------------------------------------------------------
 # Correlation ID middleware tests (TD-017)
 # ---------------------------------------------------------------------------
@@ -67,8 +66,13 @@ class TestCorrelationIdInLogs:
         """CorrelationIdFilter injects correlation_id into log records."""
         log_filter = CorrelationIdFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="test message", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
         )
 
         test_id = str(uuid.uuid4())
@@ -83,8 +87,13 @@ class TestCorrelationIdInLogs:
         """Without middleware, correlation_id defaults to empty string."""
         log_filter = CorrelationIdFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="test", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
         )
         # Reset to default
         token = correlation_id_var.set("")
@@ -109,12 +118,14 @@ class TestSentryIntegration:
             with patch("sentry_sdk.init") as mock_init:
                 with patch("sentry_sdk.capture_exception") as mock_capture:
                     import sentry_sdk
+
                     sentry_sdk.capture_exception(ValueError("test error"))
                     mock_capture.assert_called_once()
 
     def test_sentry_not_initialized_without_dsn(self):
         """Sentry is not initialized when SENTRY_DSN is empty."""
         import os
+
         dsn = os.getenv("SENTRY_DSN", "")
         # In test environment, SENTRY_DSN should not be set
         assert dsn == ""
@@ -135,6 +146,7 @@ class TestPNCPBaseURLConfig:
     def test_pncp_base_url_in_sources_config(self):
         """SOURCES_CONFIG uses the configurable PNCP_BASE_URL."""
         from config import SOURCES_CONFIG
+
         assert SOURCES_CONFIG["pncp"]["base_url"] == PNCP_BASE_URL
 
 

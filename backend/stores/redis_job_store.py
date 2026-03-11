@@ -14,8 +14,7 @@ v3-story-2.2 optimizations:
 
 import json
 import logging
-import time
-from typing import Dict, List, Optional
+from typing import Optional
 
 from job_store import JobStore, SearchJob
 
@@ -68,15 +67,17 @@ class RedisJobStore(JobStore):
             # Strip excel_bytes from the serialized result
             result = {k: v for k, v in result.items() if k != "excel_bytes"}
 
-        return json.dumps({
-            "job_id": job.job_id,
-            "status": job.status,
-            "progress": job.progress,
-            "result": result,
-            "error": job.error,
-            "created_at": job.created_at,
-            "completed_at": job.completed_at,
-        })
+        return json.dumps(
+            {
+                "job_id": job.job_id,
+                "status": job.status,
+                "progress": job.progress,
+                "result": result,
+                "error": job.error,
+                "created_at": job.created_at,
+                "completed_at": job.completed_at,
+            }
+        )
 
     @staticmethod
     def _deserialize_job(data: str) -> SearchJob:
@@ -128,7 +129,7 @@ class RedisJobStore(JobStore):
         """
         await super().update_progress(job_id, **kwargs)
 
-    async def complete(self, job_id: str, result: Dict) -> None:
+    async def complete(self, job_id: str, result: dict) -> None:
         """Mark job complete in both in-memory cache and Redis."""
         await super().complete(job_id, result)
         async with self._lock:
@@ -231,25 +232,25 @@ class RedisJobStore(JobStore):
             pipe.delete(key)
             # RPUSH in batches to avoid huge argument lists
             for i in range(0, len(items), _RPUSH_BATCH_SIZE):
-                batch = [json.dumps(item) for item in items[i:i + _RPUSH_BATCH_SIZE]]
+                batch = [json.dumps(item) for item in items[i : i + _RPUSH_BATCH_SIZE]]
                 if batch:
                     pipe.rpush(key, *batch)
             pipe.expire(key, self._redis_ttl)
             await pipe.execute()
             logger.debug(
                 "Items stored for job %s (%d items) via Redis LIST",
-                job_id, len(items),
+                job_id,
+                len(items),
             )
         except Exception as e:
             logger.warning(
                 "Redis LIST store failed for job %s: %s — in-memory fallback",
-                job_id, e,
+                job_id,
+                e,
             )
             await super().store_items(job_id, items)
 
-    async def get_items_page(
-        self, job_id: str, page: int = 1, page_size: int = 20
-    ) -> tuple:
+    async def get_items_page(self, job_id: str, page: int = 1, page_size: int = 20) -> tuple:
         """Return a page of items and total count via LRANGE (DB-009).
 
         Uses LLEN for count and LRANGE for the page slice — no full
@@ -268,7 +269,8 @@ class RedisJobStore(JobStore):
         except Exception as e:
             logger.warning(
                 "Redis LRANGE failed for job %s: %s — in-memory fallback",
-                job_id, e,
+                job_id,
+                e,
             )
             return await super().get_items_page(job_id, page, page_size)
 

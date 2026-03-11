@@ -4,7 +4,7 @@ import re
 import unicodedata
 from datetime import datetime
 from functools import lru_cache
-from typing import Set, Tuple, List, Dict, Optional
+from typing import Optional
 
 import nltk
 from nltk.stem import RSLPStemmer
@@ -25,7 +25,7 @@ _rslp_stemmer = RSLPStemmer()
 # negatives, but rely on an extensive KEYWORDS_EXCLUSAO set to filter out
 # non-clothing contexts. This ensures we catch "Aquisição de camisas polo
 # para guardas" while excluding "confecção de placas de sinalização".
-KEYWORDS_UNIFORMES: Set[str] = {
+KEYWORDS_UNIFORMES: set[str] = {
     # Primary terms (high precision)
     "uniforme",
     "uniformes",
@@ -131,17 +131,16 @@ KEYWORDS_UNIFORMES: Set[str] = {
 # (confecção, costura, camisa, colete, avental, boné, bota, meia, etc.)
 # to avoid false negatives. Each exclusion blocks a known non-clothing
 # context for those ambiguous terms.
-KEYWORDS_EXCLUSAO: Set[str] = {
+KEYWORDS_EXCLUSAO: set[str] = {
     # --- "uniforme/uniformização" in non-clothing context ---
-    "uniformizacao",        # standardization — never refers to clothing
-    "uniformemente",        # adverb "uniformly" — never refers to clothing
+    "uniformizacao",  # standardization — never refers to clothing
+    "uniformemente",  # adverb "uniformly" — never refers to clothing
     "uniformização de procedimento",
     "uniformização de entendimento",
     "uniformizacao de jurisprudencia",
     "uniforme de transito",
     "padrao uniforme",
     "padronizacao de uniforme escolar",
-
     # --- "confecção" in non-clothing context (manufacturing/fabrication) ---
     "confeccao de placa",
     "confeccao de placas",
@@ -172,7 +171,6 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     "confeccao de portao",
     "confeccao de portoes",
     "confeccao de pecas de ferro",
-
     # --- "costura" in non-procurement context (courses/training) ---
     "curso de corte",
     "oficina de corte",
@@ -182,46 +180,36 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     "curso de costura",
     "oficina de costura",
     "aula de costura",
-
     # --- "malha" in non-textile context ---
     "malha viaria",
     "malha rodoviaria",
     "malha tensionada",
     "malha de fibra optica",
-
     # --- "avental" in non-clothing context ---
     "avental plumbifero",
-
     # --- "chapéu/boné" in non-clothing context ---
     "chapeu pensador",
-
     # --- "camisa" in non-clothing context ---
     "amor a camisa",
-
     # --- "bota" in non-footwear context ---
     "bota de concreto",
     "bota de cimento",
-
     # --- "meia" in non-clothing context ---
     "meia entrada",
-
     # --- Software / digital ---
     "software de uniforme",
     "plataforma de uniforme",
     "solucao de software",
     "plataforma web",
-
     # --- Decoration / events / costumes ---
     "decoracao",
     "fantasia",
     "fantasias",
     "traje oficial",
     "trajes oficiais",
-
     # --- Non-apparel manufacturing ---
     "tapecaria",
     "forracao",
-
     # --- "roupa" in non-clothing context (bed/table linens) ---
     "roupa de cama",
     "roupa de mesa",
@@ -229,15 +217,12 @@ KEYWORDS_EXCLUSAO: Set[str] = {
     "cama mesa e banho",
     "enxoval hospitalar",
     "enxoval hospital",
-
     # --- "colete" in non-apparel context ---
     "colete salva vidas",
     "colete salva vida",
     "colete balistico",
-
     # --- "bota" in non-footwear context (expanded) ---
     "bota de borracha para construcao",
-
     # --- Construction / infrastructure that matches "bota", "colete" etc. ---
     "material de construcao",
     "materiais de construcao",
@@ -247,8 +232,9 @@ KEYWORDS_EXCLUSAO: Set[str] = {
 
 
 # EPI terms that alone (without clothing context) indicate a non-vestuario procurement
-EPI_ONLY_KEYWORDS: Set[str] = {
-    "epi", "epis",
+EPI_ONLY_KEYWORDS: set[str] = {
+    "epi",
+    "epis",
     "equipamento de protecao individual",
     "equipamentos de protecao individual",
 }
@@ -337,13 +323,15 @@ def stem_text(text: str) -> str:
 
 
 def match_keywords(
-    objeto: str, keywords: Set[str], exclusions: Set[str] | None = None,
-    epi_only_keywords: Set[str] | None = None,
-    keywords_a: Set[str] | None = None,
-    keywords_b: Set[str] | None = None,
-    keywords_c: Set[str] | None = None,
+    objeto: str,
+    keywords: set[str],
+    exclusions: set[str] | None = None,
+    epi_only_keywords: set[str] | None = None,
+    keywords_a: set[str] | None = None,
+    keywords_b: set[str] | None = None,
+    keywords_c: set[str] | None = None,
     threshold: float = 0.6,
-) -> Tuple[bool, List[str], float]:
+) -> tuple[bool, list[str], float]:
     """
     Check if procurement object description contains sector keywords.
 
@@ -384,17 +372,17 @@ def match_keywords(
     # (e.g., "bota" and "botas" share stem "bot" — count only once per tier)
     if keywords_a:
         score = 0.0
-        matched: List[str] = []
+        matched: list[str] = []
         scored_stems: set = set()
         for kw in keywords_a:
             if _keyword_matches(kw, objeto_norm, objeto_stemmed):
                 score = max(score, 1.0)
                 matched.append(kw)
-        for kw in (keywords_b or set()):
+        for kw in keywords_b or set():
             if _keyword_matches(kw, objeto_norm, objeto_stemmed):
                 score = max(score, 0.7)
                 matched.append(kw)
-        for kw in (keywords_c or set()):
+        for kw in keywords_c or set():
             if _keyword_matches(kw, objeto_norm, objeto_stemmed):
                 kw_stem = stem_text(kw)
                 if kw_stem not in scored_stems:
@@ -450,17 +438,17 @@ def _keyword_matches(kw: str, objeto_norm: str, objeto_stemmed: str) -> bool:
 
 def filter_licitacao(
     licitacao: dict,
-    ufs_selecionadas: Set[str],
+    ufs_selecionadas: set[str],
     valor_min: float = 50_000.0,
     valor_max: float = 5_000_000.0,
-    keywords: Set[str] | None = None,
-    exclusions: Set[str] | None = None,
-    epi_only_keywords: Set[str] | None = None,
-    keywords_a: Set[str] | None = None,
-    keywords_b: Set[str] | None = None,
-    keywords_c: Set[str] | None = None,
+    keywords: set[str] | None = None,
+    exclusions: set[str] | None = None,
+    epi_only_keywords: set[str] | None = None,
+    keywords_a: set[str] | None = None,
+    keywords_b: set[str] | None = None,
+    keywords_c: set[str] | None = None,
     threshold: float = 0.6,
-) -> Tuple[bool, Optional[str], List[str], float]:
+) -> tuple[bool, Optional[str], list[str], float]:
     """
     Apply all filters to a single procurement bid (fail-fast sequential filtering).
 
@@ -521,10 +509,14 @@ def filter_licitacao(
     # Support both PNCP field name and NormalizedRecord field name
     objeto = licitacao.get("objetoCompra") or licitacao.get("objeto", "")
     match, keywords_found, kw_score = match_keywords(
-        objeto, kw, exc,
+        objeto,
+        kw,
+        exc,
         epi_only_keywords=epi_only_keywords,
-        keywords_a=keywords_a, keywords_b=keywords_b,
-        keywords_c=keywords_c, threshold=threshold,
+        keywords_a=keywords_a,
+        keywords_b=keywords_b,
+        keywords_c=keywords_c,
+        threshold=threshold,
     )
 
     if not match:
@@ -541,6 +533,7 @@ def filter_licitacao(
             # Handle both "Z" suffix and "+00:00" offset
             data_fim = datetime.fromisoformat(data_fim_str.replace("Z", "+00:00"))
             from datetime import timezone
+
             now = datetime.now(timezone.utc)
             if data_fim < now:
                 return False, "Prazo de submissão encerrado", [], 0.0
@@ -551,18 +544,18 @@ def filter_licitacao(
 
 
 def filter_batch(
-    licitacoes: List[dict],
-    ufs_selecionadas: Set[str],
+    licitacoes: list[dict],
+    ufs_selecionadas: set[str],
     valor_min: float = 50_000.0,
     valor_max: float = 5_000_000.0,
-    keywords: Set[str] | None = None,
-    exclusions: Set[str] | None = None,
-    epi_only_keywords: Set[str] | None = None,
-    keywords_a: Set[str] | None = None,
-    keywords_b: Set[str] | None = None,
-    keywords_c: Set[str] | None = None,
+    keywords: set[str] | None = None,
+    exclusions: set[str] | None = None,
+    epi_only_keywords: set[str] | None = None,
+    keywords_a: set[str] | None = None,
+    keywords_b: set[str] | None = None,
+    keywords_c: set[str] | None = None,
     threshold: float = 0.6,
-) -> Tuple[List[dict], Dict[str, int]]:
+) -> tuple[list[dict], dict[str, int]]:
     """
     Filter a batch of procurement bids and return statistics.
 
@@ -602,8 +595,8 @@ def filter_batch(
         >>> stats["rejeitadas_uf"]
         1
     """
-    aprovadas: List[dict] = []
-    stats: Dict[str, int] = {
+    aprovadas: list[dict] = []
+    stats: dict[str, int] = {
         "total": len(licitacoes),
         "aprovadas": 0,
         "rejeitadas_uf": 0,
@@ -615,8 +608,17 @@ def filter_batch(
 
     for lic in licitacoes:
         aprovada, motivo, kw_found, kw_score = filter_licitacao(
-            lic, ufs_selecionadas, valor_min, valor_max, keywords, exclusions,
-            epi_only_keywords, keywords_a, keywords_b, keywords_c, threshold,
+            lic,
+            ufs_selecionadas,
+            valor_min,
+            valor_max,
+            keywords,
+            exclusions,
+            epi_only_keywords,
+            keywords_a,
+            keywords_b,
+            keywords_c,
+            threshold,
         )
 
         if aprovada:

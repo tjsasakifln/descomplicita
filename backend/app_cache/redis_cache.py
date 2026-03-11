@@ -2,8 +2,7 @@
 
 import json
 import logging
-import time
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ class RedisCache:
         except Exception as e:
             logger.warning("Redis cache put failed for %s: %s", cache_key, e)
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return cache statistics."""
         total = self._hits + self._misses
         return {

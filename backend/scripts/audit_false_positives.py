@@ -21,8 +21,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RetryConfig, setup_logging
+from filter import match_keywords, normalize_text
 from pncp_client import PNCPClient
-from filter import normalize_text, match_keywords
 from sectors import SECTORS, SectorConfig
 
 setup_logging("INFO")
@@ -93,11 +93,13 @@ def analyze_sector(items: list[dict], sector: SectorConfig) -> dict:
 
         elif not kw_match and kw_match_no_exc:
             # Correctly blocked by exclusion
-            blocked_by_exclusion.append({
-                "codigo": codigo,
-                "objeto": objeto[:300],
-                "keywords_would_match": kw_found_no_exc[:5],
-            })
+            blocked_by_exclusion.append(
+                {
+                    "codigo": codigo,
+                    "objeto": objeto[:300],
+                    "keywords_would_match": kw_found_no_exc[:5],
+                }
+            )
 
     return {
         "sector_id": sector.id,
@@ -126,8 +128,16 @@ def _check_suspect_fp(obj_norm: str, kw_found: list[str], sector: SectorConfig) 
         # "epi" alone without clothing context
         if kw_norms <= {"epi", "epis", "equipamento de protecao individual", "equipamentos de protecao individual"}:
             # Check if it's actually about non-clothing EPI
-            non_clothing_epi = ["capacete", "oculos", "protetor auricular", "cinto", "trava queda",
-                                "luva de procedimento", "luva nitrilo", "mascara"]
+            non_clothing_epi = [
+                "capacete",
+                "oculos",
+                "protetor auricular",
+                "cinto",
+                "trava queda",
+                "luva de procedimento",
+                "luva nitrilo",
+                "mascara",
+            ]
             if any(term in obj_norm for term in non_clothing_epi):
                 return "EPI nao-vestuario (capacete/oculos/luvas)"
         # "bota" alone might be industrial/safety boots in wrong context
@@ -242,8 +252,7 @@ def print_report(results: list[dict]):
     total_suspect = 0
 
     for r in results:
-        print(f"{r['sector_name']:<35} {r['approved_count']:>6} "
-              f"{r['blocked_count']:>6} {r['suspect_count']:>8}")
+        print(f"{r['sector_name']:<35} {r['approved_count']:>6} {r['blocked_count']:>6} {r['suspect_count']:>8}")
         total_approved += r["approved_count"]
         total_blocked += r["blocked_count"]
         total_suspect += r["suspect_count"]
@@ -256,17 +265,17 @@ def print_report(results: list[dict]):
         if r["suspect_count"] == 0 and r["blocked_count"] == 0:
             continue
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"  {r['sector_name']} ({r['sector_id']})")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         # Suspect false positives (approved but questionable)
         if r["suspect_false_positives"]:
             print(f"\n  SUSPEITOS DE FALSO POSITIVO ({r['suspect_count']}):")
-            print(f"  {'—'*70}")
+            print(f"  {'—' * 70}")
             for i, fp in enumerate(r["suspect_false_positives"][:15]):
-                val_str = f"R$ {fp['valor']:,.2f}" if fp['valor'] else "N/A"
-                print(f"\n  FP-{i+1}. [{fp['uf']}] {val_str}")
+                val_str = f"R$ {fp['valor']:,.2f}" if fp["valor"] else "N/A"
+                print(f"\n  FP-{i + 1}. [{fp['uf']}] {val_str}")
                 print(f"    Objeto: {fp['objeto'][:200]}")
                 print(f"    Keywords: {', '.join(fp['keywords'][:5])}")
                 print(f"    Motivo suspeito: {fp['suspect_reason']}")
@@ -274,18 +283,18 @@ def print_report(results: list[dict]):
         # Correctly blocked by exclusion
         if r["blocked_by_exclusion"]:
             print(f"\n  CORRETAMENTE BLOQUEADOS POR EXCLUSAO ({r['blocked_count']}):")
-            print(f"  {'—'*70}")
+            print(f"  {'—' * 70}")
             for i, b in enumerate(r["blocked_by_exclusion"][:10]):
-                print(f"\n  BLQ-{i+1}. {b['objeto'][:200]}")
+                print(f"\n  BLQ-{i + 1}. {b['objeto'][:200]}")
                 print(f"    Keywords bloqueadas: {', '.join(b['keywords_would_match'][:5])}")
 
         # Sample of approved items (to manually verify)
         if r["approved"]:
             print(f"\n  AMOSTRA DE APROVADOS ({min(10, r['approved_count'])} de {r['approved_count']}):")
-            print(f"  {'—'*70}")
+            print(f"  {'—' * 70}")
             for i, a in enumerate(r["approved"][:10]):
-                val_str = f"R$ {a['valor']:,.2f}" if a['valor'] else "N/A"
-                print(f"\n  OK-{i+1}. [{a['uf']}] {val_str}")
+                val_str = f"R$ {a['valor']:,.2f}" if a["valor"] else "N/A"
+                print(f"\n  OK-{i + 1}. [{a['uf']}] {val_str}")
                 print(f"    Objeto: {a['objeto'][:200]}")
                 print(f"    Keywords: {', '.join(a['keywords'][:5])}")
 

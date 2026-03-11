@@ -2,8 +2,8 @@
 
 from unittest.mock import AsyncMock, Mock
 
-from sources.orchestrator import OrchestratorResult, SourceStats
 from sources.base import NormalizedRecord
+from sources.orchestrator import OrchestratorResult, SourceStats
 
 
 def make_mock_orchestrator(raw_records=None, error=None):
@@ -48,12 +48,14 @@ def make_mock_orchestrator(raw_records=None, error=None):
 
     orch_result = OrchestratorResult(
         records=records,
-        source_stats={"pncp": SourceStats(
-            total_fetched=len(records),
-            after_dedup=len(records),
-            elapsed_ms=100,
-            status="success",
-        )},
+        source_stats={
+            "pncp": SourceStats(
+                total_fetched=len(records),
+                after_dedup=len(records),
+                elapsed_ms=100,
+                status="success",
+            )
+        },
         dedup_removed=0,
         sources_used=["pncp"],
     )

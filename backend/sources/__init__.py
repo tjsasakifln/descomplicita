@@ -11,10 +11,10 @@ from sources.transparencia_source import TransparenciaSource
 
 __all__ = [
     "DataSourceClient",
-    "NormalizedRecord",
-    "SearchQuery",
     "MultiSourceOrchestrator",
+    "NormalizedRecord",
     "OrchestratorResult",
+    "SearchQuery",
     "SourceStats",
     "TransparenciaSource",
     "get_enabled_source_names",

@@ -17,7 +17,7 @@ Scoring reference (tier mode, vestuario):
 
 import pytest
 
-from filter import match_keywords, EPI_ONLY_KEYWORDS
+from filter import EPI_ONLY_KEYWORDS, match_keywords
 from sectors import SECTORS
 
 # Get vestuario sector configuration
@@ -68,7 +68,6 @@ GOLDEN_RELEVANT = [
     ("Contratacao para confeccao de uniformes da guarda civil municipal", "Tier A: uniformes"),
     ("Fornecimento de roupa profissional para cozinheiros e auxiliares", "Tier A: roupa profissional"),
     ("Aquisicao de conjunto uniforme para agentes comunitarios de saude", "Tier A: conjunto uniforme"),
-
     # --- Tier B: strong clothing terms (score=0.7, passes 0.6 threshold) ---
     ("Aquisicao de gandolas e calcas para policia militar", "Tier A: calcas + Tier B: gandolas"),
     ("Fornecimento de camisas polo para servidores publicos", "Tier B: camisas polo"),
@@ -80,21 +79,31 @@ GOLDEN_RELEVANT = [
     ("Pregao eletronico para jardineiras infantis para creches municipais", "Tier B: jardineiras"),
     ("Fornecimento de gandolas camufladas para guarda municipal", "Tier B: gandolas"),
     ("Aquisicao de epi vestuario para trabalhadores da construcao", "Tier B: epi vestuario"),
-
     # --- Tier C additive: 2+ ambiguous terms reaching threshold ---
-    ("Aquisicao de coletes e aventais para equipe de cozinha escolar", "Tier C additive: coletes(0.3)+aventais(0.3)=0.6"),
-    ("Fornecimento de botas e meias para trabalhadores rurais do municipio", "Tier C additive: botas(0.3)+meias(0.3)=0.6"),
+    (
+        "Aquisicao de coletes e aventais para equipe de cozinha escolar",
+        "Tier C additive: coletes(0.3)+aventais(0.3)=0.6",
+    ),
+    (
+        "Fornecimento de botas e meias para trabalhadores rurais do municipio",
+        "Tier C additive: botas(0.3)+meias(0.3)=0.6",
+    ),
     ("Aquisicao de aventais e coletes para equipe de almoxarifado", "Tier C additive: aventais(0.3)+coletes(0.3)=0.6"),
     ("Fornecimento de coletes, botas e aventais para equipe de cozinha", "Tier C additive: coletes+botas+aventais=0.9"),
     ("Aquisicao de meias e botas para carteiros do servico postal", "Tier C additive: meias(0.3)+botas(0.3)=0.6"),
-
     # --- Mixed tiers ---
     ("Fornecimento de epi jaleco e calca para profissionais de saude", "Tier A: jaleco, calca + Tier C: epi"),
-    ("Aquisicao de uniforme completo: camiseta, calca, meia e bota", "Tier A: uniforme, camiseta, calca + Tier C: meia, bota"),
+    (
+        "Aquisicao de uniforme completo: camiseta, calca, meia e bota",
+        "Tier A: uniforme, camiseta, calca + Tier C: meia, bota",
+    ),
     ("Pregao para camisetas e bones para evento esportivo municipal", "Tier A: camisetas + Tier B: bones"),
     ("Fornecimento de jalecos, aventais e toucas para cozinha hospitalar", "Tier A: jalecos + Tier C: aventais"),
     ("Aquisicao de fardamento completo com gandola e coturno", "Tier A: fardamento + Tier B: gandola"),
-    ("Registro de precos para uniformes, camisas e agasalhos escolares", "Tier A: uniformes + Tier B: camisas, agasalhos"),
+    (
+        "Registro de precos para uniformes, camisas e agasalhos escolares",
+        "Tier A: uniformes + Tier B: camisas, agasalhos",
+    ),
     ("Confeccao de camisetas e bermudas para projeto social", "Tier A: camisetas, bermudas"),
     ("Aquisicao de vestimenta de protecao para bombeiros municipais", "Tier A: vestimenta"),
     ("Fornecimento de roupas e calcados para funcionarios da saude", "Tier A: roupas"),
@@ -126,7 +135,6 @@ GOLDEN_IRRELEVANT = [
     ("Sinalizacao visual para estacionamento publico municipal", "Exclusion: sinalizacao visual"),
     ("Confeccao de embalagens para kits de higiene pessoal", "Exclusion: confeccao de embalagens"),
     ("Malha rodoviaria para acesso a zona industrial", "Exclusion: malha rodoviaria"),
-
     # --- No keyword matches at all (unrelated sectors) ---
     ("Aquisicao de computadores e monitores para laboratorio de informatica", "No match: informatica"),
     ("Fornecimento de medicamentos para ubs do municipio", "No match: medicamentos"),
@@ -148,19 +156,22 @@ GOLDEN_IRRELEVANT = [
     ("Aquisicao de instrumentos musicais para banda municipal", "No match: instrumentos"),
     ("Pregao eletronico para servicos de lavanderia hospitalar", "No match: lavanderia"),
     ("Aquisicao de brinquedos pedagogicos para creches municipais", "No match: brinquedos"),
-
     # --- Single Tier C keyword (score=0.3, below 0.6 threshold) ---
     ("Aquisicao de botas de borracha para uso em lavouras", "Single Tier C: bota (0.3)"),
     ("Fornecimento de meias esportivas para escolinha de futebol", "Single Tier C: meias (0.3)"),
     ("Aquisicao de aventais descartaveis para laboratorio quimico", "Single Tier C: aventais (0.3)"),
     ("Fornecimento de coletes refletivos para equipe de transito", "Single Tier C: coletes (0.3)"),
-    ("Aquisicao de equipamento de protecao individual para eletricistas", "Single Tier C: equipamento de protecao individual (0.3)"),
-
+    (
+        "Aquisicao de equipamento de protecao individual para eletricistas",
+        "Single Tier C: equipamento de protecao individual (0.3)",
+    ),
     # --- EPI-only in tier mode (still just Tier C, score=0.3) ---
     ("Fornecimento de epis para trabalhadores da construcao civil", "Single Tier C: epis (0.3)"),
     ("Aquisicao de epi capacetes luvas e oculos de protecao", "Single Tier C: epi (0.3)"),
-    ("Fornecimento de equipamentos de protecao individual capacetes e luvas", "Single Tier C: equipamentos de protecao individual (0.3)"),
-
+    (
+        "Fornecimento de equipamentos de protecao individual capacetes e luvas",
+        "Single Tier C: equipamentos de protecao individual (0.3)",
+    ),
     # --- Decoracao / fantasia exclusions ---
     ("Aquisicao de fantasias para festa junina da escola municipal", "Exclusion: fantasias"),
     ("Servico de decoracao para eventos oficiais da prefeitura", "Exclusion: decoracao"),
@@ -173,16 +184,11 @@ class TestGoldenSuiteRelevant:
     @pytest.mark.parametrize(
         "objeto,reason",
         GOLDEN_RELEVANT,
-        ids=[f"R{i+1}" for i in range(len(GOLDEN_RELEVANT))],
+        ids=[f"R{i + 1}" for i in range(len(GOLDEN_RELEVANT))],
     )
     def test_relevant_item_approved(self, objeto, reason):
         approved, matched, score = _run_match(objeto)
-        assert approved, (
-            f"Expected APPROVED: {objeto}\n"
-            f"  reason: {reason}\n"
-            f"  score:  {score}\n"
-            f"  matched: {matched}"
-        )
+        assert approved, f"Expected APPROVED: {objeto}\n  reason: {reason}\n  score:  {score}\n  matched: {matched}"
 
 
 class TestGoldenSuiteIrrelevant:
@@ -191,16 +197,11 @@ class TestGoldenSuiteIrrelevant:
     @pytest.mark.parametrize(
         "objeto,reason",
         GOLDEN_IRRELEVANT,
-        ids=[f"I{i+1}" for i in range(len(GOLDEN_IRRELEVANT))],
+        ids=[f"I{i + 1}" for i in range(len(GOLDEN_IRRELEVANT))],
     )
     def test_irrelevant_item_rejected(self, objeto, reason):
         approved, matched, score = _run_match(objeto)
-        assert not approved, (
-            f"Expected REJECTED: {objeto}\n"
-            f"  reason: {reason}\n"
-            f"  score:  {score}\n"
-            f"  matched: {matched}"
-        )
+        assert not approved, f"Expected REJECTED: {objeto}\n  reason: {reason}\n  score:  {score}\n  matched: {matched}"
 
 
 class TestGoldenSuiteMetrics:
@@ -227,18 +228,18 @@ class TestGoldenSuiteMetrics:
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("GOLDEN SUITE METRICS (v3-story-1.2 baseline)")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"True Positives (relevant approved):   {tp}")
         print(f"False Positives (irrelevant approved): {fp}")
         print(f"False Negatives (relevant rejected):   {fn}")
         print(f"True Negatives (irrelevant rejected):  {tn}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Precision: {precision:.4f}")
         print(f"Recall:    {recall:.4f}")
         print(f"F1 Score:  {f1:.4f}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Minimum quality thresholds
         assert precision >= 0.90, f"Precision {precision:.4f} below 0.90 threshold"

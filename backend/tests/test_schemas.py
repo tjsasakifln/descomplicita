@@ -1,8 +1,10 @@
 """Tests for Pydantic schemas (API request/response validation)."""
 
-import pytest
 from datetime import date, timedelta
+
+import pytest
 from pydantic import ValidationError
+
 from schemas import BuscaRequest, BuscaResponse, ResumoLicitacoes
 
 
@@ -17,9 +19,7 @@ class TestBuscaRequest:
 
     def test_valid_request(self):
         d_ini, d_fin = _recent_dates(7)
-        request = BuscaRequest(
-            ufs=["SP", "RJ"], data_inicial=d_ini, data_final=d_fin
-        )
+        request = BuscaRequest(ufs=["SP", "RJ"], data_inicial=d_ini, data_final=d_fin)
         assert request.ufs == ["SP", "RJ"]
 
     def test_single_uf(self):
@@ -115,7 +115,6 @@ class TestBuscaRequest:
 
 
 class TestResumoLicitacoes:
-
     def test_valid_resumo(self):
         resumo = ResumoLicitacoes(
             resumo_executivo="Encontradas 15 licitações.",
@@ -147,17 +146,13 @@ class TestResumoLicitacoes:
 
     def test_negative_total_oportunidades_rejected(self):
         with pytest.raises(ValidationError) as exc_info:
-            ResumoLicitacoes(
-                resumo_executivo="Test", total_oportunidades=-5, valor_total=0.0
-            )
+            ResumoLicitacoes(resumo_executivo="Test", total_oportunidades=-5, valor_total=0.0)
         errors = exc_info.value.errors()
         assert any("greater_than_equal" in str(error) for error in errors)
 
     def test_negative_valor_total_rejected(self):
         with pytest.raises(ValidationError) as exc_info:
-            ResumoLicitacoes(
-                resumo_executivo="Test", total_oportunidades=0, valor_total=-1000.0
-            )
+            ResumoLicitacoes(resumo_executivo="Test", total_oportunidades=0, valor_total=-1000.0)
         errors = exc_info.value.errors()
         assert any("greater_than_equal" in str(error) for error in errors)
 
@@ -209,9 +204,7 @@ class TestBuscaResponse:
             )
 
     def test_negative_totals_rejected(self):
-        resumo = ResumoLicitacoes(
-            resumo_executivo="Test", total_oportunidades=0, valor_total=0.0
-        )
+        resumo = ResumoLicitacoes(resumo_executivo="Test", total_oportunidades=0, valor_total=0.0)
         with pytest.raises(ValidationError):
             BuscaResponse(resumo=resumo, total_raw=-100, total_filtrado=0)
         with pytest.raises(ValidationError):
@@ -223,12 +216,9 @@ class TestBuscaResponse:
 
 
 class TestSchemaJSONSerialization:
-
     def test_busca_request_json(self):
         d_ini, d_fin = _recent_dates(7)
-        request = BuscaRequest(
-            ufs=["SP", "RJ"], data_inicial=d_ini, data_final=d_fin
-        )
+        request = BuscaRequest(ufs=["SP", "RJ"], data_inicial=d_ini, data_final=d_fin)
         json_data = request.model_dump()
         assert json_data["ufs"] == ["SP", "RJ"]
         assert json_data["data_inicial"] == d_ini
@@ -245,12 +235,8 @@ class TestSchemaJSONSerialization:
         assert len(json_data["destaques"]) == 2
 
     def test_busca_response_nested_json(self):
-        resumo = ResumoLicitacoes(
-            resumo_executivo="Test", total_oportunidades=10, valor_total=500000.0
-        )
-        response = BuscaResponse(
-            resumo=resumo, total_raw=100, total_filtrado=10
-        )
+        resumo = ResumoLicitacoes(resumo_executivo="Test", total_oportunidades=10, valor_total=500000.0)
+        response = BuscaResponse(resumo=resumo, total_raw=100, total_filtrado=10)
         json_data = response.model_dump()
         assert "resumo" in json_data
         assert json_data["resumo"]["total_oportunidades"] == 10

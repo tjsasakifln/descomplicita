@@ -1,6 +1,6 @@
 """Tests for SOURCES_CONFIG and DEFAULT_MODALIDADES in config.py."""
 
-from config import SOURCES_CONFIG, DEFAULT_MODALIDADES
+from config import DEFAULT_MODALIDADES, SOURCES_CONFIG
 
 
 class TestSourcesConfig:

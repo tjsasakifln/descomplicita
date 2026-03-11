@@ -2,14 +2,14 @@
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import httpx
 import pytest
 
-from config import RetryConfig, DEFAULT_MODALIDADES
-from exceptions import PNCPAPIError
 from clients.async_pncp_client import AsyncPNCPClient, calculate_delay
+from config import DEFAULT_MODALIDADES, RetryConfig
+from exceptions import PNCPAPIError
 
 DEFAULT_MODALIDADE = 6
 
@@ -157,8 +157,16 @@ class TestAsyncFetchAll:
             200,
             json={
                 "data": [
-                    {"numeroControlePNCP": "001", "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
-                    {"numeroControlePNCP": "002", "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""}, "orgaoEntidade": {"razaoSocial": ""}},
+                    {
+                        "numeroControlePNCP": "001",
+                        "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""},
+                        "orgaoEntidade": {"razaoSocial": ""},
+                    },
+                    {
+                        "numeroControlePNCP": "002",
+                        "unidadeOrgao": {"ufSigla": "SP", "municipioNome": ""},
+                        "orgaoEntidade": {"razaoSocial": ""},
+                    },
                 ],
                 "totalRegistros": 2,
                 "totalPaginas": 1,
@@ -266,6 +274,7 @@ class TestDateRangeChunking:
         assert chunks[0][0] == "2025-08-01"
         assert chunks[-1][1] == "2026-01-28"
         from datetime import date, timedelta
+
         for i in range(len(chunks) - 1):
             end = date.fromisoformat(chunks[i][1])
             next_start = date.fromisoformat(chunks[i + 1][0])

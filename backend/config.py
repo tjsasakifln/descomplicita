@@ -1,11 +1,9 @@
 """Configuration models for PNCP client."""
 
-from dataclasses import dataclass, field
-from typing import Tuple, Type, List
 import logging
 import os
 import sys
-
+from dataclasses import dataclass, field
 
 # PNCP Modality Codes (codigoModalidadeContratacao)
 # Source: https://pncp.gov.br/api/pncp/v1/modalidades
@@ -29,12 +27,12 @@ MODALIDADES_PNCP = {
 
 # Default modalities for Descomplicita search
 # Competitive procurement + high-volume modalities for uniforms, medicines, food
-DEFAULT_MODALIDADES: List[int] = [
-    4,   # Concorrência - Eletrônica
-    5,   # Concorrência - Presencial
-    6,   # Pregão - Eletrônico (most common for uniforms)
-    7,   # Pregão - Presencial
-    8,   # Dispensa
+DEFAULT_MODALIDADES: list[int] = [
+    4,  # Concorrência - Eletrônica
+    5,  # Concorrência - Presencial
+    6,  # Pregão - Eletrônico (most common for uniforms)
+    7,  # Pregão - Presencial
+    8,  # Dispensa
     13,  # Leilão - Presencial (SE-001.3: Ata de Registro de Preços)
     15,  # Chamada pública (SE-001.3: agricultura familiar, medicamentos)
 ]
@@ -42,10 +40,10 @@ DEFAULT_MODALIDADES: List[int] = [
 # Reduced modalities for large UF counts (>10 UFs).
 # Pregão Eletrônico alone covers ~80% of procurement volume.
 # Using fewer modalities prevents cascading timeouts when querying many states.
-PRIORITY_MODALIDADES: List[int] = [
-    6,   # Pregão - Eletrônico (dominant modality)
-    4,   # Concorrência - Eletrônica
-    8,   # Dispensa
+PRIORITY_MODALIDADES: list[int] = [
+    6,  # Pregão - Eletrônico (dominant modality)
+    4,  # Concorrência - Eletrônica
+    8,  # Dispensa
 ]
 
 # Threshold: if UF count exceeds this, use PRIORITY_MODALIDADES
@@ -68,6 +66,9 @@ MAX_DATE_RANGE_DAYS: int = int(os.getenv("MAX_DATE_RANGE_DAYS", "90"))
 # Maximum download size in bytes (TD-036) — default 50MB
 MAX_DOWNLOAD_SIZE: int = int(os.getenv("MAX_DOWNLOAD_SIZE", str(50 * 1024 * 1024)))
 
+# Feature flag: streaming download (TD-C01/XD-PERF-01)
+ENABLE_STREAMING_DOWNLOAD: bool = os.getenv("ENABLE_STREAMING_DOWNLOAD", "true").lower() == "true"
+
 
 @dataclass
 class RetryConfig:
@@ -81,12 +82,10 @@ class RetryConfig:
     timeout: int = 40  # HTTP timeout per individual request (seconds)
 
     # HTTP status codes that should trigger retry
-    retryable_status_codes: Tuple[int, ...] = field(
-        default_factory=lambda: (408, 429, 500, 502, 503, 504)
-    )
+    retryable_status_codes: tuple[int, ...] = field(default_factory=lambda: (408, 429, 500, 502, 503, 504))
 
     # Exception types that should trigger retry
-    retryable_exceptions: Tuple[Type[Exception], ...] = field(
+    retryable_exceptions: tuple[type[Exception], ...] = field(
         default_factory=lambda: (
             ConnectionError,
             TimeoutError,
