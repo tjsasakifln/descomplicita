@@ -9,6 +9,7 @@ During the transition period, all three methods are accepted.
 Supabase auth sets request.state.user_id for multi-tenant isolation.
 """
 
+import hmac
 import logging
 import os
 
@@ -64,8 +65,25 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         jwt_secret = os.getenv("JWT_SECRET")
         supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
 
-        # If no auth method is configured, skip auth (development mode)
+        # If no auth method is configured...
         if not api_key and not jwt_secret and not supabase_jwt_secret:
+            # SYS-007: Fail in production if no auth is configured
+            env = os.getenv("NODE_ENV", os.getenv("ENVIRONMENT", "development"))
+            if env == "production":
+                logger.error(
+                    "FATAL: No authentication configured in production. "
+                    "Set API_KEY, JWT_SECRET, or SUPABASE_JWT_SECRET."
+                )
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": "Server misconfiguration: authentication not configured. "
+                        "Contact system administrator."
+                    },
+                )
+
+            # Dev mode: allow bypass with warning
+            logger.warning("Auth bypass active — development mode only")
             request.state.user_id = None
             request.state.user_sub = "anonymous"
             request.state.auth_method = "none"
@@ -109,7 +127,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         request_key = request.headers.get("X-API-Key")
 
         if api_key and request_key:
-            if request_key == api_key:
+            if hmac.compare_digest(request_key, api_key):
                 request.state.user_id = None
                 request.state.user_sub = "api_key_user"
                 request.state.auth_method = "api_key"

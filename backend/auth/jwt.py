@@ -1,55 +1,34 @@
-"""Stateless JWT authentication for Descomplicita backend (TD-C02/XD-SEC-02).
+"""Stateless JWT authentication for Descomplicita backend (v3-story-3.3).
 
-Provides JWT token generation and validation using HMAC-SHA256.
-Tokens are stateless — no database lookup required for validation.
+Provides JWT token generation and validation using PyJWT with HMAC-SHA256.
+Supports key rotation via JWT_SECRET_PREVIOUS for zero-downtime rotations.
 
 Environment variables:
     JWT_SECRET: Secret key for signing tokens (required in production).
+    JWT_SECRET_PREVIOUS: Previous secret for key rotation (optional).
     JWT_EXPIRATION_HOURS: Token validity period in hours (default: 24).
-    JWT_ALGORITHM: Signing algorithm (default: HS256).
 """
 
-import hashlib
-import hmac
-import json
 import logging
 import os
-import time
-from base64 import urlsafe_b64decode, urlsafe_b64encode
 from typing import Optional
+
+import jwt as pyjwt
 
 logger = logging.getLogger(__name__)
 
 # Configuration from environment
 JWT_SECRET: str = os.getenv("JWT_SECRET", "")
+JWT_SECRET_PREVIOUS: str = os.getenv("JWT_SECRET_PREVIOUS", "")
 JWT_EXPIRATION_HOURS: int = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 JWT_ALGORITHM: str = "HS256"
+JWT_ISSUER: str = "descomplicita-api"
+JWT_AUDIENCE: str = "descomplicita-client"
 
 
 class JWTError(Exception):
     """Raised when JWT validation fails."""
-
     pass
-
-
-def _b64_encode(data: bytes) -> str:
-    """URL-safe base64 encode without padding."""
-    return urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _b64_decode(s: str) -> bytes:
-    """URL-safe base64 decode with padding restoration."""
-    padding = 4 - len(s) % 4
-    if padding != 4:
-        s += "=" * padding
-    return urlsafe_b64decode(s)
-
-
-def _hmac_sign(message: str, secret: str) -> str:
-    """Create HMAC-SHA256 signature."""
-    return _b64_encode(
-        hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
-    )
 
 
 def generate_token(
@@ -75,21 +54,22 @@ def generate_token(
         raise JWTError("JWT_SECRET not configured")
 
     exp_hours = expiration_hours if expiration_hours is not None else JWT_EXPIRATION_HOURS
+
+    import time
     now = int(time.time())
 
-    header = {"alg": JWT_ALGORITHM, "typ": "JWT"}
     payload = {
         "sub": subject,
         "iat": now,
         "exp": now + (exp_hours * 3600),
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
     }
 
-    header_b64 = _b64_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
-    payload_b64 = _b64_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    message = f"{header_b64}.{payload_b64}"
-    signature = _hmac_sign(message, secret)
-
-    return f"{message}.{signature}"
+    try:
+        return pyjwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
+    except Exception as e:
+        raise JWTError(f"Token generation failed: {e}")
 
 
 def validate_token(
@@ -98,12 +78,14 @@ def validate_token(
 ) -> dict:
     """Validate and decode a JWT token.
 
+    Supports key rotation: tries current secret first, then previous secret.
+
     Args:
         token: The JWT token string.
         secret: Signing secret (defaults to JWT_SECRET env var).
 
     Returns:
-        Decoded payload dict with 'sub', 'iat', 'exp' fields.
+        Decoded payload dict with 'sub', 'iat', 'exp', 'iss', 'aud' fields.
 
     Raises:
         JWTError: If token is invalid, expired, or signature doesn't match.
@@ -112,39 +94,30 @@ def validate_token(
     if not secret:
         raise JWTError("JWT_SECRET not configured")
 
-    parts = token.split(".")
-    if len(parts) != 3:
-        raise JWTError("Invalid token format")
+    secrets_to_try = [secret]
+    # Add previous secret for key rotation (only when using default secret)
+    if secret == JWT_SECRET and JWT_SECRET_PREVIOUS:
+        secrets_to_try.append(JWT_SECRET_PREVIOUS)
 
-    header_b64, payload_b64, signature = parts
+    last_error = None
+    for s in secrets_to_try:
+        try:
+            payload = pyjwt.decode(
+                token,
+                s,
+                algorithms=[JWT_ALGORITHM],
+                issuer=JWT_ISSUER,
+                audience=JWT_AUDIENCE,
+            )
+            return payload
+        except pyjwt.ExpiredSignatureError:
+            raise JWTError("Token expired")
+        except pyjwt.InvalidIssuerError:
+            raise JWTError("Invalid token issuer")
+        except pyjwt.InvalidAudienceError:
+            raise JWTError("Invalid token audience")
+        except pyjwt.InvalidTokenError as e:
+            last_error = e
+            continue
 
-    # Verify signature
-    message = f"{header_b64}.{payload_b64}"
-    expected_sig = _hmac_sign(message, secret)
-    if not hmac.compare_digest(signature, expected_sig):
-        raise JWTError("Invalid token signature")
-
-    # Decode header
-    try:
-        header = json.loads(_b64_decode(header_b64))
-    except (json.JSONDecodeError, Exception) as e:
-        raise JWTError(f"Invalid token header: {e}")
-
-    if header.get("alg") != JWT_ALGORITHM:
-        raise JWTError(f"Unsupported algorithm: {header.get('alg')}")
-
-    # Decode payload
-    try:
-        payload = json.loads(_b64_decode(payload_b64))
-    except (json.JSONDecodeError, Exception) as e:
-        raise JWTError(f"Invalid token payload: {e}")
-
-    # Check expiration
-    exp = payload.get("exp")
-    if exp is None:
-        raise JWTError("Token missing expiration")
-
-    if time.time() > exp:
-        raise JWTError("Token expired")
-
-    return payload
+    raise JWTError(f"Invalid token signature")

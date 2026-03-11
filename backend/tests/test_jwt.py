@@ -1,11 +1,12 @@
-"""Tests for JWT authentication module (TD-C02/XD-SEC-02).
+"""Tests for JWT authentication module (v3-story-3.3: PyJWT migration).
 
 Covers:
-- Token generation and structure
-- Token validation and payload content
+- Token generation and structure (with PyJWT)
+- Token validation with audience, issuer claims
 - Expiration enforcement
 - Tampered-signature rejection
 - Missing-secret error handling
+- Key rotation via JWT_SECRET_PREVIOUS
 - Middleware: 401 without token, pass-through with valid token
 - Token endpoint: POST /auth/token exchange flow
 """
@@ -17,14 +18,14 @@ from base64 import urlsafe_b64decode, urlsafe_b64encode
 import pytest
 from fastapi.testclient import TestClient
 
-from auth.jwt import JWTError, generate_token, validate_token
+from auth.jwt import JWTError, generate_token, validate_token, JWT_ISSUER, JWT_AUDIENCE
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-TEST_SECRET = "test-secret-key-for-jwt-tests"
+TEST_SECRET = "test-secret-key-for-jwt-tests-32b"  # ≥32 bytes for PyJWT
 TEST_SUBJECT = "test_client"
 
 
@@ -70,6 +71,12 @@ class TestGenerateToken:
         assert before <= payload["iat"] <= after
         assert payload["exp"] > payload["iat"]
 
+    def test_payload_contains_issuer_and_audience(self):
+        token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
+        _, payload, _ = _split_token(token)
+        assert payload["iss"] == JWT_ISSUER
+        assert payload["aud"] == JWT_AUDIENCE
+
     def test_default_expiration_is_24_hours(self):
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
         _, payload, _ = _split_token(token)
@@ -96,8 +103,8 @@ class TestGenerateToken:
         assert t1 != t2
 
     def test_different_secrets_produce_different_signatures(self):
-        t1 = generate_token(TEST_SUBJECT, secret="secret-one")
-        t2 = generate_token(TEST_SUBJECT, secret="secret-two")
+        t1 = generate_token(TEST_SUBJECT, secret="secret-one-that-is-32-bytes-long")
+        t2 = generate_token(TEST_SUBJECT, secret="secret-two-that-is-32-bytes-long")
         sig1 = t1.split(".")[2]
         sig2 = t2.split(".")[2]
         assert sig1 != sig2
@@ -116,6 +123,8 @@ class TestValidateToken:
         assert "sub" in payload
         assert "iat" in payload
         assert "exp" in payload
+        assert "iss" in payload
+        assert "aud" in payload
 
     def test_sub_matches_subject(self):
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
@@ -147,10 +156,7 @@ class TestValidateToken:
 
 class TestTokenExpiration:
     def test_expired_token_raises_jwt_error(self):
-        # Generate a token that already expired (expiration_hours=0 → exp == iat)
-        # To guarantee it's in the past we use a negative value via direct construction
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET, expiration_hours=0)
-        # Sleep a tiny moment so time.time() > exp
         time.sleep(1.1)
         with pytest.raises(JWTError, match="expired"):
             validate_token(token, secret=TEST_SECRET)
@@ -170,7 +176,6 @@ class TestInvalidToken:
     def test_tampered_signature_raises_jwt_error(self):
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
         parts = token.split(".")
-        # Corrupt the last character of the signature
         bad_sig = parts[2][:-1] + ("A" if parts[2][-1] != "A" else "B")
         tampered = f"{parts[0]}.{parts[1]}.{bad_sig}"
         with pytest.raises(JWTError, match="signature"):
@@ -179,7 +184,6 @@ class TestInvalidToken:
     def test_tampered_payload_raises_jwt_error(self):
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
         parts = token.split(".")
-        # Replace the payload with a different one (same structure, different sub)
         new_payload = urlsafe_b64encode(
             json.dumps({"sub": "hacker", "iat": 0, "exp": 9999999999}).encode()
         ).rstrip(b"=").decode()
@@ -188,12 +192,12 @@ class TestInvalidToken:
             validate_token(tampered, secret=TEST_SECRET)
 
     def test_wrong_secret_raises_jwt_error(self):
-        token = generate_token(TEST_SUBJECT, secret="correct-secret")
+        token = generate_token(TEST_SUBJECT, secret="correct-secret-that-is-32-bytes!")
         with pytest.raises(JWTError, match="signature"):
-            validate_token(token, secret="wrong-secret")
+            validate_token(token, secret="wrong-secret-that-is-also-32byt!")
 
-    def test_invalid_format_missing_parts_raises_jwt_error(self):
-        with pytest.raises(JWTError, match="format"):
+    def test_invalid_format_raises_jwt_error(self):
+        with pytest.raises(JWTError):
             validate_token("not.a.valid.jwt.token", secret=TEST_SECRET)
 
     def test_empty_string_raises_jwt_error(self):
@@ -201,12 +205,36 @@ class TestInvalidToken:
             validate_token("", secret=TEST_SECRET)
 
     def test_only_two_parts_raises_jwt_error(self):
-        with pytest.raises(JWTError, match="format"):
+        with pytest.raises(JWTError):
             validate_token("header.payload", secret=TEST_SECRET)
 
     def test_garbage_token_raises_jwt_error(self):
         with pytest.raises(JWTError):
             validate_token("aaa.bbb.ccc", secret=TEST_SECRET)
+
+    def test_rejects_token_with_wrong_audience(self):
+        """JWT with incorrect audience is rejected."""
+        import jwt as pyjwt
+        payload = {
+            "sub": TEST_SUBJECT, "iat": int(time.time()),
+            "exp": int(time.time()) + 3600,
+            "iss": JWT_ISSUER, "aud": "wrong-audience",
+        }
+        token = pyjwt.encode(payload, TEST_SECRET, algorithm="HS256")
+        with pytest.raises(JWTError, match="audience"):
+            validate_token(token, secret=TEST_SECRET)
+
+    def test_rejects_token_with_wrong_issuer(self):
+        """JWT with incorrect issuer is rejected."""
+        import jwt as pyjwt
+        payload = {
+            "sub": TEST_SUBJECT, "iat": int(time.time()),
+            "exp": int(time.time()) + 3600,
+            "iss": "wrong-issuer", "aud": JWT_AUDIENCE,
+        }
+        token = pyjwt.encode(payload, TEST_SECRET, algorithm="HS256")
+        with pytest.raises(JWTError, match="issuer"):
+            validate_token(token, secret=TEST_SECRET)
 
 
 # ---------------------------------------------------------------------------
@@ -217,13 +245,10 @@ class TestInvalidToken:
 class TestMissingSecret:
     def test_generate_with_no_secret_raises(self, monkeypatch):
         monkeypatch.delenv("JWT_SECRET", raising=False)
-        # Reload module-level constant is already "" in test env via conftest;
-        # pass secret="" explicitly to mirror runtime behaviour.
         with pytest.raises(JWTError, match="JWT_SECRET not configured"):
             generate_token(TEST_SUBJECT, secret="")
 
     def test_validate_with_no_secret_raises(self, monkeypatch):
-        # Build a valid token first, then try validating without a secret
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
         monkeypatch.delenv("JWT_SECRET", raising=False)
         with pytest.raises(JWTError, match="JWT_SECRET not configured"):
@@ -231,14 +256,59 @@ class TestMissingSecret:
 
     def test_generate_uses_env_secret_when_not_passed(self, monkeypatch):
         monkeypatch.setenv("JWT_SECRET", TEST_SECRET)
-        # Re-import to pick up env change; but the module caches at import time,
-        # so we test via the explicit kwarg path and confirm it works.
         token = generate_token(TEST_SUBJECT, secret=TEST_SECRET)
         assert len(token.split(".")) == 3
 
 
 # ---------------------------------------------------------------------------
-# 6. Middleware tests — 401 without token, success with valid token
+# 6. Key rotation — JWT_SECRET_PREVIOUS support
+# ---------------------------------------------------------------------------
+
+
+class TestKeyRotation:
+    def test_token_signed_with_previous_secret_is_valid(self, monkeypatch):
+        """Tokens signed with the previous key are still accepted during rotation."""
+        old_secret = "old-secret-that-is-32-bytes-long"
+        new_secret = "new-secret-that-is-32-bytes-long"
+        # Generate with old secret
+        token = generate_token(TEST_SUBJECT, secret=old_secret)
+        # Set up rotation: new as current, old as previous
+        monkeypatch.setattr("auth.jwt.JWT_SECRET", new_secret)
+        monkeypatch.setattr("auth.jwt.JWT_SECRET_PREVIOUS", old_secret)
+        # Validate without explicit secret (uses module defaults)
+        payload = validate_token(token)
+        assert payload["sub"] == TEST_SUBJECT
+
+    def test_token_signed_with_current_secret_is_valid(self, monkeypatch):
+        """Tokens signed with the current key are accepted."""
+        new_secret = "new-secret-that-is-32-bytes-long"
+        monkeypatch.setattr("auth.jwt.JWT_SECRET", new_secret)
+        monkeypatch.setattr("auth.jwt.JWT_SECRET_PREVIOUS", "old-secret-that-is-32-bytes-long")
+        token = generate_token(TEST_SUBJECT)
+        payload = validate_token(token)
+        assert payload["sub"] == TEST_SUBJECT
+
+    def test_token_signed_with_unknown_secret_is_rejected(self, monkeypatch):
+        """Tokens signed with neither current nor previous key are rejected."""
+        monkeypatch.setattr("auth.jwt.JWT_SECRET", "current-secret-is-32-bytes-long!")
+        monkeypatch.setattr("auth.jwt.JWT_SECRET_PREVIOUS", "previous-secret-32-bytes-long!!")
+        token = generate_token(TEST_SUBJECT, secret="unknown-secret-is-32-bytes-long!")
+        with pytest.raises(JWTError, match="signature"):
+            validate_token(token)
+
+    def test_generate_always_uses_current_secret(self, monkeypatch):
+        """generate_token always signs with the current secret, not previous."""
+        new_secret = "new-secret-that-is-32-bytes-long"
+        monkeypatch.setattr("auth.jwt.JWT_SECRET", new_secret)
+        monkeypatch.setattr("auth.jwt.JWT_SECRET_PREVIOUS", "old-secret-that-is-32-bytes-long")
+        token = generate_token(TEST_SUBJECT)
+        # Should validate with current secret directly
+        payload = validate_token(token, secret=new_secret)
+        assert payload["sub"] == TEST_SUBJECT
+
+
+# ---------------------------------------------------------------------------
+# 7. Middleware tests — 401 without token, success with valid token
 # ---------------------------------------------------------------------------
 
 
@@ -260,8 +330,6 @@ class TestAuthMiddleware:
     def test_public_paths_do_not_require_auth(self, client):
         """Health and other public endpoints bypass middleware."""
         resp = client.get("/health")
-        # Auth is disabled in test env (no JWT_SECRET or API_KEY) but we
-        # verify the endpoint is reachable regardless.
         assert resp.status_code != 401
 
     def test_protected_endpoint_returns_401_without_token(self, authed_client):
@@ -276,7 +344,6 @@ class TestAuthMiddleware:
         from main import app
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/jobs", headers={"Authorization": f"Bearer {token}"})
-        # We expect 200 (or any non-401), not an auth rejection
         assert resp.status_code != 401
 
     def test_protected_endpoint_returns_401_with_invalid_jwt(self, monkeypatch):
@@ -320,17 +387,12 @@ class TestAuthMiddleware:
 
     def test_auth_token_endpoint_is_public(self, authed_client):
         """/auth/token is in PUBLIC_PATHS and must not require prior auth."""
-        # Even with no headers, the endpoint should not return 401 due to middleware;
-        # it may return 401 from its own logic (missing X-API-Key) but not from middleware.
         resp = authed_client.post("/auth/token")
-        # A 401 here means the endpoint itself rejected it (no API key provided),
-        # not the middleware. 503 means JWT not configured from the endpoint's perspective.
-        # Both are acceptable — just not a middleware-level rejection for a public path.
         assert resp.status_code in (401, 503)
 
 
 # ---------------------------------------------------------------------------
-# 7. Token endpoint — POST /auth/token with API key returns JWT
+# 8. Token endpoint — POST /auth/token with API key returns JWT
 # ---------------------------------------------------------------------------
 
 
@@ -371,7 +433,6 @@ class TestAuthTokenEndpoint:
         assert "access_token" in body
         assert body["token_type"] == "bearer"
         assert "expires_in" in body
-        # The returned token must be a valid three-part JWT
         assert len(body["access_token"].split(".")) == 3
 
     def test_returned_token_is_validatable(self, client, monkeypatch):
@@ -390,11 +451,9 @@ class TestAuthTokenEndpoint:
         monkeypatch.setenv("API_KEY", "real-api-key")
         from main import app
         client = TestClient(app, raise_server_exceptions=False)
-        # Exchange API key for JWT
         token_resp = client.post("/auth/token", headers={"X-API-Key": "real-api-key"})
         assert token_resp.status_code == 200
         token = token_resp.json()["access_token"]
-        # Use JWT to access a protected endpoint
         protected_resp = client.get("/jobs", headers={"Authorization": f"Bearer {token}"})
         assert protected_resp.status_code != 401
 

@@ -12,6 +12,7 @@ v3-story-2.0 changes:
 
 import asyncio
 import csv
+import hmac
 import io
 import logging
 import os
@@ -37,6 +38,7 @@ from config import setup_logging, MAX_DATE_RANGE_DAYS, MAX_DOWNLOAD_SIZE
 from error_codes import ErrorCode, error_response
 from middleware.auth import APIKeyMiddleware
 from middleware.correlation_id import CorrelationIdMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
 from schemas import (
     BuscaRequest,
     JobCreatedResponse,
@@ -199,8 +201,11 @@ app.add_middleware(
     allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
+
+# Security headers (CSP + HSTS) — v3-story-3.3
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Authentication middleware (JWT + API key fallback)
 app.add_middleware(APIKeyMiddleware)
@@ -334,7 +339,7 @@ async def auth_token(request: Request):
     if not request_key:
         raise error_response(ErrorCode.AUTH_REQUIRED, status_code=401)
 
-    if api_key and request_key != api_key:
+    if api_key and not hmac.compare_digest(request_key, api_key):
         raise error_response(ErrorCode.AUTH_INVALID_KEY, status_code=401)
 
     # Generate JWT
