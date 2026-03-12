@@ -71,15 +71,10 @@ async def gerar_resumo(
         raise ValueError("OPENAI_API_KEY environment variable not set. Please configure your OpenAI API key.")
 
     # Prepare data for LLM (limit to 50 bids to avoid token overflow)
-    # Pre-filter: exclude bids with past opening dates from LLM context
-    hoje = datetime.now()
+    # Note: bids already passed the main filter (deadline, UF, value, keyword)
+    # so no additional pre-filtering is needed here
     dados_resumidos = []
     for lic in licitacoes[:50]:
-        abertura_str = lic.get("dataAberturaProposta") or ""
-        if abertura_str:
-            abertura_dt = parse_datetime(abertura_str)
-            if abertura_dt and abertura_dt < hoje:
-                continue  # Skip past opening dates — not actionable
         dados_resumidos.append(
             {
                 "objeto": (lic.get("objetoCompra") or "")[:200],  # Truncate to 200 chars
@@ -87,7 +82,7 @@ async def gerar_resumo(
                 "uf": lic.get("uf") or "",
                 "municipio": lic.get("municipio") or "",
                 "valor": lic.get("valorTotalEstimado") or 0,
-                "abertura": abertura_str,
+                "abertura": lic.get("dataAberturaProposta") or "",
             }
         )
 

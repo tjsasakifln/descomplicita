@@ -624,14 +624,14 @@ def test_fallback_no_alert_for_dates_beyond_7_days():
 @pytest.mark.asyncio
 @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"})
 @patch("llm.AsyncOpenAI")
-async def test_gerar_resumo_excludes_past_dates_from_llm_input(mock_openai):
-    """LLM should NOT receive bids with past opening dates in its input data."""
+async def test_gerar_resumo_sends_all_filtered_bids_to_llm(mock_openai):
+    """LLM should receive all bids since they already passed the main filter pipeline."""
     from datetime import timedelta
 
     mock_resumo = ResumoLicitacoes(
         resumo_executivo="Resumo OK",
-        total_oportunidades=1,
-        valor_total=50000.0,
+        total_oportunidades=2,
+        valor_total=150000.0,
         destaques=[],
         alerta_urgencia=None,
     )
@@ -667,5 +667,6 @@ async def test_gerar_resumo_excludes_past_dates_from_llm_input(mock_openai):
     call_args = mock_client.beta.chat.completions.parse.call_args
     user_prompt = call_args.kwargs["messages"][1]["content"]
 
-    assert "Prefeitura Antiga" not in user_prompt, "Past-date bid should be excluded from LLM input"
-    assert "Prefeitura Nova" in user_prompt, "Future-date bid should be included in LLM input"
+    # All bids should be sent to LLM — they already passed main filter
+    assert "Prefeitura Antiga" in user_prompt, "All filtered bids should be sent to LLM"
+    assert "Prefeitura Nova" in user_prompt, "All filtered bids should be sent to LLM"

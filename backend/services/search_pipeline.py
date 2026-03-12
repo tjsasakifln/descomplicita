@@ -275,6 +275,18 @@ async def execute_search_pipeline(
         resumo.total_oportunidades = actual_total
         resumo.valor_total = actual_valor
 
+        # Defensive: if LLM resumo_executivo contradicts actual results, use fallback
+        if actual_total > 0 and "nenhuma" in resumo.resumo_executivo.lower():
+            logger.warning(
+                "[job=%s] LLM resumo_executivo says 'nenhuma' but %s results exist, replacing with fallback",
+                job_id,
+                actual_total,
+            )
+            fallback = gerar_resumo_fallback_fn(licitacoes_filtradas, sector_name=sector.name)
+            resumo.resumo_executivo = fallback.resumo_executivo
+            resumo.destaques = fallback.destaques
+            resumo.alerta_urgencia = fallback.alerta_urgencia
+
         resumo_dict = resumo.model_dump()
 
         # TD-C01/XD-PERF-01: Store Excel bytes separately to avoid memory duplication
