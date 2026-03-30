@@ -28,7 +28,7 @@ supabase==2.28.3
 PyJWT==2.12.1
 
 # NLP / Stemming (v3-story-2.1)
-nltk==3.9.1
+nltk==3.9.4
 
 # Error monitoring
 sentry-sdk[fastapi]==2.56.0
