@@ -31,4 +31,4 @@ PyJWT==2.12.1
 nltk==3.9.4
 
 # Error monitoring
-sentry-sdk[fastapi]==2.56.0
+sentry-sdk[fastapi]==2.57.0
